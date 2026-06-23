@@ -46,9 +46,10 @@ def healthz():
 
 @app.get("/api/auth/google/login")
 def login(request: Request):
-    authorization_url, state = oauth.build_authorization_url()
-    # Store state to protect against CSRF on the callback.
+    authorization_url, state, code_verifier = oauth.build_authorization_url()
+    # Store state (CSRF protection) and the PKCE verifier for the callback.
     request.session["oauth_state"] = state
+    request.session["code_verifier"] = code_verifier
     return RedirectResponse(authorization_url)
 
 
@@ -62,6 +63,7 @@ def callback(request: Request):
     creds = oauth.exchange_code(
         state=stored_state,
         authorization_response_url=str(request.url),
+        code_verifier=request.session.get("code_verifier"),
     )
 
     # In a real app, map this to YOUR authenticated user id.
