@@ -4,6 +4,13 @@ export const num = (v) => nf.format(Math.round(v || 0));
 
 export const pct1 = (v) => `${(v || 0).toFixed(1).replace(".", ",")}%`;
 
+// KpiCard delta props from a % change. `higherIsBetter=false` for bounce/position.
+export function deltaProps(pct, higherIsBetter = true) {
+  if (pct == null) return {};
+  const positive = higherIsBetter ? pct >= 0 : pct <= 0;
+  return { delta: `${Math.abs(pct).toFixed(1).replace(".", ",")}%`, positive };
+}
+
 export function duration(seconds) {
   const s = Math.round(seconds || 0);
   const m = Math.floor(s / 60);

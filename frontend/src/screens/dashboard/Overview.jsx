@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
-import { usePeriod } from "../../lib/PeriodProvider.jsx";
-import { num, shortDate } from "../../lib/format.js";
+import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { num, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend } from "../../components/charts.jsx";
 import { IcArrow } from "../../components/icons.jsx";
 
 export default function Overview() {
   const { props, selected, loading: pLoading, error: pError } = useProperties();
-  const { days, label } = usePeriod();
+  const { start, end, compare, label } = useDateRange();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,11 +18,13 @@ export default function Overview() {
     if (!selected) return;
     setLoading(true);
     setError(null);
-    api("/api/analytics/overview?property_id=" + encodeURIComponent(selected) + "&days=" + days)
+    let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end;
+    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
+    api("/api/analytics/overview" + q)
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
-  }, [selected, days]);
+  }, [selected, start, end, compare?.start, compare?.end]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -45,7 +47,7 @@ export default function Overview() {
       {!loading && !error && data && (
         <>
           <div style={{ display: "flex", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
-            <KpiCard label="Bezoekers" value={num(data.kpis.users)} sparkValues={series} sparkColor="var(--c-accent)" />
+            <KpiCard label="Bezoekers" value={num(data.kpis.users)} sparkValues={series} sparkColor="var(--c-accent)" {...(data.deltas ? deltaProps(data.deltas.users, true) : {})} />
             <KpiCard label="Conversies" value={num(conversiesTotal)} sparkValues={series} sparkColor="var(--c-mint)" />
             <KpiCard label="Advertentiekosten" value="—" />
             <KpiCard label="ROAS" value="—" />
@@ -53,7 +55,7 @@ export default function Overview() {
 
           <div style={{ display: "flex", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
             <SectionCard title="prestaties over tijd" style={{ flex: 2, minWidth: 320 }}>
-              <AreaChart values={series} labels={pickLabels(data.sessions_by_date.map((d) => shortDate(d.date)))} height={232} />
+              <AreaChart values={series} compareValues={data.compare_series} labels={pickLabels(data.sessions_by_date.map((d) => shortDate(d.date)))} height={232} />
             </SectionCard>
             <SectionCard title="verkeersbronnen" style={{ flex: 1, minWidth: 240 }}>
               <Donut segments={data.channels} centerTop={num(data.kpis.sessions)} centerSub="sessies" />

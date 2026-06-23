@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
-import { usePeriod } from "../../lib/PeriodProvider.jsx";
-import { num, pct1, shortDate } from "../../lib/format.js";
+import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart } from "../../components/charts.jsx";
 import { GscGlyph } from "../../components/icons.jsx";
@@ -13,7 +13,7 @@ export default function SearchConsole() {
   const [sitesErr, setSitesErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { days, label } = usePeriod();
+  const { start, end, compare, label } = useDateRange();
 
   useEffect(() => {
     api("/api/search-console/sites")
@@ -30,10 +30,12 @@ export default function SearchConsole() {
     if (!site) return;
     setError(null);
     setData(null);
-    api("/api/search-console/report?site=" + encodeURIComponent(site) + "&days=" + days)
+    let q = "?site=" + encodeURIComponent(site) + "&start=" + start + "&end=" + end;
+    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
+    api("/api/search-console/report" + q)
       .then(setData)
       .catch(setError);
-  }, [site, days]);
+  }, [site, start, end, compare?.start, compare?.end]);
 
   const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); setData(null); };
 
@@ -67,10 +69,10 @@ export default function SearchConsole() {
       {data && (
         <>
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <KpiCard label="Klikken" value={num(t.clicks)} />
-            <KpiCard label="Vertoningen" value={num(t.impressions)} />
-            <KpiCard label="Gem. CTR" value={pct1((t.ctr || 0) * 100)} />
-            <KpiCard label="Gem. positie" value={(t.position || 0).toFixed(1).replace(".", ",")} />
+            <KpiCard label="Klikken" value={num(t.clicks)} {...(data.deltas ? deltaProps(data.deltas.clicks, true) : {})} />
+            <KpiCard label="Vertoningen" value={num(t.impressions)} {...(data.deltas ? deltaProps(data.deltas.impressions, true) : {})} />
+            <KpiCard label="Gem. CTR" value={pct1((t.ctr || 0) * 100)} {...(data.deltas ? deltaProps(data.deltas.ctr, true) : {})} />
+            <KpiCard label="Gem. positie" value={(t.position || 0).toFixed(1).replace(".", ",")} {...(data.deltas ? deltaProps(data.deltas.position, false) : {})} />
           </div>
 
           <SectionCard title="klikken over tijd" style={{ marginBottom: 16 }}>

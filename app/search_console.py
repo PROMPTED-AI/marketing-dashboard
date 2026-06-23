@@ -18,63 +18,56 @@ def list_sites(creds: Credentials) -> list[dict]:
     ]
 
 
-def run_search_analytics(creds: Credentials, site_url: str, days: int = 28) -> dict:
-    """Return clicks/impressions/ctr/position totals, a daily series, and top queries."""
-    from datetime import date, timedelta
-
-    end = date.today()
-    start = end - timedelta(days=days)
+def run_search_analytics(
+    creds: Credentials,
+    site_url: str,
+    start: str,
+    end: str,
+    compare: tuple[str, str] | None = None,
+) -> dict:
+    """Clicks/impressions/ctr/position totals (+ optional comparison deltas),
+    a daily series, and top queries/pages. Dates are ISO (YYYY-MM-DD)."""
     api = _client(creds).searchanalytics()
 
-    def query(dimensions, row_limit=25):
-        body = {
-            "startDate": start.isoformat(),
-            "endDate": end.isoformat(),
-            "dimensions": dimensions,
-            "rowLimit": row_limit,
-        }
+    def query(s, e, dimensions, row_limit=25):
+        body = {"startDate": s, "endDate": e, "dimensions": dimensions, "rowLimit": row_limit}
         return api.query(siteUrl=site_url, body=body).execute().get("rows", [])
 
-    totals_rows = query([], row_limit=1)
-    totals = totals_rows[0] if totals_rows else {}
+    def totals_for(s, e):
+        rows = query(s, e, [], row_limit=1)
+        return rows[0] if rows else {}
+
+    cur = totals_for(start, end)
+    totals = {
+        "clicks": cur.get("clicks", 0),
+        "impressions": cur.get("impressions", 0),
+        "ctr": cur.get("ctr", 0),
+        "position": cur.get("position", 0),
+    }
+
+    deltas = None
+    if compare:
+        prev = totals_for(compare[0], compare[1])
+
+        def delta(key):
+            c, p = cur.get(key, 0), prev.get(key, 0)
+            return ((c - p) / p * 100) if p else None
+
+        deltas = {k: delta(k) for k in ("clicks", "impressions", "ctr", "position")}
 
     by_date = [
-        {
-            "date": r["keys"][0],
-            "clicks": r.get("clicks", 0),
-            "impressions": r.get("impressions", 0),
-        }
-        for r in query(["date"], row_limit=days + 1)
+        {"date": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0)}
+        for r in query(start, end, ["date"], row_limit=500)
     ]
     top_queries = [
-        {
-            "query": r["keys"][0],
-            "clicks": r.get("clicks", 0),
-            "impressions": r.get("impressions", 0),
-            "ctr": r.get("ctr", 0),
-            "position": r.get("position", 0),
-        }
-        for r in query(["query"], row_limit=10)
+        {"query": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
+         "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
+        for r in query(start, end, ["query"], row_limit=10)
     ]
     top_pages = [
-        {
-            "page": r["keys"][0],
-            "clicks": r.get("clicks", 0),
-            "impressions": r.get("impressions", 0),
-            "ctr": r.get("ctr", 0),
-            "position": r.get("position", 0),
-        }
-        for r in query(["page"], row_limit=10)
+        {"page": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
+         "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
+        for r in query(start, end, ["page"], row_limit=10)
     ]
 
-    return {
-        "totals": {
-            "clicks": totals.get("clicks", 0),
-            "impressions": totals.get("impressions", 0),
-            "ctr": totals.get("ctr", 0),
-            "position": totals.get("position", 0),
-        },
-        "by_date": by_date,
-        "top_queries": top_queries,
-        "top_pages": top_pages,
-    }
+    return {"totals": totals, "deltas": deltas, "by_date": by_date, "top_queries": top_queries, "top_pages": top_pages}

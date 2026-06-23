@@ -192,11 +192,20 @@ def report(request: Request, property_id: str, org_id: str | None = None):
 
 
 @app.get("/api/analytics/overview")
-def analytics_overview(request: Request, property_id: str, days: int = 30, org_id: str | None = None):
+def analytics_overview(
+    request: Request,
+    property_id: str,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org)
-    data = analytics.run_ga_overview(creds, property_id, days=max(1, min(days, 365)))
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    data = analytics.run_ga_overview(creds, property_id, start, end, compare)
     return {"org_id": target_org, "property_id": property_id, **data}
 
 
@@ -260,11 +269,20 @@ def gsc_sites(request: Request, org_id: str | None = None):
 
 
 @app.get("/api/search-console/report")
-def gsc_report(request: Request, site: str, days: int = 28, org_id: str | None = None):
+def gsc_report(
+    request: Request,
+    site: str,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org, provider="search_console")
-    data = search_console.run_search_analytics(creds, site, days=max(1, min(days, 365)))
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    data = search_console.run_search_analytics(creds, site, start, end, compare)
     return {"org_id": target_org, "site": site, **data}
 
 
