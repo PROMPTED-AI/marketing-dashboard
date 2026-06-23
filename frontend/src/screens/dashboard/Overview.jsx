@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
+import { usePeriod } from "../../lib/PeriodProvider.jsx";
 import { num, shortDate } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend } from "../../components/charts.jsx";
@@ -8,6 +9,7 @@ import { IcArrow } from "../../components/icons.jsx";
 
 export default function Overview() {
   const { props, selected, loading: pLoading, error: pError } = useProperties();
+  const { days, label } = usePeriod();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,11 +18,11 @@ export default function Overview() {
     if (!selected) return;
     setLoading(true);
     setError(null);
-    api("/api/analytics/overview?property_id=" + encodeURIComponent(selected))
+    api("/api/analytics/overview?property_id=" + encodeURIComponent(selected) + "&days=" + days)
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
-  }, [selected]);
+  }, [selected, days]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -34,7 +36,7 @@ export default function Overview() {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
         <div>
           <div className="display" style={{ fontSize: 30 }}>overzicht</div>
-          <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>prestaties van de laatste 30 dagen · live uit Google Analytics</div>
+          <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>prestaties van de {label} · live uit Google Analytics</div>
         </div>
         <button className="btn-primary" style={{ height: 42, padding: "0 20px", fontSize: 13.5 }}>rapport exporteren <IcArrow s={16} /></button>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
+import { usePeriod } from "../../lib/PeriodProvider.jsx";
 import { num, pct1, shortDate } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart } from "../../components/charts.jsx";
@@ -12,6 +13,7 @@ export default function SearchConsole() {
   const [sitesErr, setSitesErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { days, label } = usePeriod();
 
   useEffect(() => {
     api("/api/search-console/sites")
@@ -27,10 +29,11 @@ export default function SearchConsole() {
   useEffect(() => {
     if (!site) return;
     setError(null);
-    api("/api/search-console/report?site=" + encodeURIComponent(site))
+    setData(null);
+    api("/api/search-console/report?site=" + encodeURIComponent(site) + "&days=" + days)
       .then(setData)
       .catch(setError);
-  }, [site]);
+  }, [site, days]);
 
   const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); setData(null); };
 
@@ -39,7 +42,7 @@ export default function SearchConsole() {
   if (!sites?.length)
     return (
       <div>
-        <Header />
+        <Header label={label} />
         <div className="card" style={{ padding: 28, color: "var(--c-muted)" }}>
           Geen geverifieerde Search Console-sites gevonden voor dit account.
         </div>
@@ -50,6 +53,7 @@ export default function SearchConsole() {
   return (
     <div>
       <Header
+        label={label}
         right={
           sites.length > 1 ? (
             <select value={site} onChange={(e) => chooseSite(e.target.value)} style={selectStyle}>
@@ -91,7 +95,7 @@ export default function SearchConsole() {
   );
 }
 
-function Header({ right }) {
+function Header({ right, label }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -101,7 +105,7 @@ function Header({ right }) {
         {right}
       </div>
       <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>search console — seo</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>laatste 28 dagen · live via je Search Console-koppeling</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>{label} · live via je Search Console-koppeling</div>
     </div>
   );
 }

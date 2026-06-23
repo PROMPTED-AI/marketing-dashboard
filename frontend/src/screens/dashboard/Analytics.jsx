@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
+import { usePeriod } from "../../lib/PeriodProvider.jsx";
 import { num, pct1, duration, shortDate } from "../../lib/format.js";
 import { KpiCard, ProgressRow, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend, RealtimeBars, palette } from "../../components/charts.jsx";
@@ -8,6 +9,7 @@ import { GaGlyph } from "../../components/icons.jsx";
 
 export default function Analytics() {
   const { props, selected, choose, loading: pLoading, error: pError } = useProperties();
+  const { days, label } = usePeriod();
   const [data, setData] = useState(null);
   const [rt, setRt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,13 +19,13 @@ export default function Analytics() {
     if (!selected) return;
     setLoading(true);
     setError(null);
-    const q = "?property_id=" + encodeURIComponent(selected);
+    const q = "?property_id=" + encodeURIComponent(selected) + "&days=" + days;
     api("/api/analytics/overview" + q)
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
-    api("/api/analytics/realtime" + q).then(setRt).catch(() => setRt(null));
-  }, [selected]);
+    api("/api/analytics/realtime?property_id=" + encodeURIComponent(selected)).then(setRt).catch(() => setRt(null));
+  }, [selected, days]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -55,7 +57,7 @@ export default function Analytics() {
       </div>
 
       <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics — gedrag &amp; verkeer</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>automatisch ingeladen via je GA4-koppeling · laatste 30 dagen</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>automatisch ingeladen via je GA4-koppeling · {label}</div>
 
       <TabState loading={loading} error={error} onConnect />
       {!loading && !error && data && (

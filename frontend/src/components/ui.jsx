@@ -1,4 +1,5 @@
 import { Sparkline } from "./charts.jsx";
+import { connectUrl } from "../lib/api.js";
 
 export function KpiCard({ label, value, delta, positive = true, sparkValues, sparkColor }) {
   return (
@@ -51,7 +52,7 @@ export function TabState({ loading, error, empty, onConnect }) {
       <div className="card" style={{ padding: 40, textAlign: "center" }}>
         <div className="pill accent" style={{ marginBottom: 12 }}>geen koppeling</div>
         <div style={{ color: "var(--c-muted)", marginBottom: 16 }}>Er is geen actieve koppeling voor deze organisatie.</div>
-        {onConnect && <a className="btn-primary" href="/api/auth/google/login" style={{ height: 44, padding: "0 20px", textDecoration: "none" }}>Koppel Google</a>}
+        {onConnect && <a className="btn-primary" href={connectUrl(["google_analytics", "search_console"], typeof window !== "undefined" ? window.location.pathname : "/app")} style={{ height: 44, padding: "0 20px", textDecoration: "none" }}>Koppel Google</a>}
       </div>
     );
   if (error) return <div className="card" style={{ padding: 28, color: "var(--c-neg)" }}>Fout: {String(error.message || error)}</div>;

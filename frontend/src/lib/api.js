@@ -18,3 +18,14 @@ export async function api(path, opts = {}) {
 
 export const LOGIN_URL = "/api/auth/google/login";
 export const LOGOUT_URL = "/api/auth/logout";
+
+// Incremental authorization: connect specific tools for the signed-in user.
+export function connectUrl(providers, returnTo = "/app/integrations") {
+  const list = Array.isArray(providers) ? providers : [providers];
+  return (
+    "/api/auth/google/connect?providers=" +
+    encodeURIComponent(list.join(",")) +
+    "&return_to=" +
+    encodeURIComponent(returnTo)
+  );
+}
