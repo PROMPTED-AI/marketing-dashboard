@@ -50,16 +50,73 @@ Then in the browser:
 |------|---------|
 | `app/config.py` | Loads env vars, defines scopes + OAuth client config |
 | `app/oauth.py` | Builds the auth URL, exchanges the code, (de)serializes credentials |
-| `app/token_store.py` | Per-user token storage (demo: JSON files — see notes) |
+| `app/db.py` | Postgres connection pool + schema |
+| `app/crypto.py` | Fernet encryption for tokens at rest |
+| `app/token_store.py` | Per-user token storage (encrypted, in Postgres) |
 | `app/analytics.py` | Sample GA4 Data API report |
 | `app/main.py` | FastAPI routes: login, callback, report |
+| `Dockerfile` | Container image for Cloud Run |
+
+## Deployment (Google Cloud Run + Neon + Netlify)
+
+Recommended architecture for external users:
+
+```
+prompted-ai.nl (Netlify)        ->  static frontend / dashboard UI
+api.<your-domain>  (Cloud Run)  ->  this FastAPI backend (HTTPS, scales to zero)
+Neon (serverless Postgres)      ->  encrypted token storage
+```
+
+### 1. Database — Neon
+
+1. Create a project at <https://neon.tech> and copy the **pooled** connection
+   string (host contains `-pooler`).
+2. Use it as `DATABASE_URL`. The `ga_tokens` table is created automatically on
+   first startup.
+
+### 2. Secrets
+
+```bash
+# Fernet key for encrypting stored tokens
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Store `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`,
+`SESSION_SECRET`, `DATABASE_URL` and `TOKEN_ENCRYPTION_KEY` as Cloud Run
+environment variables (ideally backed by Secret Manager) — never in the repo.
+
+### 3. Deploy to Cloud Run
+
+```bash
+gcloud run deploy ga-oauth-backend \
+  --source . \
+  --region europe-west4 \
+  --allow-unauthenticated \
+  --set-env-vars "GOOGLE_REDIRECT_URI=https://api.<your-domain>/api/auth/google/callback,..."
+```
+
+(`--source .` builds the `Dockerfile` for you. Add the remaining env vars, or
+wire them via Secret Manager with `--set-secrets`.)
+
+### 4. Wire up OAuth + DNS
+
+- Add `https://api.<your-domain>/api/auth/google/callback` as an **Authorized
+  redirect URI** on the OAuth client, and set `GOOGLE_REDIRECT_URI` to match.
+- Map the Cloud Run service to your subdomain (Cloud Run **Custom domains**, or
+  a Netlify proxy/redirect rule from `prompted-ai.nl` to the backend).
+- **Publish** the OAuth consent screen so non-test users can sign in.
+
+> **Note on Netlify:** Netlify hosts the *frontend* only — it runs static sites
+> and short-lived JS/TS functions, not a persistent Python server, so this
+> FastAPI backend runs on Cloud Run instead.
 
 ## Production notes
 
 - **Never** commit `.env` or `client_secret*.json` (already git-ignored).
-- Store refresh tokens **encrypted** in a database / secret manager, keyed by
-  your own user id — `token_store.py` writes plaintext JSON for demo purposes
-  only.
+- Tokens are stored **encrypted** (Fernet) in Postgres, keyed by user id.
+  Rotating `TOKEN_ENCRYPTION_KEY` invalidates stored tokens (users reconnect).
 - Keep the **Client Secret** server-side only.
+- Map the session to **your own authenticated user id** before going live; the
+  skeleton uses a per-session UUID.
 - Let users pick which GA property to query (the Analytics Admin API can list
   the properties they have access to).
