@@ -141,7 +141,7 @@ def logout(request: Request):
 @app.get("/api/admin/organizations")
 def admin_organizations(request: Request):
     auth.require_admin(request)
-    return {"organizations": models.list_organizations_with_status()}
+    return {"organizations": models.list_organizations_with_connections()}
 
 
 @app.get("/api/analytics/properties")

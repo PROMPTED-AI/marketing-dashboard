@@ -6,7 +6,10 @@ import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
 import Overview from "./screens/dashboard/Overview.jsx";
 import Analytics from "./screens/dashboard/Analytics.jsx";
+import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
+import Integrations from "./screens/dashboard/Integrations.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
+import Admin from "./screens/Admin.jsx";
 
 function FullLoader() {
   return (
@@ -42,14 +45,15 @@ export default function App() {
         <Route index element={<DashIndex />} />
         <Route path="overview" element={<Overview />} />
         <Route path="analytics" element={<Analytics />} />
-        <Route path="search-console" element={<Placeholder title="search console" note="organisch verkeer, posities & zoekwoorden" />} />
+        <Route path="search-console" element={<SearchConsole />} />
         <Route path="google-ads" element={<Placeholder title="google ads" comingSoon />} />
         <Route path="meta" element={<Placeholder title="meta / social" comingSoon />} />
         <Route path="reports" element={<Placeholder title="rapporten" />} />
-        <Route path="integrations" element={<Placeholder title="integraties" note="beheer je gekoppelde bronnen" />} />
+        <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Placeholder title="instellingen" />} />
       </Route>
 
+      <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
       <Route path="/" element={<Navigate to={me ? "/app" : "/login"} replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
