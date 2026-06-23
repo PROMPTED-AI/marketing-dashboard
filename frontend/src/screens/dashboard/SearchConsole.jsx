@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useCachedApi } from "../../lib/swr.js";
+import { gscReportUrl, sitesUrl } from "../../lib/urls.js";
 import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart } from "../../components/charts.jsx";
@@ -9,40 +10,22 @@ import ExportButton from "../../components/ExportButton.jsx";
 import { GscGlyph } from "../../components/icons.jsx";
 
 export default function SearchConsole() {
-  const [sites, setSites] = useState(null);
   const [site, setSite] = useState(() => localStorage.getItem("kompas-gsc-site") || "");
-  const [data, setData] = useState(null);
-  const [sitesErr, setSitesErr] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
-  useEffect(() => {
-    setLoading(true);
-    api("/api/search-console/sites" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : ""))
-      .then((d) => {
-        const list = d.sites || [];
-        setSites(list);
-        setSite((cur) => (cur && list.some((s) => s.site_url === cur) ? cur : list[0]?.site_url || ""));
-      })
-      .catch(setSitesErr)
-      .finally(() => setLoading(false));
-  }, [orgId]);
+  const { data: sitesResp, loading, error: sitesErr } = useCachedApi(sitesUrl(orgId));
+  const sites = sitesResp?.sites || null;
 
+  // Auto-select a valid site once the list (re)loads.
   useEffect(() => {
-    if (!site) return;
-    setError(null);
-    setData(null);
-    let q = "?site=" + encodeURIComponent(site) + "&start=" + start + "&end=" + end;
-    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
-    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
-    api("/api/search-console/report" + q)
-      .then(setData)
-      .catch(setError);
-  }, [site, start, end, compare?.start, compare?.end, orgId]);
+    if (!sites) return;
+    setSite((cur) => (cur && sites.some((s) => s.site_url === cur) ? cur : sites[0]?.site_url || ""));
+  }, [sites]);
 
-  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); setData(null); };
+  const { data, error } = useCachedApi(gscReportUrl(site, start, end, compare, orgId));
+
+  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); };
 
   if (loading) return <TabState loading />;
   if (sitesErr) return <TabState error={sitesErr} onConnect />;

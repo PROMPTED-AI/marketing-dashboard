@@ -3,6 +3,8 @@ import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useCachedApi } from "../../lib/swr.js";
+import { overviewUrl } from "../../lib/urls.js";
 import { num, pct1, duration, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, ProgressRow, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend, RealtimeBars, palette } from "../../components/charts.jsx";
@@ -13,25 +15,10 @@ export default function Analytics() {
   const { props, selected, choose, loading: pLoading, error: pError } = useProperties();
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
-  const [data, setData] = useState(null);
+  const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
   const [rt, setRt] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!selected) return;
-    setLoading(true);
-    setError(null);
-    const org = orgId ? "&org_id=" + encodeURIComponent(orgId) : "";
-    let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end + org;
-    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
-    api("/api/analytics/overview" + q)
-      .then(setData)
-      .catch(setError)
-      .finally(() => setLoading(false));
-  }, [selected, start, end, compare?.start, compare?.end, orgId]);
-
-  // realtime: refresh on load and then poll every 30s
+  // realtime: refresh on load and then poll every 30s (never cached)
   useEffect(() => {
     if (!selected) return;
     const org = orgId ? "&org_id=" + encodeURIComponent(orgId) : "";

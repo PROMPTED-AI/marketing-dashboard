@@ -32,7 +32,7 @@ from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, auth, config, db, models, oauth, search_console
+from . import analytics, auth, cache, config, db, models, oauth, search_console
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -42,6 +42,7 @@ SPA_INDEX = SPA_DIR / "index.html"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_schema()
+    cache.init_schema()
     yield
 
 
@@ -158,6 +159,7 @@ def callback(request: Request):
         creds_dict = oauth.credentials_to_dict(creds)
         for provider in providers:
             models.save_connection(org["id"], email, creds_dict, provider=provider)
+        cache.invalidate_org(org["id"])  # new source -> drop stale property/report cache
         return RedirectResponse(return_to)
 
     return RedirectResponse("/")
@@ -209,8 +211,14 @@ def organizations(request: Request):
 def properties(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|props"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     creds = _org_credentials(target_org)
-    return {"org_id": target_org, "properties": analytics.list_properties(creds)}
+    payload = {"org_id": target_org, "properties": analytics.list_properties(creds)}
+    cache.set(key, payload, cache.LIST_TTL)
+    return payload
 
 
 @app.get("/api/analytics/report")
@@ -234,10 +242,16 @@ def analytics_overview(
 ):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|overview|{property_id}|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     creds = _org_credentials(target_org)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = analytics.run_ga_overview(creds, property_id, start, end, compare)
-    return {"org_id": target_org, "property_id": property_id, **data}
+    payload = {"org_id": target_org, "property_id": property_id, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
 
 
 @app.get("/api/analytics/realtime")
@@ -282,6 +296,7 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
 
     conn = models.get_connection(target_org, provider=provider)
     models.delete_connection(target_org, provider)
+    cache.invalidate_org(target_org)  # drop cached property/report data for this org
     # If this was the last Google connection, revoke the shared grant at Google.
     if conn and models.count_google_connections(target_org) == 0:
         try:
@@ -295,8 +310,14 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
 def gsc_sites(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|gscsites"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     creds = _org_credentials(target_org, provider="search_console")
-    return {"org_id": target_org, "sites": search_console.list_sites(creds)}
+    payload = {"org_id": target_org, "sites": search_console.list_sites(creds)}
+    cache.set(key, payload, cache.LIST_TTL)
+    return payload
 
 
 @app.get("/api/search-console/report")
@@ -311,10 +332,16 @@ def gsc_report(
 ):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|gsc|{site}|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     creds = _org_credentials(target_org, provider="search_console")
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = search_console.run_search_analytics(creds, site, start, end, compare)
-    return {"org_id": target_org, "site": site, **data}
+    payload = {"org_id": target_org, "site": site, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
 
 
 # Catch-all: serve the SPA's index.html for any non-API route so the client-side

@@ -1,6 +1,7 @@
 import { useConnections } from "../../lib/useConnections.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { connectUrl, disconnectProvider } from "../../lib/api.js";
+import { invalidateOrg } from "../../lib/swr.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
 
@@ -26,6 +27,7 @@ export default function Integrations() {
 
   const onDisconnect = (provider, name) => {
     if (window.confirm(`${name} ontkoppelen? De toegang wordt ingetrokken.`)) {
+      invalidateOrg(orgId); // drop cached properties/reports for this org
       disconnectProvider(provider, orgId).then(reload).catch(() => reload());
     }
   };

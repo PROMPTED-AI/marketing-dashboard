@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useCachedApi } from "../../lib/swr.js";
+import { overviewUrl } from "../../lib/urls.js";
 import { num, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend } from "../../components/charts.jsx";
@@ -12,22 +12,7 @@ export default function Overview() {
   const { props, selected, loading: pLoading, error: pError } = useProperties();
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!selected) return;
-    setLoading(true);
-    setError(null);
-    let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end;
-    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
-    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
-    api("/api/analytics/overview" + q)
-      .then(setData)
-      .catch(setError)
-      .finally(() => setLoading(false));
-  }, [selected, start, end, compare?.start, compare?.end, orgId]);
+  const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
