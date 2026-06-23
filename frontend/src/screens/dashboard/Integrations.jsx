@@ -1,4 +1,5 @@
 import { useConnections } from "../../lib/useConnections.jsx";
+import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { connectUrl, disconnectProvider } from "../../lib/api.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
@@ -19,12 +20,13 @@ function StatusPill({ status }) {
 
 export default function Integrations() {
   const { data, loading, reload } = useConnections();
+  const { orgId } = useActiveOrg();
   if (loading) return <TabState loading />;
   const items = data?.connections || [];
 
   const onDisconnect = (provider, name) => {
     if (window.confirm(`${name} ontkoppelen? De toegang wordt ingetrokken.`)) {
-      disconnectProvider(provider).then(reload).catch(() => reload());
+      disconnectProvider(provider, orgId).then(reload).catch(() => reload());
     }
   };
 

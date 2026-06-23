@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
+import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
@@ -13,10 +14,12 @@ export default function SearchConsole() {
   const [sitesErr, setSitesErr] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
   useEffect(() => {
-    api("/api/search-console/sites")
+    setLoading(true);
+    api("/api/search-console/sites" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : ""))
       .then((d) => {
         const list = d.sites || [];
         setSites(list);
@@ -24,7 +27,7 @@ export default function SearchConsole() {
       })
       .catch(setSitesErr)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     if (!site) return;
@@ -32,10 +35,11 @@ export default function SearchConsole() {
     setData(null);
     let q = "?site=" + encodeURIComponent(site) + "&start=" + start + "&end=" + end;
     if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
+    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
     api("/api/search-console/report" + q)
       .then(setData)
       .catch(setError);
-  }, [site, start, end, compare?.start, compare?.end]);
+  }, [site, start, end, compare?.start, compare?.end, orgId]);
 
   const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); setData(null); };
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
+import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { num, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
@@ -9,6 +10,7 @@ import { IcArrow } from "../../components/icons.jsx";
 
 export default function Overview() {
   const { props, selected, loading: pLoading, error: pError } = useProperties();
+  const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,11 +22,12 @@ export default function Overview() {
     setError(null);
     let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end;
     if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
+    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
     api("/api/analytics/overview" + q)
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
-  }, [selected, start, end, compare?.start, compare?.end]);
+  }, [selected, start, end, compare?.start, compare?.end, orgId]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;

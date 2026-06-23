@@ -174,6 +174,17 @@ def admin_organizations(request: Request):
     return {"organizations": models.list_organizations_with_connections()}
 
 
+@app.get("/api/organizations")
+def organizations(request: Request):
+    """Organizations the user may view/switch to (admins: all; clients: own)."""
+    user = auth.current_user(request)
+    if user["role"] == "agency_admin":
+        orgs = models.list_organizations_with_connections()
+        return {"organizations": [{"id": o["id"], "name": o["name"], "domain": o["domain"]} for o in orgs]}
+    org = models.get_organization(user["organization_id"])
+    return {"organizations": [{"id": org["id"], "name": org["name"], "domain": org["domain"]}] if org else []}
+
+
 @app.get("/api/analytics/properties")
 def properties(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
