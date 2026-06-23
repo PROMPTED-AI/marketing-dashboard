@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 
 // Loads per-provider connection status for the current org.
@@ -6,16 +6,17 @@ export function useConnections() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let alive = true;
-    api("/api/connections")
-      .then((d) => alive && setData(d))
-      .catch(() => alive && setData(null))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
+  const reload = useCallback(() => {
+    setLoading(true);
+    return api("/api/connections")
+      .then((d) => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  return { data, loading };
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { data, loading, reload };
 }

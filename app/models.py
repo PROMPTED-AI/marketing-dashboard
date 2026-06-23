@@ -2,7 +2,7 @@
 import json
 import uuid
 
-from . import crypto, db
+from . import config, crypto, db
 
 # ---------------------------------------------------------------- organizations
 
@@ -125,6 +125,25 @@ def set_connection_status(
             "WHERE organization_id = %s AND provider = %s",
             (status, organization_id, provider),
         )
+
+
+def delete_connection(organization_id: str, provider: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute(
+            "DELETE FROM connections WHERE organization_id = %s AND provider = %s",
+            (organization_id, provider),
+        )
+
+
+def count_google_connections(organization_id: str) -> int:
+    """How many Google-provider connections remain for an org."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT count(*) FROM connections "
+            "WHERE organization_id = %s AND provider = ANY(%s)",
+            (organization_id, list(config.GOOGLE_PROVIDERS)),
+        ).fetchone()
+    return row[0] if row else 0
 
 
 def list_organizations_with_status() -> list[dict]:

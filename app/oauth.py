@@ -7,6 +7,26 @@ from google_auth_oauthlib.flow import Flow
 from . import config
 
 
+def revoke(creds: Credentials) -> None:
+    """Best-effort: revoke the Google grant (refresh token) for this account.
+
+    Revoking the refresh token invalidates the whole grant for our client, so
+    only call this when removing the last Google connection of an org.
+    """
+    token = creds.refresh_token or creds.token
+    if not token:
+        return
+    try:
+        requests.post(
+            "https://oauth2.googleapis.com/revoke",
+            params={"token": token},
+            headers={"content-type": "application/x-www-form-urlencoded"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        pass
+
+
 def fetch_user_email(creds: Credentials) -> str:
     """Return the email of the account that just authorized (their identity)."""
     resp = requests.get(
