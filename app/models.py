@@ -7,21 +7,55 @@ from . import config, crypto, db
 # ---------------------------------------------------------------- organizations
 
 
-def get_or_create_org_by_domain(domain: str, name: str | None = None) -> dict:
-    """Find the organization for an email domain, creating it on first sight."""
+def get_company_org_by_domain(domain: str) -> dict | None:
+    """Look up a real (non-personal) client org by its email domain. No create."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, domain FROM organizations "
+            "WHERE domain = %s AND is_personal = false",
+            (domain,),
+        ).fetchone()
+    return {"id": row[0], "name": row[1], "domain": row[2]} if row else None
+
+
+def get_or_create_personal_org(email: str) -> dict:
+    """An isolated org for one user (shared/public domain or unknown domain).
+
+    Keyed by the full email address (stored in the unique ``domain`` column),
+    so two users never share it. Flagged personal so it stays out of the admin
+    client list and the org switcher.
+    """
     with db.get_conn() as conn:
         row = conn.execute(
             "SELECT id, name, domain FROM organizations WHERE domain = %s",
-            (domain,),
+            (email,),
         ).fetchone()
         if row:
             return {"id": row[0], "name": row[1], "domain": row[2]}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain) VALUES (%s, %s, %s)",
-            (org_id, name or domain, domain),
+            "INSERT INTO organizations (id, name, domain, is_personal) "
+            "VALUES (%s, %s, %s, true)",
+            (org_id, email, email),
         )
-        return {"id": org_id, "name": name or domain, "domain": domain}
+        return {"id": org_id, "name": email, "domain": email}
+
+
+def org_for_login(email: str) -> dict:
+    """Resolve the org a signing-in user belongs to (invite-only model).
+
+    A user only joins a shared org when an agency admin has pre-provisioned it
+    for their (non-public) company domain. Everyone else — public/shared email
+    providers, or company domains not yet added — gets an isolated personal org.
+    This prevents unrelated users (e.g. any gmail.com account) from landing in
+    the same org and seeing each other's data.
+    """
+    domain = email.split("@")[-1].lower()
+    if not config.is_public_email_domain(domain):
+        org = get_company_org_by_domain(domain)
+        if org:
+            return org
+    return get_or_create_personal_org(email)
 
 
 def create_or_rename_organization(name: str, domain: str) -> dict:
@@ -171,6 +205,7 @@ def list_organizations_with_status() -> list[dict]:
             FROM organizations o
             LEFT JOIN connections c
               ON c.organization_id = o.id AND c.provider = 'google_analytics'
+            WHERE o.is_personal = false
             ORDER BY o.name
             """
         ).fetchall()
@@ -191,7 +226,8 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain FROM organizations ORDER BY name"
+            "SELECT id, name, domain FROM organizations "
+            "WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
             "SELECT organization_id, provider, status, google_email, updated_at FROM connections"

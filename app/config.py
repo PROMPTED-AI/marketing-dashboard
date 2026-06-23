@@ -43,6 +43,26 @@ AGENCY_ADMIN_EMAILS = {
     if e.strip()
 }
 
+# Public / shared email providers. Users with one of these domains must NOT be
+# grouped into a shared organization by domain (that would let unrelated people
+# — e.g. any gmail.com user — see each other's data). They each get an isolated
+# personal org instead. Extend via the PUBLIC_EMAIL_DOMAINS env var (comma-sep).
+_DEFAULT_PUBLIC_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
+    "msn.com", "yahoo.com", "yahoo.co.uk", "ymail.com", "icloud.com", "me.com",
+    "mac.com", "aol.com", "protonmail.com", "proton.me", "gmx.com", "gmx.net",
+    "mail.com", "zoho.com", "yandex.com", "hey.com", "fastmail.com", "pm.me",
+}
+PUBLIC_EMAIL_DOMAINS = _DEFAULT_PUBLIC_EMAIL_DOMAINS | {
+    d.strip().lower()
+    for d in os.environ.get("PUBLIC_EMAIL_DOMAINS", "").split(",")
+    if d.strip()
+}
+
+
+def is_public_email_domain(domain: str) -> bool:
+    return domain.strip().lower() in PUBLIC_EMAIL_DOMAINS
+
 # The client config the way google-auth-oauthlib expects it. This avoids
 # shipping a client_secret.json file in the repo.
 CLIENT_CONFIG = {

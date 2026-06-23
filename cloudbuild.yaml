@@ -1,0 +1,44 @@
+# Cloud Build pipeline: bouwt de container en rolt 'm uit naar Cloud Run.
+# Gekoppeld aan GitHub via een Cloud Build-trigger op branch `main`, zodat elke
+# merge automatisch een nieuwe revisie live zet — geen handmatige gcloud nodig.
+#
+# Env-variabelen (SESSION_SECRET, DATABASE_URL, TOKEN_ENCRYPTION_KEY,
+# GOOGLE_CLIENT_*) staan op de Cloud Run-service zelf en blijven behouden over
+# revisies heen; deze deploy raakt ze niet aan.
+
+steps:
+  # 1. Bouw het image (multi-stage Dockerfile: bouwt de frontend + backend).
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - .
+
+  # 2. Push het image naar Artifact Registry.
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+
+  # 3. Rol uit naar Cloud Run (bestaande env-vars blijven staan).
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+
+substitutions:
+  _REGION: europe-west4
+  _SERVICE: ga-oauth-backend
+  _REPO: cloud-run-source-deploy
+
+options:
+  logging: CLOUD_LOGGING_ONLY
