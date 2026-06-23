@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
@@ -33,7 +33,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import analytics, auth, config, db, models, oauth
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+# The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
+SPA_DIR = Path(__file__).resolve().parent / "static_spa"
+SPA_INDEX = SPA_DIR / "index.html"
 
 
 @asynccontextmanager
@@ -44,7 +46,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Marketing Dashboard - GA4 (multi-tenant)", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Serve the built SPA's static assets (present in production / after a build).
+if (SPA_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=SPA_DIR / "assets"), name="assets")
+if (SPA_DIR / "fonts").is_dir():
+    app.mount("/fonts", StaticFiles(directory=SPA_DIR / "fonts"), name="fonts")
 
 
 def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
@@ -67,11 +74,6 @@ def _org_credentials(org_id: str) -> Credentials:
     # Persist any refreshed access token.
     models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds))
     return creds
-
-
-@app.get("/")
-def index():
-    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/healthz")
@@ -154,3 +156,17 @@ def report(request: Request, property_id: str, org_id: str | None = None):
     creds = _org_credentials(target_org)
     rows = analytics.run_basic_report(creds, property_id)
     return {"org_id": target_org, "property_id": property_id, "rows": rows}
+
+
+# Catch-all: serve the SPA's index.html for any non-API route so the client-side
+# router can handle deep links. Declared last so it never shadows /api or mounts.
+@app.get("/{full_path:path}")
+def spa(full_path: str):
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    if SPA_INDEX.exists():
+        return FileResponse(SPA_INDEX)
+    return JSONResponse(
+        {"detail": "Frontend not built. Run `npm run build` in frontend/."},
+        status_code=503,
+    )
