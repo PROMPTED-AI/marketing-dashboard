@@ -151,3 +151,41 @@ def list_organizations_with_status() -> list[dict]:
         }
         for r in rows
     ]
+
+
+def list_organizations_with_connections() -> list[dict]:
+    """Admin client table: every org with its per-provider status + last sync."""
+    with db.get_conn() as conn:
+        orgs = conn.execute(
+            "SELECT id, name, domain FROM organizations ORDER BY name"
+        ).fetchall()
+        conns = conn.execute(
+            "SELECT organization_id, provider, status, google_email, updated_at FROM connections"
+        ).fetchall()
+
+    by_org: dict[str, dict] = {}
+    for org_id, provider, status, email, updated in conns:
+        by_org.setdefault(org_id, {})[provider] = {
+            "status": status,
+            "google_email": email,
+            "updated_at": updated.isoformat() if updated else None,
+        }
+
+    out = []
+    for org_id, name, domain in orgs:
+        providers = by_org.get(org_id, {})
+        last_sync = max(
+            (p["updated_at"] for p in providers.values() if p["updated_at"]),
+            default=None,
+        )
+        out.append(
+            {
+                "id": org_id,
+                "name": name,
+                "domain": domain,
+                "providers": providers,
+                "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
+                "last_sync": last_sync,
+            }
+        )
+    return out

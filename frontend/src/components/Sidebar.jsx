@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import {
-  IcStar, IcGrid, IcBars, IcSearch, IcAds, IcShare, IcDoc, IcPlug, IcCog, IcChevUpDown, IcChevDown,
+  IcStar, IcGrid, IcBars, IcSearch, IcAds, IcShare, IcDoc, IcPlug, IcCog, IcUsers, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
 
 const NAV = [
@@ -46,6 +46,12 @@ export default function Sidebar({ org, user, connected = 0, total = 4 }) {
             {label}
           </NavLink>
         ))}
+        {user?.role === "agency_admin" && (
+          <NavLink to="/admin" style={() => navItem(false)}>
+            <IcUsers s={18} />
+            Klantenbeheer
+          </NavLink>
+        )}
       </div>
 
       <div style={{ flex: 1 }} />
