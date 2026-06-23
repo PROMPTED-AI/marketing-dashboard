@@ -1,22 +1,35 @@
-"""Per-user token storage.
+"""Per-user token storage, encrypted at rest in Postgres.
 
-DEMO ONLY: this writes plaintext JSON to ./tokens (git-ignored).
-For production, store tokens ENCRYPTED in a database or a secret manager,
-keyed by your own user id, and never expose the refresh_token to clients.
+Credentials are serialized to JSON, encrypted with the app's Fernet key, and
+stored as a single BYTEA per user. The refresh_token never touches the client
+and is never logged.
 """
 import json
-from pathlib import Path
 
-_DIR = Path(__file__).resolve().parent.parent / "tokens"
-_DIR.mkdir(exist_ok=True)
+from . import crypto, db
 
 
 def save(user_id: str, creds: dict) -> None:
-    (_DIR / f"{user_id}.json").write_text(json.dumps(creds))
+    blob = crypto.encrypt(json.dumps(creds))
+    with db.get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO ga_tokens (user_id, encrypted_creds, updated_at)
+            VALUES (%s, %s, now())
+            ON CONFLICT (user_id)
+            DO UPDATE SET encrypted_creds = EXCLUDED.encrypted_creds,
+                          updated_at = now()
+            """,
+            (user_id, blob),
+        )
 
 
 def load(user_id: str) -> dict | None:
-    path = _DIR / f"{user_id}.json"
-    if not path.exists():
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT encrypted_creds FROM ga_tokens WHERE user_id = %s",
+            (user_id,),
+        ).fetchone()
+    if not row:
         return None
-    return json.loads(path.read_text())
+    return json.loads(crypto.decrypt(row[0]))

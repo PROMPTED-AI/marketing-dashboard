@@ -11,14 +11,23 @@ This is a minimal, single-user-per-session skeleton meant as a starting
 point. See token_store.py for the production notes on token storage.
 """
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, config, oauth, token_store
+from . import analytics, config, db, oauth, token_store
 
-app = FastAPI(title="Marketing Dashboard - GA4 OAuth")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure the tokens table exists before serving requests.
+    db.init_schema()
+    yield
+
+
+app = FastAPI(title="Marketing Dashboard - GA4 OAuth", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET)
 
 
@@ -28,6 +37,11 @@ def index():
         "status": "ok",
         "next_step": "Open /api/auth/google/login to connect a Google Analytics account.",
     }
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
 
 @app.get("/api/auth/google/login")

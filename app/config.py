@@ -13,6 +13,12 @@ CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
 REDIRECT_URI = os.environ["GOOGLE_REDIRECT_URI"]
 SESSION_SECRET = os.environ["SESSION_SECRET"]
 
+# Postgres connection string (use Neon's pooled URL in production).
+DATABASE_URL = os.environ["DATABASE_URL"]
+
+# Fernet key used to encrypt stored OAuth tokens at rest.
+TOKEN_ENCRYPTION_KEY = os.environ["TOKEN_ENCRYPTION_KEY"]
+
 # The client config the way google-auth-oauthlib expects it. This avoids
 # shipping a client_secret.json file in the repo.
 CLIENT_CONFIG = {
