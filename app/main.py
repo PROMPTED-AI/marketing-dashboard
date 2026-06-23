@@ -31,7 +31,7 @@ from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, auth, config, db, models, oauth
+from . import analytics, auth, config, db, models, oauth, search_console
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -61,18 +61,18 @@ def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
     return user["organization_id"]
 
 
-def _org_credentials(org_id: str) -> Credentials:
-    """Load + refresh an org's GA credentials, flipping status to revoked on failure."""
-    conn = models.get_connection(org_id)
+def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credentials:
+    """Load + refresh an org's credentials, flipping status to revoked on failure."""
+    conn = models.get_connection(org_id, provider=provider)
     if not conn or conn["status"] != "connected":
         raise HTTPException(status_code=409, detail="No active connection for this organization")
     try:
         creds = oauth.credentials_from_dict(conn["creds"])
     except RefreshError:
-        models.set_connection_status(org_id, "revoked")
+        models.set_connection_status(org_id, "revoked", provider=provider)
         raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
     # Persist any refreshed access token.
-    models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds))
+    models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
     return creds
 
 
@@ -123,8 +123,11 @@ def callback(request: Request):
     user = models.upsert_user(email, org["id"], role)
 
     request.session["user_id"] = user["id"]
-    # Store the GA connection under the user's organization.
-    models.save_connection(org["id"], email, oauth.credentials_to_dict(creds))
+    # One Google consent grants both Analytics + Search Console scopes; record a
+    # connection for each Google provider under the user's organization.
+    creds_dict = oauth.credentials_to_dict(creds)
+    for provider in config.GOOGLE_PROVIDERS:
+        models.save_connection(org["id"], email, creds_dict, provider=provider)
 
     return RedirectResponse("/")
 
@@ -156,6 +159,43 @@ def report(request: Request, property_id: str, org_id: str | None = None):
     creds = _org_credentials(target_org)
     rows = analytics.run_basic_report(creds, property_id)
     return {"org_id": target_org, "property_id": property_id, "rows": rows}
+
+
+@app.get("/api/connections")
+def connections(request: Request, org_id: str | None = None):
+    """Per-provider connection status for the onboarding + sidebar progress."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    items = []
+    for provider in config.GOOGLE_PROVIDERS:
+        conn = models.get_connection(target_org, provider=provider)
+        items.append(
+            {
+                "provider": provider,
+                "status": conn["status"] if conn else "not_connected",
+                "google_email": conn["google_email"] if conn else None,
+            }
+        )
+    for provider in config.PLACEHOLDER_PROVIDERS:
+        items.append({"provider": provider, "status": "coming_soon", "google_email": None})
+    connected = sum(1 for i in items if i["status"] == "connected")
+    return {"org_id": target_org, "connected": connected, "total": len(items), "connections": items}
+
+
+@app.get("/api/search-console/sites")
+def gsc_sites(request: Request, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    creds = _org_credentials(target_org, provider="search_console")
+    return {"org_id": target_org, "sites": search_console.list_sites(creds)}
+
+
+@app.get("/api/search-console/report")
+def gsc_report(request: Request, site: str, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    creds = _org_credentials(target_org, provider="search_console")
+    return {"org_id": target_org, "site": site, **search_console.run_search_analytics(creds, site)}
 
 
 # Catch-all: serve the SPA's index.html for any non-API route so the client-side

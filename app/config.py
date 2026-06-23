@@ -9,11 +9,17 @@ load_dotenv()
 # request; relax oauthlib so that does not raise a "scope has changed" error.
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
-# Scopes: identify the signed-in user (email) + read their GA4 data.
+# Scopes: identify the signed-in user (email) + read GA4 + Search Console data.
 SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/analytics.readonly",
+    "https://www.googleapis.com/auth/webmasters.readonly",
 ]
+
+# Providers the dashboard knows about. Google ones are granted together in a
+# single consent; ads/meta are placeholders ("binnenkort") this iteration.
+GOOGLE_PROVIDERS = ["google_analytics", "search_console"]
+PLACEHOLDER_PROVIDERS = ["google_ads", "meta_ads"]
 
 CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]

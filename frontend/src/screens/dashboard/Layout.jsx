@@ -1,27 +1,25 @@
-import { LOGOUT_URL } from "../../lib/api.js";
+import { Outlet } from "react-router-dom";
+import Sidebar from "../../components/Sidebar.jsx";
+import Topbar from "../../components/Topbar.jsx";
 import { useMe } from "../../lib/useMe.jsx";
-import { useTheme } from "../../lib/ThemeProvider.jsx";
+import { useConnections } from "../../lib/useConnections.jsx";
 
-// Phase 1 placeholder shell — replaced by the full sidebar/topbar dashboard in Phase 2.
+// Dashboard shell: fixed sidebar + (topbar over a scrolling content area).
 export default function Layout() {
   const { me } = useMe();
-  const { theme, toggle } = useTheme();
+  const { data } = useConnections();
   return (
-    <div style={{ minHeight: "100vh", padding: 40 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
-        <div className="display" style={{ fontSize: 26 }}>kompas</div>
-        <div style={{ flex: 1 }} />
-        <button className="btn-ghost" style={{ height: 38, padding: "0 14px" }} onClick={toggle}>
-          {theme === "dark" ? "light" : "dark"} thema
-        </button>
-        <a className="btn-ghost" href={LOGOUT_URL} style={{ height: 38, padding: "0 14px", textDecoration: "none" }}>uitloggen</a>
-      </div>
-      <div className="card" style={{ padding: 28, maxWidth: 560 }}>
-        <div className="display" style={{ fontSize: 24, marginBottom: 8 }}>ingelogd ✓</div>
-        <div style={{ color: "var(--c-muted)", fontSize: 14, lineHeight: 1.6 }}>
-          Welkom, <b style={{ color: "var(--c-ink)" }}>{me?.email}</b> — rol:{" "}
-          <b style={{ color: "var(--c-ink)" }}>{me?.role}</b>.<br />
-          Het volledige dashboard (sidebar, onboarding, Analytics-tab) volgt in de volgende fase.
+    <div style={{ height: "100vh", display: "flex", background: "var(--c-page)", color: "var(--c-ink)" }}>
+      <Sidebar
+        org={me?.organization}
+        user={me}
+        connected={data?.connected ?? 0}
+        total={data?.total ?? 4}
+      />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <Topbar />
+        <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
+          <Outlet />
         </div>
       </div>
     </div>
