@@ -17,7 +17,7 @@ export default function Layout() {
       />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Topbar />
-        <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
+        <div className="dash-content" style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
           <Outlet />
         </div>
       </div>

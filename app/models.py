@@ -24,6 +24,21 @@ def get_or_create_org_by_domain(domain: str, name: str | None = None) -> dict:
         return {"id": org_id, "name": name or domain, "domain": domain}
 
 
+def create_or_rename_organization(name: str, domain: str) -> dict:
+    """Admin adds a client org by domain. If the domain exists, rename it."""
+    with db.get_conn() as conn:
+        row = conn.execute("SELECT id FROM organizations WHERE domain = %s", (domain,)).fetchone()
+        if row:
+            conn.execute("UPDATE organizations SET name = %s WHERE id = %s", (name, row[0]))
+            return {"id": row[0], "name": name, "domain": domain}
+        org_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO organizations (id, name, domain) VALUES (%s, %s, %s)",
+            (org_id, name, domain),
+        )
+        return {"id": org_id, "name": name, "domain": domain}
+
+
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(

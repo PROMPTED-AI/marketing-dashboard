@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { api, LOGOUT_URL } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 import Topbar from "../components/Topbar.jsx";
-import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChevDown } from "../components/icons.jsx";
+import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChevDown, IcPlus } from "../components/icons.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -37,10 +37,11 @@ export default function Admin() {
   const nav = useNavigate();
   const [orgs, setOrgs] = useState(null);
   const [error, setError] = useState(null);
+  const [adding, setAdding] = useState(false);
 
-  useEffect(() => {
-    api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
-  }, []);
+  const reload = () => api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
+
+  useEffect(() => { reload(); }, []);
 
   if (meLoading) return null;
   if (!me) return <Navigate to="/login" replace />;
@@ -80,8 +81,15 @@ export default function Admin() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
         <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
-          <div className="display" style={{ fontSize: 30 }}>klanten</div>
-          <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>alle organisaties op het platform — koppelingen, status &amp; activiteit</div>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div className="display" style={{ fontSize: 30 }}>klanten</div>
+              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>alle organisaties op het platform — koppelingen, status &amp; activiteit</div>
+            </div>
+            <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setAdding(true)}>
+              <IcPlus s={16} /> klant toevoegen
+            </button>
+          </div>
 
           {error && <div className="card" style={{ padding: 20, color: "var(--c-neg)" }}>Fout: {String(error.message || error)}</div>}
 
@@ -119,6 +127,65 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {adding && <AddClientModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); }} />}
+    </div>
+  );
+}
+
+function AddClientModal({ onClose, onDone }) {
+  const [name, setName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [org, setOrg] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      const d = await api("/api/admin/organizations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, domain }) });
+      setOrg(d.organization);
+    } catch (e2) {
+      setErr(e2);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card" style={{ width: 460, maxWidth: "calc(100vw - 32px)", padding: 26 }}>
+        {org ? (
+          <div>
+            <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>klant aangemaakt</div>
+            <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
+              <strong style={{ color: "var(--c-ink)" }}>{org.name}</strong> ({org.domain}) staat klaar. Nodig de klant uit door iemand met een
+              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard — ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn-primary" style={{ height: 42, padding: "0 20px" }} onClick={onDone}>klaar</button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>klant toevoegen</div>
+            <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>maak een organisatie aan en nodig de klant uit via hun e-maildomein.</div>
+            <label style={lbl}>Naam organisatie</label>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
+            <label style={lbl}>E-maildomein</label>
+            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="voorbeeld.nl" style={inp} />
+            <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Iedereen die met dit domein inlogt, hoort bij deze klant.</div>
+            {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 12 }}>{String(err.message || err)}</div>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button type="button" onClick={onClose} style={btnGhost}>annuleren</button>
+              <button type="submit" disabled={busy || !name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
+                {busy ? "bezig…" : "aanmaken"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -139,3 +206,7 @@ const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
 const headRow = { display: "grid", gridTemplateColumns: "2.2fr 1.4fr 1.1fr 1fr", gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
 const dataRow = { display: "grid", gridTemplateColumns: "2.2fr 1.4fr 1.1fr 1fr", gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
+const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", margin: "12px 0 6px" };
+const inp = { width: "100%", height: 44, padding: "0 14px", fontSize: 14, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", boxSizing: "border-box" };
+const btnGhost = { height: 42, padding: "0 18px", fontSize: 13.5, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 };

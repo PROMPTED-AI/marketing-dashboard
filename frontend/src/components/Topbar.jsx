@@ -6,7 +6,7 @@ import { IcSearch, IcSun, IcMoon, IcBell } from "./icons.jsx";
 export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true }) {
   const { theme, toggle } = useTheme();
   return (
-    <div style={bar}>
+    <div style={bar} className="no-print">
       {left || (
         <div style={searchPill}>
           <IcSearch s={16} />

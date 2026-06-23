@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
+from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import analytics, auth, config, db, models, oauth, search_console
@@ -172,6 +173,25 @@ def logout(request: Request):
 def admin_organizations(request: Request):
     auth.require_admin(request)
     return {"organizations": models.list_organizations_with_connections()}
+
+
+class OrgIn(BaseModel):
+    name: str
+    domain: str
+
+
+@app.post("/api/admin/organizations")
+def admin_add_organization(request: Request, payload: OrgIn):
+    auth.require_admin(request)
+    name = payload.name.strip()
+    domain = (
+        payload.domain.strip().lower()
+        .removeprefix("https://").removeprefix("http://").strip("/").split("/")[0]
+    )
+    if not name or "." not in domain:
+        raise HTTPException(status_code=400, detail="Naam en een geldig domein zijn vereist")
+    org = models.create_or_rename_organization(name, domain)
+    return {"organization": org}
 
 
 @app.get("/api/organizations")

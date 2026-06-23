@@ -29,7 +29,7 @@ export default function Sidebar({ user, connected = 0, total = 4 }) {
   const [switchOpen, setSwitchOpen] = useState(false);
   const canSwitch = orgs.length > 1;
   return (
-    <div style={wrap}>
+    <div style={wrap} className="no-print">
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
         <div style={logoBox}><IcStar /></div>
         <div className="display" style={{ fontSize: 20 }}>kompas</div>

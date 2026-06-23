@@ -6,6 +6,7 @@ import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { num, pct1, duration, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, ProgressRow, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend, RealtimeBars, palette } from "../../components/charts.jsx";
+import ExportButton from "../../components/ExportButton.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
 
 export default function Analytics() {
@@ -28,8 +29,20 @@ export default function Analytics() {
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
-    api("/api/analytics/realtime?property_id=" + encodeURIComponent(selected) + org).then(setRt).catch(() => setRt(null));
   }, [selected, start, end, compare?.start, compare?.end, orgId]);
+
+  // realtime: refresh on load and then poll every 30s
+  useEffect(() => {
+    if (!selected) return;
+    const org = orgId ? "&org_id=" + encodeURIComponent(orgId) : "";
+    const tick = () =>
+      api("/api/analytics/realtime?property_id=" + encodeURIComponent(selected) + org)
+        .then(setRt)
+        .catch(() => setRt(null));
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [selected, orgId]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -37,6 +50,27 @@ export default function Analytics() {
     return <TabState empty />;
 
   const prop = props.find((p) => p.property_id === selected);
+
+  const sections = () => {
+    if (!data) return [];
+    const out = [
+      { title: "Analytics — " + label },
+      { columns: ["Metric", "Waarde"], rows: [
+        ["Gebruikers", data.kpis.users],
+        ["Sessies", data.kpis.sessions],
+        ["Bouncepercentage %", (data.kpis.bounceRate * 100).toFixed(1)],
+        ["Gem. sessieduur (s)", Math.round(data.kpis.avgSessionDuration)],
+      ] },
+      { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: data.channels.map((c) => [c.label, c.sessions, c.pct]) },
+      { title: "Toppagina's", columns: ["Pagina", "Weergaven", "Bounce %"], rows: data.top_pages.map((p) => [p.path, p.views, (p.bounceRate * 100).toFixed(1)]) },
+      { title: "Apparaten", columns: ["Apparaat", "%"], rows: data.devices.map((d) => [d.label, d.pct]) },
+      { title: "Geografie", columns: ["Land", "%"], rows: data.geography.map((g) => [g.label, g.pct]) },
+      { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: data.sessions_by_date.map((d) => [d.date, d.sessions]) },
+    ];
+    if (data.conversions?.length)
+      out.push({ title: "Conversies", columns: ["Doel", "Aantal"], rows: data.conversions.map((c) => [c.name, c.count]) });
+    return out;
+  };
 
   return (
     <div>
@@ -58,6 +92,7 @@ export default function Analytics() {
         <div className="pill pos" style={{ padding: "7px 13px", fontSize: 12.5 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> live verbonden
         </div>
+        <ExportButton filename="analytics" sections={sections} />
       </div>
 
       <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics — gedrag &amp; verkeer</div>

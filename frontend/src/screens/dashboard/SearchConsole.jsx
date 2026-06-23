@@ -5,6 +5,7 @@ import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart } from "../../components/charts.jsx";
+import ExportButton from "../../components/ExportButton.jsx";
 import { GscGlyph } from "../../components/icons.jsx";
 
 export default function SearchConsole() {
@@ -56,16 +57,36 @@ export default function SearchConsole() {
     );
 
   const t = data?.totals;
+
+  const sections = () => {
+    if (!data) return [];
+    return [
+      { title: "Search Console — " + label + " · " + site },
+      { columns: ["Metric", "Waarde"], rows: [
+        ["Klikken", t.clicks],
+        ["Vertoningen", t.impressions],
+        ["Gem. CTR %", ((t.ctr || 0) * 100).toFixed(2)],
+        ["Gem. positie", (t.position || 0).toFixed(1)],
+      ] },
+      { title: "Top zoekopdrachten", columns: ["Zoekopdracht", "Klikken", "Vertoningen", "CTR %", "Positie"], rows: data.top_queries.map((r) => [r.query, r.clicks, r.impressions, ((r.ctr || 0) * 100).toFixed(2), (r.position || 0).toFixed(1)]) },
+      { title: "Top pagina's", columns: ["Pagina", "Klikken", "Vertoningen", "CTR %", "Positie"], rows: data.top_pages.map((r) => [r.page, r.clicks, r.impressions, ((r.ctr || 0) * 100).toFixed(2), (r.position || 0).toFixed(1)]) },
+      { title: "Klikken per dag", columns: ["Datum", "Klikken", "Vertoningen"], rows: data.by_date.map((d) => [d.date, d.clicks, d.impressions]) },
+    ];
+  };
+
   return (
     <div>
       <Header
         label={label}
         right={
-          sites.length > 1 ? (
-            <select value={site} onChange={(e) => chooseSite(e.target.value)} style={selectStyle}>
-              {sites.map((s) => <option key={s.site_url} value={s.site_url}>{s.site_url}</option>)}
-            </select>
-          ) : <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{site}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {sites.length > 1 ? (
+              <select value={site} onChange={(e) => chooseSite(e.target.value)} style={selectStyle}>
+                {sites.map((s) => <option key={s.site_url} value={s.site_url}>{s.site_url}</option>)}
+              </select>
+            ) : <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{site}</span>}
+            {data && <ExportButton filename="search-console" sections={sections} />}
+          </div>
         }
       />
       <TabState error={error} onConnect />
