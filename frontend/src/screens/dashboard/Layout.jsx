@@ -11,7 +11,6 @@ export default function Layout() {
   return (
     <div style={{ height: "100vh", display: "flex", background: "var(--c-page)", color: "var(--c-ink)" }}>
       <Sidebar
-        org={me?.organization}
         user={me}
         connected={data?.connected ?? 0}
         total={data?.total ?? 4}
