@@ -5,8 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Scope needed to read GA4 report data on behalf of the logged-in user.
-SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
+# Google may return extra granted scopes (e.g. openid) on top of the ones we
+# request; relax oauthlib so that does not raise a "scope has changed" error.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
+# Scopes: identify the signed-in user (email) + read their GA4 data.
+SCOPES = [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/analytics.readonly",
+]
 
 CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
@@ -18,6 +25,13 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 # Fernet key used to encrypt stored OAuth tokens at rest.
 TOKEN_ENCRYPTION_KEY = os.environ["TOKEN_ENCRYPTION_KEY"]
+
+# Comma-separated emails that get the "agency_admin" role (see all orgs).
+AGENCY_ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("AGENCY_ADMIN_EMAILS", "").split(",")
+    if e.strip()
+}
 
 # The client config the way google-auth-oauthlib expects it. This avoids
 # shipping a client_secret.json file in the repo.

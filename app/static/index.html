@@ -5,60 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Marketing Dashboard — Google Analytics</title>
   <style>
-    :root { --brand: #1a73e8; --bg: #f6f8fc; --card: #fff; --text: #202124; --muted: #5f6368; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-           background: var(--bg); color: var(--text); }
-    .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px; }
-    h1 { font-size: 24px; margin: 0 0 4px; }
-    p.sub { color: var(--muted); margin: 0 0 28px; }
-    .card { background: var(--card); border: 1px solid #e0e3e7; border-radius: 12px;
-            padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-    button, .btn { background: var(--brand); color: #fff; border: 0; border-radius: 8px;
-                   padding: 10px 18px; font-size: 15px; cursor: pointer; text-decoration: none;
-                   display: inline-block; }
-    button:hover, .btn:hover { background: #1666d0; }
-    select { padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #d0d4d9;
-             min-width: 320px; max-width: 100%; }
-    label { display: block; font-weight: 600; margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eceff1; }
-    th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
-    .muted { color: var(--muted); }
-    .hidden { display: none; }
-    .badge { display: inline-block; background: #e6f4ea; color: #137333; border-radius: 999px;
-             padding: 4px 12px; font-size: 13px; font-weight: 600; }
-    .spinner { color: var(--muted); }
-    .error { color: #c5221f; }
+    :root { --brand:#1a73e8; --bg:#f6f8fc; --card:#fff; --text:#202124; --muted:#5f6368; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+           background:var(--bg); color:var(--text); }
+    .wrap { max-width:880px; margin:0 auto; padding:32px 20px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+    h1 { font-size:22px; margin:0; }
+    .who { font-size:14px; color:var(--muted); text-align:right; }
+    .role { display:inline-block; background:#e8f0fe; color:#1a56c4; border-radius:999px;
+            padding:2px 10px; font-size:12px; font-weight:600; margin-left:6px; }
+    .card { background:var(--card); border:1px solid #e0e3e7; border-radius:12px;
+            padding:22px; margin-bottom:18px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    button,.btn { background:var(--brand); color:#fff; border:0; border-radius:8px;
+                  padding:10px 18px; font-size:15px; cursor:pointer; text-decoration:none;
+                  display:inline-block; }
+    button:hover,.btn:hover { background:#1666d0; }
+    .btn.ghost { background:#fff; color:var(--brand); border:1px solid #d0d4d9; }
+    select { padding:10px; font-size:15px; border-radius:8px; border:1px solid #d0d4d9;
+             min-width:320px; max-width:100%; }
+    label { display:block; font-weight:600; margin-bottom:8px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th,td { text-align:left; padding:10px 12px; border-bottom:1px solid #eceff1; font-size:14px; }
+    th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+    .muted { color:var(--muted); }
+    .hidden { display:none; }
+    .pill { display:inline-block; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:600; }
+    .pill.ok { background:#e6f4ea; color:#137333; }
+    .pill.bad { background:#fce8e6; color:#c5221f; }
+    .pill.none { background:#f1f3f4; color:#5f6368; }
+    .error { color:#c5221f; }
+    h2 { font-size:16px; margin:0 0 12px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Marketing Dashboard</h1>
-    <p class="sub">Bekijk je Google Analytics 4-gegevens — actieve gebruikers per land (laatste 7 dagen).</p>
+    <div class="topbar">
+      <h1>Marketing Dashboard</h1>
+      <div id="who" class="who hidden"></div>
+    </div>
 
-    <!-- Not connected -->
+    <!-- Signed out -->
+    <div id="signin-card" class="card hidden">
+      <h2>Welkom</h2>
+      <p class="muted">Log in met Google om je Google Analytics-data te bekijken.</p>
+      <a class="btn" href="/api/auth/google/login">Inloggen met Google</a>
+    </div>
+
+    <!-- Agency admin overview -->
+    <div id="admin-card" class="card hidden">
+      <h2>Organisaties (bureau-overzicht)</h2>
+      <div id="admin-body" class="muted">Laden…</div>
+    </div>
+
+    <!-- Connection prompt (when an org has no working connection) -->
     <div id="connect-card" class="card hidden">
-      <label>Nog niet gekoppeld</label>
-      <p class="muted">Koppel een Google-account om je Analytics-data te bekijken.</p>
+      <h2 id="connect-title">Koppeling</h2>
+      <p id="connect-text" class="muted"></p>
       <a class="btn" href="/api/auth/google/login">Koppel Google Analytics</a>
     </div>
 
-    <!-- Connected -->
+    <!-- Property picker -->
     <div id="picker-card" class="card hidden">
-      <span class="badge">Verbonden ✓</span>
-      <div style="margin-top:16px;">
-        <label for="property">Kies een property</label>
-        <select id="property"></select>
-      </div>
+      <label for="property" id="picker-label">Kies een property</label>
+      <select id="property"></select>
     </div>
 
+    <!-- Report -->
     <div id="report-card" class="card hidden">
       <div id="report-title" class="muted"></div>
       <div id="report-body"></div>
     </div>
 
-    <div id="status" class="spinner">Laden…</div>
+    <div id="status" class="muted">Laden…</div>
   </div>
 
   <script>
@@ -66,63 +85,121 @@
     const show = (el) => el.classList.remove("hidden");
     const hide = (el) => el.classList.add("hidden");
 
+    let me = null;          // current user
+    let viewingOrgId = null; // org currently being viewed (admin can switch)
+
     async function init() {
-      try {
-        const res = await fetch("/api/analytics/properties");
-        if (res.status === 401) { hide($("status")); show($("connect-card")); return; }
-        if (!res.ok) throw new Error("Kon properties niet laden (" + res.status + ")");
-        const data = await res.json();
-        hide($("status"));
-        renderProperties(data.properties || []);
-      } catch (e) {
-        $("status").className = "error";
-        $("status").textContent = "Fout: " + e.message;
+      const res = await fetch("/api/me");
+      if (res.status === 401) { hide($("status")); show($("signin-card")); return; }
+      if (!res.ok) { fail("Kon gebruiker niet laden (" + res.status + ")"); return; }
+      me = await res.json();
+      hide($("status"));
+      renderWho();
+      if (me.role === "agency_admin") {
+        await loadAdmin();
       }
+      // Load the user's own organization data by default.
+      viewingOrgId = me.organization ? me.organization.id : null;
+      await loadProperties(null, me.organization ? me.organization.name : "");
     }
 
-    function renderProperties(props) {
+    function renderWho() {
+      show($("who"));
+      const roleLabel = me.role === "agency_admin" ? "Bureau-admin" : "Klant";
+      $("who").innerHTML =
+        `${me.email} <span class="role">${roleLabel}</span><br>` +
+        `<a href="/api/auth/logout" class="muted" style="font-size:13px;">Uitloggen</a>`;
+    }
+
+    async function loadAdmin() {
+      show($("admin-card"));
+      const res = await fetch("/api/admin/organizations");
+      if (!res.ok) { $("admin-body").innerHTML = '<span class="error">Kon overzicht niet laden.</span>'; return; }
+      const data = await res.json();
+      const rows = (data.organizations || []).map((o) => {
+        const pill = o.status === "connected" ? '<span class="pill ok">verbonden</span>'
+                   : o.status === "revoked" ? '<span class="pill bad">ingetrokken</span>'
+                   : '<span class="pill none">niet gekoppeld</span>';
+        const action = o.status === "connected"
+          ? `<button class="btn ghost" data-org="${o.id}" data-name="${o.name}">Bekijk data</button>`
+          : '<span class="muted">—</span>';
+        return `<tr><td>${o.name}</td><td>${o.google_email || "—"}</td><td>${pill}</td><td>${action}</td></tr>`;
+      }).join("");
+      $("admin-body").innerHTML =
+        `<table><thead><tr><th>Organisatie</th><th>Gekoppeld account</th><th>Status</th><th></th></tr></thead>` +
+        `<tbody>${rows || '<tr><td colspan="4" class="muted">Nog geen organisaties.</td></tr>'}</tbody></table>`;
+      $("admin-body").querySelectorAll("button[data-org]").forEach((b) => {
+        b.addEventListener("click", () => {
+          viewingOrgId = b.dataset.org;
+          loadProperties(b.dataset.org, b.dataset.name);
+        });
+      });
+    }
+
+    async function loadProperties(orgId, orgName) {
+      hide($("connect-card")); hide($("report-card"));
+      const qs = orgId ? ("?org_id=" + encodeURIComponent(orgId)) : "";
+      const res = await fetch("/api/analytics/properties" + qs);
+      if (res.status === 409) {
+        // No working connection for this org.
+        show($("connect-card"));
+        if (me.role === "agency_admin" && orgId && orgId !== me.organization.id) {
+          $("connect-title").textContent = "Geen koppeling";
+          $("connect-text").textContent = orgName + " heeft (nog) geen werkende koppeling. De klant moet zelf inloggen en koppelen.";
+          $("connect-card").querySelector("a").classList.add("hidden");
+        } else {
+          $("connect-title").textContent = "Koppel Google Analytics";
+          $("connect-text").textContent = "Er is nog geen werkende koppeling. Klik hieronder om te (her)koppelen.";
+          $("connect-card").querySelector("a").classList.remove("hidden");
+        }
+        hide($("picker-card"));
+        return;
+      }
+      if (!res.ok) { fail("Kon properties niet laden (" + res.status + ")"); return; }
+      const data = await res.json();
+      renderProperties(data.properties || [], data.org_id, orgName);
+    }
+
+    function renderProperties(props, orgId, orgName) {
       show($("picker-card"));
+      $("picker-label").textContent = orgName ? ("Property kiezen — " + orgName) : "Kies een property";
       const sel = $("property");
       if (props.length === 0) {
         sel.innerHTML = '<option value="">Geen properties gevonden voor dit account</option>';
         return;
       }
-      sel.innerHTML = '<option value="">— kies —</option>' + props.map(p =>
+      sel.innerHTML = '<option value="">— kies —</option>' + props.map((p) =>
         `<option value="${p.property_id}">${p.display_name} (${p.account}) · ${p.property_id}</option>`
       ).join("");
-      sel.addEventListener("change", () => {
-        if (sel.value) loadReport(sel.value, sel.options[sel.selectedIndex].text);
-      });
+      sel.onchange = () => {
+        if (sel.value) loadReport(sel.value, sel.options[sel.selectedIndex].text, orgId);
+      };
     }
 
-    async function loadReport(propertyId, label) {
+    async function loadReport(propertyId, label, orgId) {
       show($("report-card"));
       $("report-title").textContent = "Rapport voor: " + label;
-      $("report-body").innerHTML = '<p class="spinner">Data ophalen…</p>';
-      try {
-        const res = await fetch("/api/analytics/report?property_id=" + encodeURIComponent(propertyId));
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error("API gaf " + res.status + ". " + txt.slice(0, 200));
-        }
-        const data = await res.json();
-        renderReport(data.rows || []);
-      } catch (e) {
-        $("report-body").innerHTML = '<p class="error">Fout: ' + e.message + '</p>';
+      $("report-body").innerHTML = '<p class="muted">Data ophalen…</p>';
+      const qs = "?property_id=" + encodeURIComponent(propertyId) +
+                 (orgId ? "&org_id=" + encodeURIComponent(orgId) : "");
+      const res = await fetch("/api/analytics/report" + qs);
+      if (!res.ok) {
+        const txt = await res.text();
+        $("report-body").innerHTML = '<p class="error">API gaf ' + res.status + '. ' + txt.slice(0, 200) + '</p>';
+        return;
       }
+      const data = await res.json();
+      renderReport(data.rows || []);
     }
 
     function renderReport(rows) {
-      if (rows.length === 0) {
-        $("report-body").innerHTML = '<p class="muted">Geen data in deze periode.</p>';
-        return;
-      }
-      const body = rows.map(r =>
-        `<tr><td>${r.country}</td><td>${r.activeUsers}</td></tr>`
-      ).join("");
+      if (rows.length === 0) { $("report-body").innerHTML = '<p class="muted">Geen data in deze periode.</p>'; return; }
+      const body = rows.map((r) => `<tr><td>${r.country}</td><td>${r.activeUsers}</td></tr>`).join("");
       $("report-body").innerHTML =
         `<table><thead><tr><th>Land</th><th>Actieve gebruikers</th></tr></thead><tbody>${body}</tbody></table>`;
     }
+
+    function fail(msg) { $("status").className = "error"; show($("status")); $("status").textContent = "Fout: " + msg; }
 
     init();
   </script>
