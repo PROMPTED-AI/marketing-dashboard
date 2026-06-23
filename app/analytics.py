@@ -67,16 +67,27 @@ def run_basic_report(creds: Credentials, property_id: str) -> list[dict]:
     ]
 
 
-def run_ga_overview(creds: Credentials, property_id: str, days: int = 30) -> dict:
-    """Rich GA4 overview for the Analytics tab (last `days` days)."""
+def run_ga_overview(
+    creds: Credentials,
+    property_id: str,
+    start: str,
+    end: str,
+    compare: tuple[str, str] | None = None,
+) -> dict:
+    """Rich GA4 overview for a date range, with optional comparison deltas.
+
+    `start`/`end` and `compare` are ISO dates (YYYY-MM-DD). When `compare` is
+    given, KPI deltas (% change vs the comparison period) are included.
+    """
     client = BetaAnalyticsDataClient(credentials=creds)
     prop = f"properties/{property_id}"
-    rng = [DateRange(start_date=f"{days}daysAgo", end_date="today")]
+    cur = DateRange(start_date=start, end_date=end, name="current")
+    cur_only = [cur]
 
-    def report(dims, metrics, order_bys=None, limit=None):
+    def report(dims, metrics, date_ranges, order_bys=None, limit=None):
         req = RunReportRequest(
             property=prop,
-            date_ranges=rng,
+            date_ranges=date_ranges,
             dimensions=[Dimension(name=d) for d in dims],
             metrics=[Metric(name=m) for m in metrics],
             order_bys=order_bys or [],
@@ -84,27 +95,56 @@ def run_ga_overview(creds: Credentials, property_id: str, days: int = 30) -> dic
         )
         return client.run_report(req)
 
-    # KPIs (single totals row)
-    k = report([], ["totalUsers", "sessions", "bounceRate", "averageSessionDuration"])
-    kv = k.rows[0].metric_values if k.rows else None
-    kpis = {
-        "users": _int(kv[0].value) if kv else 0,
-        "sessions": _int(kv[1].value) if kv else 0,
-        "bounceRate": float(kv[2].value) if kv else 0.0,
-        "avgSessionDuration": float(kv[3].value) if kv else 0.0,
-    }
+    # --- KPIs (current + optional comparison) ---
+    kpi_metrics = ["totalUsers", "sessions", "bounceRate", "averageSessionDuration"]
+    ranges = [cur]
+    if compare:
+        ranges.append(DateRange(start_date=compare[0], end_date=compare[1], name="previous"))
+    k = report([], kpi_metrics, ranges)
+    cur_vals, prev_vals = {}, {}
+    for row in k.rows:
+        which = row.dimension_values[0].value if row.dimension_values else "current"
+        target = prev_vals if which == "previous" else cur_vals
+        for i, m in enumerate(kpi_metrics):
+            target[m] = float(row.metric_values[i].value)
 
-    sd = report(
-        ["date"], ["sessions"],
-        order_bys=[OrderBy(dimension=OrderBy.DimensionOrderBy(dimension_name="date"))],
-    )
+    kpis = {
+        "users": int(cur_vals.get("totalUsers", 0)),
+        "sessions": int(cur_vals.get("sessions", 0)),
+        "bounceRate": cur_vals.get("bounceRate", 0.0),
+        "avgSessionDuration": cur_vals.get("averageSessionDuration", 0.0),
+    }
+    deltas = None
+    if compare:
+        def delta(metric):
+            c, p = cur_vals.get(metric, 0.0), prev_vals.get(metric, 0.0)
+            return ((c - p) / p * 100) if p else None
+        deltas = {
+            "users": delta("totalUsers"),
+            "sessions": delta("sessions"),
+            "bounceRate": delta("bounceRate"),
+            "avgSessionDuration": delta("averageSessionDuration"),
+        }
+
+    # --- sessions over time (+ comparison series for the dashed line) ---
+    date_order = [OrderBy(dimension=OrderBy.DimensionOrderBy(dimension_name="date"))]
+    sd = report(["date"], ["sessions"], cur_only, order_bys=date_order)
     sessions_by_date = [
         {"date": r.dimension_values[0].value, "sessions": _int(r.metric_values[0].value)}
         for r in sd.rows
     ]
+    compare_series = None
+    if compare:
+        sdp = report(
+            ["date"], ["sessions"],
+            [DateRange(start_date=compare[0], end_date=compare[1])],
+            order_bys=date_order,
+        )
+        compare_series = [_int(r.metric_values[0].value) for r in sdp.rows]
 
+    # --- breakdowns (current range only) ---
     def breakdown(dim, limit):
-        rep = report([dim], ["sessions"], order_bys=[_metric_desc("sessions")], limit=limit)
+        rep = report([dim], ["sessions"], cur_only, order_bys=[_metric_desc("sessions")], limit=limit)
         rows = [(r.dimension_values[0].value, _int(r.metric_values[0].value)) for r in rep.rows]
         total = sum(v for _, v in rows) or 1
         return [{"label": label, "sessions": v, "pct": _pct(v, total)} for label, v in rows]
@@ -115,7 +155,7 @@ def run_ga_overview(creds: Credentials, property_id: str, days: int = 30) -> dic
 
     tp = report(
         ["pagePath"], ["screenPageViews", "bounceRate"],
-        order_bys=[_metric_desc("screenPageViews")], limit=6,
+        cur_only, order_bys=[_metric_desc("screenPageViews")], limit=6,
     )
     top_pages = [
         {
@@ -126,7 +166,7 @@ def run_ga_overview(creds: Credentials, property_id: str, days: int = 30) -> dic
         for r in tp.rows
     ]
 
-    cv = report(["eventName"], ["conversions"], order_bys=[_metric_desc("conversions")], limit=6)
+    cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=6)
     conversions = [
         {"name": r.dimension_values[0].value, "count": _int(r.metric_values[0].value)}
         for r in cv.rows
@@ -135,7 +175,9 @@ def run_ga_overview(creds: Credentials, property_id: str, days: int = 30) -> dic
 
     return {
         "kpis": kpis,
+        "deltas": deltas,
         "sessions_by_date": sessions_by_date,
+        "compare_series": compare_series,
         "channels": channels,
         "devices": devices,
         "geography": geography,

@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
-import { usePeriod } from "../../lib/PeriodProvider.jsx";
-import { num, pct1, duration, shortDate } from "../../lib/format.js";
+import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { num, pct1, duration, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, ProgressRow, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend, RealtimeBars, palette } from "../../components/charts.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
 
 export default function Analytics() {
   const { props, selected, choose, loading: pLoading, error: pError } = useProperties();
-  const { days, label } = usePeriod();
+  const { start, end, compare, label } = useDateRange();
   const [data, setData] = useState(null);
   const [rt, setRt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,13 +19,14 @@ export default function Analytics() {
     if (!selected) return;
     setLoading(true);
     setError(null);
-    const q = "?property_id=" + encodeURIComponent(selected) + "&days=" + days;
+    let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end;
+    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
     api("/api/analytics/overview" + q)
       .then(setData)
       .catch(setError)
       .finally(() => setLoading(false));
     api("/api/analytics/realtime?property_id=" + encodeURIComponent(selected)).then(setRt).catch(() => setRt(null));
-  }, [selected, days]);
+  }, [selected, start, end, compare?.start, compare?.end]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -64,10 +65,10 @@ export default function Analytics() {
         <>
           {/* KPI ROW */}
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <KpiCard label="Gebruikers" value={num(data.kpis.users)} />
-            <KpiCard label="Sessies" value={num(data.kpis.sessions)} />
-            <KpiCard label="Bouncepercentage" value={pct1(data.kpis.bounceRate * 100)} />
-            <KpiCard label="Gem. sessieduur" value={duration(data.kpis.avgSessionDuration)} />
+            <KpiCard label="Gebruikers" value={num(data.kpis.users)} {...(data.deltas ? deltaProps(data.deltas.users, true) : {})} />
+            <KpiCard label="Sessies" value={num(data.kpis.sessions)} {...(data.deltas ? deltaProps(data.deltas.sessions, true) : {})} />
+            <KpiCard label="Bouncepercentage" value={pct1(data.kpis.bounceRate * 100)} {...(data.deltas ? deltaProps(data.deltas.bounceRate, false) : {})} />
+            <KpiCard label="Gem. sessieduur" value={duration(data.kpis.avgSessionDuration)} {...(data.deltas ? deltaProps(data.deltas.avgSessionDuration, true) : {})} />
           </div>
 
           {/* SESSIONS CHART + REALTIME */}
@@ -75,6 +76,7 @@ export default function Analytics() {
             <SectionCard title="sessies over tijd" style={{ flex: 2, minWidth: 320 }}>
               <AreaChart
                 values={data.sessions_by_date.map((d) => d.sessions)}
+                compareValues={data.compare_series}
                 labels={pickLabels(data.sessions_by_date.map((d) => shortDate(d.date)))}
                 height={210}
               />

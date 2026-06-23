@@ -78,7 +78,7 @@ export default function Admin() {
 
       {/* main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar searchPlaceholder="zoek klant of domein…" />
+        <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
         <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
           <div className="display" style={{ fontSize: 30 }}>klanten</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>alle organisaties op het platform — koppelingen, status &amp; activiteit</div>

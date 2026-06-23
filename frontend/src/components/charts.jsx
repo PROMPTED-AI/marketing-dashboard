@@ -3,17 +3,18 @@
 const PALETTE = ["var(--c-accent)", "var(--c-sky)", "var(--c-mint)", "var(--c-orange)", "var(--c-purple)", "var(--c-yellow)"];
 export const palette = PALETTE;
 
-// Area chart with soft fill + line, from an array of numbers.
-export function AreaChart({ values = [], labels = [], height = 220 }) {
+// Area chart with soft fill + line. `compareValues` adds a dashed "previous" line.
+export function AreaChart({ values = [], labels = [], compareValues = null, height = 220 }) {
   const W = 940, H = 240;
   if (!values.length) return <Empty height={height} />;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
+  const all = compareValues && compareValues.length ? values.concat(compareValues) : values;
+  const max = Math.max(...all, 1);
+  const min = Math.min(...all, 0);
   const span = max - min || 1;
-  const x = (i) => (i / (values.length - 1 || 1)) * W;
+  const xf = (arr, i) => (i / (arr.length - 1 || 1)) * W;
   const y = (v) => H - 20 - ((v - min) / span) * (H - 50);
-  const pts = values.map((v, i) => `${x(i).toFixed(1)} ${y(v).toFixed(1)}`);
-  const line = "M" + pts.join(" L");
+  const path = (arr) => "M" + arr.map((v, i) => `${xf(arr, i).toFixed(1)} ${y(v).toFixed(1)}`).join(" L");
+  const line = path(values);
   const area = `${line} L${W} ${H} L0 ${H} Z`;
   return (
     <div>
@@ -22,6 +23,9 @@ export function AreaChart({ values = [], labels = [], height = 220 }) {
           <line key={gy} x1="0" y1={gy} x2={W} y2={gy} style={{ stroke: "var(--c-track)" }} strokeWidth="1" />
         ))}
         <path d={area} style={{ fill: "var(--c-accent-soft)" }} />
+        {compareValues && compareValues.length > 0 && (
+          <path d={path(compareValues)} fill="none" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+        )}
         <path d={line} fill="none" style={{ stroke: "var(--c-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {labels.length > 0 && (
