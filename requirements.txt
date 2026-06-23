@@ -3,6 +3,7 @@ uvicorn[standard]>=0.29
 google-auth>=2.29
 google-auth-oauthlib>=1.2
 google-analytics-data>=0.18
+google-analytics-admin>=0.22
 itsdangerous>=2.1
 python-dotenv>=1.0
 psycopg[binary]>=3.1
