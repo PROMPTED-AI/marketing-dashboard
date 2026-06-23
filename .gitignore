@@ -18,3 +18,8 @@ env/
 .DS_Store
 .idea/
 .vscode/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+app/static_spa/

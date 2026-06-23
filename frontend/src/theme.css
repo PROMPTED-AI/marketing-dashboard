@@ -1,0 +1,73 @@
+/* kompas design tokens — light + dark, from the approved design. */
+@font-face {
+  font-family: "Dystopian";
+  src: url("/fonts/Dystopian-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-display: swap;
+}
+
+:root {
+  --c-page: #f3f4fb; --c-surface: #ffffff; --c-surface-2: #fafbfe; --c-sidebar: #ffffff;
+  --c-ink: #0a0a52; --c-ink-soft: #3c3f6b; --c-muted: #757cab;
+  --c-border: #e6e9f5; --c-border-soft: #eff1fa; --c-border-strong: #a9b2d8;
+  --c-accent: #294af5; --c-accent-ink: #ffffff; --c-accent-soft: #eaedfe;
+  --c-pos: #15a874; --c-pos-soft: #e2f7ee; --c-neg: #f0603b; --c-neg-soft: #fdeae4;
+  --c-sky: #64abff; --c-mint: #59d8a1; --c-orange: #ff7c66; --c-purple: #6e80f0; --c-yellow: #ffc02e;
+  --c-track: #eceef7;
+  --sh-sm: 0 1px 2px rgba(10, 10, 82, 0.06);
+  --sh-md: 0 8px 24px rgba(10, 10, 82, 0.07);
+  --sh-lg: 0 18px 50px rgba(10, 10, 82, 0.12);
+}
+
+[data-theme="dark"] {
+  --c-page: #08082a; --c-surface: #101038; --c-surface-2: #15154a; --c-sidebar: #0b0b2e;
+  --c-ink: #eef0ff; --c-ink-soft: #c4c8f0; --c-muted: #8a90c8;
+  --c-border: rgba(255, 255, 255, 0.09); --c-border-soft: rgba(255, 255, 255, 0.05); --c-border-strong: rgba(255, 255, 255, 0.22);
+  --c-accent: #7184f2; --c-accent-ink: #ffffff; --c-accent-soft: rgba(113, 132, 242, 0.18);
+  --c-pos: #3fd79b; --c-pos-soft: rgba(63, 215, 155, 0.15); --c-neg: #ff8a6e; --c-neg-soft: rgba(255, 138, 110, 0.15);
+  --c-sky: #64abff; --c-mint: #59d8a1; --c-orange: #ff7c66; --c-purple: #8a98f5; --c-yellow: #ffd05a;
+  --c-track: rgba(255, 255, 255, 0.08);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-md: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --sh-lg: 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Montserrat", sans-serif;
+  background: var(--c-page);
+  color: var(--c-ink);
+}
+.display { font-family: "Dystopian", "Montserrat", sans-serif; text-transform: lowercase; letter-spacing: -0.02em; }
+a { color: inherit; }
+
+/* shared primitives */
+.btn-primary {
+  border: none; border-radius: 999px; background: var(--c-accent); color: var(--c-accent-ink);
+  font-family: "Montserrat", sans-serif; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  box-shadow: 0 10px 24px rgba(41, 74, 245, 0.22);
+}
+.btn-primary:hover { filter: brightness(0.94); }
+.btn-ghost {
+  border: 1px solid var(--c-border); border-radius: 999px; background: var(--c-surface);
+  color: var(--c-ink); font-family: "Montserrat", sans-serif; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 11px;
+}
+.btn-ghost:hover { background: var(--c-surface-2); }
+.card {
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px;
+  box-shadow: var(--sh-sm);
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 700;
+}
+.pill.pos { background: var(--c-pos-soft); color: var(--c-pos); }
+.pill.neg { background: var(--c-neg-soft); color: var(--c-neg); }
+.pill.accent { background: var(--c-accent-soft); color: var(--c-accent); }
+.pill.muted { background: var(--c-track); color: var(--c-muted); }
+.spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--c-track); border-top-color: var(--c-accent); animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
