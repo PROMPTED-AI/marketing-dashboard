@@ -145,10 +145,11 @@ def callback(request: Request):
         code_verifier=request.session.get("code_verifier"),
     )
 
-    # Identify the user and place them in an organization (by email domain).
+    # Identify the user and place them in an organization. Invite-only: a user
+    # only joins a shared org when an admin pre-provisioned their company domain;
+    # public/shared domains and unknown domains get an isolated personal org.
     email = oauth.fetch_user_email(creds).lower()
-    domain = email.split("@")[-1]
-    org = models.get_or_create_org_by_domain(domain)
+    org = models.org_for_login(email)
     user = models.upsert_user(email, org["id"], auth.role_for(email))
     request.session["user_id"] = user["id"]
 
@@ -192,6 +193,11 @@ def admin_add_organization(request: Request, payload: OrgIn):
     )
     if not name or "." not in domain:
         raise HTTPException(status_code=400, detail="Naam en een geldig domein zijn vereist")
+    if config.is_public_email_domain(domain):
+        raise HTTPException(
+            status_code=400,
+            detail="Publieke e-maildomeinen (zoals gmail.com) kunnen niet als klant worden toegevoegd",
+        )
     org = models.create_or_rename_organization(name, domain)
     return {"organization": org}
 

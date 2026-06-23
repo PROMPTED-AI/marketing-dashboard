@@ -35,6 +35,12 @@ def init_schema() -> None:
             )
             """
         )
+        # Personal orgs isolate users on shared/public email domains (no
+        # domain-based grouping). They are hidden from the admin client list.
+        conn.execute(
+            "ALTER TABLE organizations "
+            "ADD COLUMN IF NOT EXISTS is_personal BOOLEAN NOT NULL DEFAULT false"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
