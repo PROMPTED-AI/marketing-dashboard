@@ -1,47 +1,31 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useCachedApi } from "../../lib/swr.js";
+import { gscReportUrl, sitesUrl } from "../../lib/urls.js";
 import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart } from "../../components/charts.jsx";
+import ExportButton from "../../components/ExportButton.jsx";
 import { GscGlyph } from "../../components/icons.jsx";
 
 export default function SearchConsole() {
-  const [sites, setSites] = useState(null);
   const [site, setSite] = useState(() => localStorage.getItem("kompas-gsc-site") || "");
-  const [data, setData] = useState(null);
-  const [sitesErr, setSitesErr] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
-  useEffect(() => {
-    setLoading(true);
-    api("/api/search-console/sites" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : ""))
-      .then((d) => {
-        const list = d.sites || [];
-        setSites(list);
-        setSite((cur) => (cur && list.some((s) => s.site_url === cur) ? cur : list[0]?.site_url || ""));
-      })
-      .catch(setSitesErr)
-      .finally(() => setLoading(false));
-  }, [orgId]);
+  const { data: sitesResp, loading, error: sitesErr } = useCachedApi(sitesUrl(orgId));
+  const sites = sitesResp?.sites || null;
 
+  // Auto-select a valid site once the list (re)loads.
   useEffect(() => {
-    if (!site) return;
-    setError(null);
-    setData(null);
-    let q = "?site=" + encodeURIComponent(site) + "&start=" + start + "&end=" + end;
-    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
-    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
-    api("/api/search-console/report" + q)
-      .then(setData)
-      .catch(setError);
-  }, [site, start, end, compare?.start, compare?.end, orgId]);
+    if (!sites) return;
+    setSite((cur) => (cur && sites.some((s) => s.site_url === cur) ? cur : sites[0]?.site_url || ""));
+  }, [sites]);
 
-  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); setData(null); };
+  const { data, error } = useCachedApi(gscReportUrl(site, start, end, compare, orgId));
+
+  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); };
 
   if (loading) return <TabState loading />;
   if (sitesErr) return <TabState error={sitesErr} onConnect />;
@@ -56,16 +40,36 @@ export default function SearchConsole() {
     );
 
   const t = data?.totals;
+
+  const sections = () => {
+    if (!data) return [];
+    return [
+      { title: "Search Console — " + label + " · " + site },
+      { columns: ["Metric", "Waarde"], rows: [
+        ["Klikken", t.clicks],
+        ["Vertoningen", t.impressions],
+        ["Gem. CTR %", ((t.ctr || 0) * 100).toFixed(2)],
+        ["Gem. positie", (t.position || 0).toFixed(1)],
+      ] },
+      { title: "Top zoekopdrachten", columns: ["Zoekopdracht", "Klikken", "Vertoningen", "CTR %", "Positie"], rows: data.top_queries.map((r) => [r.query, r.clicks, r.impressions, ((r.ctr || 0) * 100).toFixed(2), (r.position || 0).toFixed(1)]) },
+      { title: "Top pagina's", columns: ["Pagina", "Klikken", "Vertoningen", "CTR %", "Positie"], rows: data.top_pages.map((r) => [r.page, r.clicks, r.impressions, ((r.ctr || 0) * 100).toFixed(2), (r.position || 0).toFixed(1)]) },
+      { title: "Klikken per dag", columns: ["Datum", "Klikken", "Vertoningen"], rows: data.by_date.map((d) => [d.date, d.clicks, d.impressions]) },
+    ];
+  };
+
   return (
     <div>
       <Header
         label={label}
         right={
-          sites.length > 1 ? (
-            <select value={site} onChange={(e) => chooseSite(e.target.value)} style={selectStyle}>
-              {sites.map((s) => <option key={s.site_url} value={s.site_url}>{s.site_url}</option>)}
-            </select>
-          ) : <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{site}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {sites.length > 1 ? (
+              <select value={site} onChange={(e) => chooseSite(e.target.value)} style={selectStyle}>
+                {sites.map((s) => <option key={s.site_url} value={s.site_url}>{s.site_url}</option>)}
+              </select>
+            ) : <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{site}</span>}
+            {data && <ExportButton filename="search-console" sections={sections} />}
+          </div>
         }
       />
       <TabState error={error} onConnect />

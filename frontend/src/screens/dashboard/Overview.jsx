@@ -1,33 +1,18 @@
-import { useEffect, useState } from "react";
-import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useCachedApi } from "../../lib/swr.js";
+import { overviewUrl } from "../../lib/urls.js";
 import { num, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
 import { AreaChart, Donut, Legend } from "../../components/charts.jsx";
-import { IcArrow } from "../../components/icons.jsx";
+import ExportButton from "../../components/ExportButton.jsx";
 
 export default function Overview() {
   const { props, selected, loading: pLoading, error: pError } = useProperties();
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!selected) return;
-    setLoading(true);
-    setError(null);
-    let q = "?property_id=" + encodeURIComponent(selected) + "&start=" + start + "&end=" + end;
-    if (compare) q += "&compare_start=" + compare.start + "&compare_end=" + compare.end;
-    if (orgId) q += "&org_id=" + encodeURIComponent(orgId);
-    api("/api/analytics/overview" + q)
-      .then(setData)
-      .catch(setError)
-      .finally(() => setLoading(false));
-  }, [selected, start, end, compare?.start, compare?.end, orgId]);
+  const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -36,6 +21,21 @@ export default function Overview() {
   const series = data?.sessions_by_date?.map((d) => d.sessions) || [];
   const conversiesTotal = (data?.conversions || []).reduce((a, c) => a + c.count, 0);
 
+  const sections = () => {
+    if (!data) return [];
+    return [
+      { title: "Overzicht — " + label },
+      { columns: ["Metric", "Waarde"], rows: [
+        ["Bezoekers", data.kpis.users],
+        ["Sessies", data.kpis.sessions],
+        ["Conversies", conversiesTotal],
+        ["Bouncepercentage %", (data.kpis.bounceRate * 100).toFixed(1)],
+      ] },
+      { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: data.channels.map((c) => [c.label, c.sessions, c.pct]) },
+      { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: data.sessions_by_date.map((d) => [d.date, d.sessions]) },
+    ];
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
@@ -43,7 +43,7 @@ export default function Overview() {
           <div className="display" style={{ fontSize: 30 }}>overzicht</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>prestaties van de {label} · live uit Google Analytics</div>
         </div>
-        <button className="btn-primary" style={{ height: 42, padding: "0 20px", fontSize: 13.5 }}>rapport exporteren <IcArrow s={16} /></button>
+        <ExportButton filename="overzicht" sections={sections} />
       </div>
 
       <TabState loading={loading} error={error} onConnect />
