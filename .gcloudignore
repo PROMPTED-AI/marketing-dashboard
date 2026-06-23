@@ -1,0 +1,19 @@
+# Controls what `gcloud run deploy --source .` uploads to Cloud Build.
+# Without this file gcloud falls back to .gitignore (which excluded *.json and
+# dropped frontend/package.json from the build). Keep this in sync.
+.git/
+.gitignore
+.gcloudignore
+.env
+.env.example
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+tokens/
+README.md
+
+# Frontend: ship source (incl. package.json), not installed deps / build output
+frontend/node_modules/
+frontend/dist/
+app/static_spa/
