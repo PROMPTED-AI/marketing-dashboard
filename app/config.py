@@ -9,17 +9,21 @@ load_dotenv()
 # request; relax oauthlib so that does not raise a "scope has changed" error.
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
-# Scopes: identify the signed-in user (email) + read GA4 + Search Console data.
-SCOPES = [
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/analytics.readonly",
-    "https://www.googleapis.com/auth/webmasters.readonly",
-]
+# Sign-in only needs the user's identity (email). Data scopes are requested
+# incrementally, per tool, when the user actually connects that tool.
+LOGIN_SCOPES = ["https://www.googleapis.com/auth/userinfo.email"]
 
-# Providers the dashboard knows about. Google ones are granted together in a
-# single consent; ads/meta are placeholders ("binnenkort") this iteration.
-GOOGLE_PROVIDERS = ["google_analytics", "search_console"]
+# Per-tool scopes, requested when connecting that specific provider.
+PROVIDER_SCOPES = {
+    "google_analytics": ["https://www.googleapis.com/auth/analytics.readonly"],
+    "search_console": ["https://www.googleapis.com/auth/webmasters.readonly"],
+}
+GOOGLE_PROVIDERS = list(PROVIDER_SCOPES.keys())
 PLACEHOLDER_PROVIDERS = ["google_ads", "meta_ads"]
+
+# Union used when exchanging the auth code (oauthlib's scope check is relaxed,
+# so the flow object can carry the superset regardless of what was requested).
+ALL_SCOPES = LOGIN_SCOPES + [s for scopes in PROVIDER_SCOPES.values() for s in scopes]
 
 CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]

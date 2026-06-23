@@ -30,7 +30,8 @@ function RequireAuth({ children }) {
 function DashIndex() {
   const { data, loading } = useConnections();
   if (loading) return <FullLoader />;
-  if (data && data.connected === 0) return <Navigate to="/onboarding" replace />;
+  const skipped = localStorage.getItem("kompas-onboarded");
+  if (data && data.connected === 0 && !skipped) return <Navigate to="/onboarding" replace />;
   return <Navigate to="/app/overview" replace />;
 }
 

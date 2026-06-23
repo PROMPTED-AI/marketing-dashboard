@@ -18,30 +18,34 @@ def fetch_user_email(creds: Credentials) -> str:
     return resp.json()["email"]
 
 
-def build_flow(state: str | None = None) -> Flow:
+def build_flow(scopes: list[str], state: str | None = None) -> Flow:
     """Create an OAuth Flow bound to our client config and redirect URI."""
     flow = Flow.from_client_config(
         config.CLIENT_CONFIG,
-        scopes=config.SCOPES,
+        scopes=scopes,
         state=state,
     )
     flow.redirect_uri = config.REDIRECT_URI
     return flow
 
 
-def build_authorization_url() -> tuple[str, str, str]:
-    """Return (authorization_url, state, code_verifier) for the login redirect.
+def build_authorization_url(
+    scopes: list[str],
+    access_type: str = "offline",
+    prompt: str = "consent",
+) -> tuple[str, str, str]:
+    """Return (authorization_url, state, code_verifier) for the requested scopes.
 
-    ``access_type=offline`` + ``prompt=consent`` ensures we receive a
-    refresh token. The PKCE ``code_verifier`` must be kept (in the session)
-    and handed back to :func:`exchange_code`, otherwise Google rejects the
-    token exchange with "Missing code verifier".
+    ``include_granted_scopes=true`` enables incremental authorization, so each
+    tool adds its scope on top of what the user already granted. The PKCE
+    ``code_verifier`` must be kept (in the session) and handed back to
+    :func:`exchange_code`.
     """
-    flow = build_flow()
+    flow = build_flow(scopes)
     authorization_url, state = flow.authorization_url(
-        access_type="offline",
+        access_type=access_type,
         include_granted_scopes="true",
-        prompt="consent",
+        prompt=prompt,
     )
     return authorization_url, state, flow.code_verifier
 
@@ -51,8 +55,12 @@ def exchange_code(
     authorization_response_url: str,
     code_verifier: str | None = None,
 ) -> Credentials:
-    """Exchange the ?code=... callback for user Credentials."""
-    flow = build_flow(state=state)
+    """Exchange the ?code=... callback for user Credentials.
+
+    The flow carries the scope superset; oauthlib's scope check is relaxed
+    (see config) so the actually-granted subset is accepted.
+    """
+    flow = build_flow(config.ALL_SCOPES, state=state)
     flow.code_verifier = code_verifier
     flow.fetch_token(authorization_response=authorization_response_url)
     return flow.credentials

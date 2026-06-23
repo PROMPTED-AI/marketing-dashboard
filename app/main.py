@@ -96,9 +96,37 @@ def me(request: Request):
 
 @app.get("/api/auth/google/login")
 def login(request: Request):
-    authorization_url, state, code_verifier = oauth.build_authorization_url()
+    """Sign in: request only the user's identity (email), no data scopes."""
+    authorization_url, state, code_verifier = oauth.build_authorization_url(
+        config.LOGIN_SCOPES, access_type="online", prompt="select_account"
+    )
     request.session["oauth_state"] = state
     request.session["code_verifier"] = code_verifier
+    request.session["oauth_mode"] = "login"
+    return RedirectResponse(authorization_url)
+
+
+@app.get("/api/auth/google/connect")
+def connect(request: Request, providers: str, return_to: str = "/app/integrations"):
+    """Incremental authorization: connect one or more tools for the signed-in user."""
+    if not request.session.get("user_id"):
+        return RedirectResponse("/login")
+    requested = [p for p in providers.split(",") if p in config.GOOGLE_PROVIDERS]
+    if not requested:
+        raise HTTPException(status_code=400, detail="No valid providers")
+
+    scopes = list(config.LOGIN_SCOPES)
+    for p in requested:
+        scopes += config.PROVIDER_SCOPES[p]
+
+    authorization_url, state, code_verifier = oauth.build_authorization_url(
+        scopes, access_type="offline", prompt="consent"
+    )
+    request.session["oauth_state"] = state
+    request.session["code_verifier"] = code_verifier
+    request.session["oauth_mode"] = "connect"
+    request.session["oauth_providers"] = requested
+    request.session["oauth_return"] = return_to if return_to.startswith("/") else "/app"
     return RedirectResponse(authorization_url)
 
 
@@ -118,16 +146,18 @@ def callback(request: Request):
     # Identify the user and place them in an organization (by email domain).
     email = oauth.fetch_user_email(creds).lower()
     domain = email.split("@")[-1]
-    role = auth.role_for(email)
     org = models.get_or_create_org_by_domain(domain)
-    user = models.upsert_user(email, org["id"], role)
-
+    user = models.upsert_user(email, org["id"], auth.role_for(email))
     request.session["user_id"] = user["id"]
-    # One Google consent grants both Analytics + Search Console scopes; record a
-    # connection for each Google provider under the user's organization.
-    creds_dict = oauth.credentials_to_dict(creds)
-    for provider in config.GOOGLE_PROVIDERS:
-        models.save_connection(org["id"], email, creds_dict, provider=provider)
+
+    # On a "connect" flow, store the tool connection(s) that were just granted.
+    if request.session.pop("oauth_mode", "login") == "connect":
+        providers = request.session.pop("oauth_providers", [])
+        return_to = request.session.pop("oauth_return", "/app")
+        creds_dict = oauth.credentials_to_dict(creds)
+        for provider in providers:
+            models.save_connection(org["id"], email, creds_dict, provider=provider)
+        return RedirectResponse(return_to)
 
     return RedirectResponse("/")
 
@@ -162,11 +192,11 @@ def report(request: Request, property_id: str, org_id: str | None = None):
 
 
 @app.get("/api/analytics/overview")
-def analytics_overview(request: Request, property_id: str, org_id: str | None = None):
+def analytics_overview(request: Request, property_id: str, days: int = 30, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org)
-    data = analytics.run_ga_overview(creds, property_id)
+    data = analytics.run_ga_overview(creds, property_id, days=max(1, min(days, 365)))
     return {"org_id": target_org, "property_id": property_id, **data}
 
 
@@ -208,11 +238,12 @@ def gsc_sites(request: Request, org_id: str | None = None):
 
 
 @app.get("/api/search-console/report")
-def gsc_report(request: Request, site: str, org_id: str | None = None):
+def gsc_report(request: Request, site: str, days: int = 28, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org, provider="search_console")
-    return {"org_id": target_org, "site": site, **search_console.run_search_analytics(creds, site)}
+    data = search_console.run_search_analytics(creds, site, days=max(1, min(days, 365)))
+    return {"org_id": target_org, "site": site, **data}
 
 
 # Catch-all: serve the SPA's index.html for any non-API route so the client-side

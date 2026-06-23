@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LOGIN_URL } from "../lib/api.js";
+import { connectUrl } from "../lib/api.js";
 import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
 const TOOLS = [
@@ -22,11 +22,16 @@ export default function Onboarding() {
     setSel({ ga: v, gsc: v, ads: v, meta: v });
   };
 
-  // GA + GSC are granted in one Google consent. If a Google tool is selected,
-  // start the Google connect; otherwise just continue into the dashboard.
+  // Connect only the selected Google tools (incremental authorization).
   const cont = () => {
-    if (sel.ga || sel.gsc) window.location.href = LOGIN_URL;
+    const googleSel = [sel.ga && "google_analytics", sel.gsc && "search_console"].filter(Boolean);
+    localStorage.setItem("kompas-onboarded", "1");
+    if (googleSel.length) window.location.href = connectUrl(googleSel, "/app/overview");
     else nav("/app/overview");
+  };
+  const skip = () => {
+    localStorage.setItem("kompas-onboarded", "1");
+    nav("/app/overview");
   };
 
   return (
@@ -42,7 +47,7 @@ export default function Onboarding() {
             <span style={{ color: "var(--c-accent)" }}>koppelen</span><span style={{ opacity: 0.4 }}>———</span>
             <span>klaar</span>
           </div>
-          <div onClick={() => nav("/app/overview")} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>overslaan</div>
+          <div onClick={skip} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>overslaan</div>
         </div>
 
         {/* body */}

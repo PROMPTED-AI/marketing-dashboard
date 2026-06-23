@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { LOGOUT_URL } from "../lib/api.js";
 import {
   IcStar, IcGrid, IcBars, IcSearch, IcAds, IcShare, IcDoc, IcPlug, IcCog, IcUsers, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
@@ -22,6 +24,7 @@ function initials(name = "") {
 export default function Sidebar({ org, user, connected = 0, total = 4 }) {
   const orgName = org?.name || "—";
   const pct = Math.round((connected / total) * 100);
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div style={wrap}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
@@ -66,13 +69,20 @@ export default function Sidebar({ org, user, connected = 0, total = 4 }) {
         </div>
       </div>
 
-      <div style={userFoot}>
-        <div style={userChip}>{initials(user?.email)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email}</div>
-          <div style={{ fontSize: 11, color: "var(--c-muted)" }}>{user?.role === "agency_admin" ? "bureau-admin" : "klant"}</div>
+      <div style={{ ...userFoot, position: "relative" }}>
+        {menuOpen && (
+          <div style={userMenu}>
+            <a href={LOGOUT_URL} style={menuItem}>Uitloggen</a>
+          </div>
+        )}
+        <div onClick={() => setMenuOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
+          <div style={userChip}>{initials(user?.email)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email}</div>
+            <div style={{ fontSize: 11, color: "var(--c-muted)" }}>{user?.role === "agency_admin" ? "bureau-admin" : "klant"}</div>
+          </div>
+          <span style={{ color: "var(--c-muted)", transform: menuOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}><IcChevDown s={16} /></span>
         </div>
-        <span style={{ color: "var(--c-muted)" }}><IcChevDown s={16} /></span>
       </div>
     </div>
   );
@@ -85,6 +95,8 @@ const orgChip = { width: 26, height: 26, borderRadius: 7, background: "var(--c-a
 const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "var(--c-muted)", textTransform: "uppercase", margin: "6px 0 6px 8px" };
 const progressCard = { margin: 14, padding: 14, borderRadius: 12, background: "var(--c-accent-soft)" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
+const userMenu = { position: "absolute", bottom: "100%", left: 14, right: 14, marginBottom: 8, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 20 };
+const menuItem = { display: "block", padding: "12px 16px", fontSize: 14, fontWeight: 600, color: "var(--c-neg)", textDecoration: "none" };
 const userChip = { width: 32, height: 32, borderRadius: "50%", background: "var(--c-purple)", color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 
 function navItem(isActive) {

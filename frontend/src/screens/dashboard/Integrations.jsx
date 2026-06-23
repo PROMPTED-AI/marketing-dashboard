@@ -1,5 +1,5 @@
 import { useConnections } from "../../lib/useConnections.jsx";
-import { LOGIN_URL } from "../../lib/api.js";
+import { connectUrl } from "../../lib/api.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
 
@@ -46,7 +46,7 @@ export default function Integrations() {
                 <StatusPill status={c.status} />
               </div>
               <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-                {canConnect && <a className="btn-primary" href={LOGIN_URL} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>}
+                {canConnect && <a className="btn-primary" href={connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>}
                 {c.status === "connected" && <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>}
                 {c.status === "coming_soon" && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>nog niet beschikbaar</span>}
               </div>
