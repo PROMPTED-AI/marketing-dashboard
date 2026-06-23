@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+google-auth>=2.29
+google-auth-oauthlib>=1.2
+google-analytics-data>=0.18
+itsdangerous>=2.1
+python-dotenv>=1.0
