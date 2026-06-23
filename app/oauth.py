@@ -17,11 +17,13 @@ def build_flow(state: str | None = None) -> Flow:
     return flow
 
 
-def build_authorization_url() -> tuple[str, str]:
-    """Return (authorization_url, state) to redirect the user to Google.
+def build_authorization_url() -> tuple[str, str, str]:
+    """Return (authorization_url, state, code_verifier) for the login redirect.
 
     ``access_type=offline`` + ``prompt=consent`` ensures we receive a
-    refresh token, so we can keep querying without the user re-logging in.
+    refresh token. The PKCE ``code_verifier`` must be kept (in the session)
+    and handed back to :func:`exchange_code`, otherwise Google rejects the
+    token exchange with "Missing code verifier".
     """
     flow = build_flow()
     authorization_url, state = flow.authorization_url(
@@ -29,12 +31,17 @@ def build_authorization_url() -> tuple[str, str]:
         include_granted_scopes="true",
         prompt="consent",
     )
-    return authorization_url, state
+    return authorization_url, state, flow.code_verifier
 
 
-def exchange_code(state: str, authorization_response_url: str) -> Credentials:
+def exchange_code(
+    state: str,
+    authorization_response_url: str,
+    code_verifier: str | None = None,
+) -> Credentials:
     """Exchange the ?code=... callback for user Credentials."""
     flow = build_flow(state=state)
+    flow.code_verifier = code_verifier
     flow.fetch_token(authorization_response=authorization_response_url)
     return flow.credentials
 
