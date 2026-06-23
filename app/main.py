@@ -208,11 +208,7 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
     return {"property_id": property_id, **analytics.run_realtime(creds, property_id)}
 
 
-@app.get("/api/connections")
-def connections(request: Request, org_id: str | None = None):
-    """Per-provider connection status for the onboarding + sidebar progress."""
-    user = auth.current_user(request)
-    target_org = _resolve_org_id(user, org_id)
+def _connections_payload(target_org: str) -> dict:
     items = []
     for provider in config.GOOGLE_PROVIDERS:
         conn = models.get_connection(target_org, provider=provider)
@@ -227,6 +223,32 @@ def connections(request: Request, org_id: str | None = None):
         items.append({"provider": provider, "status": "coming_soon", "google_email": None})
     connected = sum(1 for i in items if i["status"] == "connected")
     return {"org_id": target_org, "connected": connected, "total": len(items), "connections": items}
+
+
+@app.get("/api/connections")
+def connections(request: Request, org_id: str | None = None):
+    """Per-provider connection status for the onboarding + sidebar progress."""
+    user = auth.current_user(request)
+    return _connections_payload(_resolve_org_id(user, org_id))
+
+
+@app.post("/api/connections/{provider}/disconnect")
+def disconnect(request: Request, provider: str, org_id: str | None = None):
+    """Remove a source. Revoke the Google grant once the last Google source goes."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    if provider not in config.GOOGLE_PROVIDERS:
+        raise HTTPException(status_code=400, detail="Unknown provider")
+
+    conn = models.get_connection(target_org, provider=provider)
+    models.delete_connection(target_org, provider)
+    # If this was the last Google connection, revoke the shared grant at Google.
+    if conn and models.count_google_connections(target_org) == 0:
+        try:
+            oauth.revoke(oauth.credentials_from_dict(conn["creds"]))
+        except Exception:
+            pass
+    return _connections_payload(target_org)
 
 
 @app.get("/api/search-console/sites")

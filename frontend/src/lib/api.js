@@ -19,6 +19,11 @@ export async function api(path, opts = {}) {
 export const LOGIN_URL = "/api/auth/google/login";
 export const LOGOUT_URL = "/api/auth/logout";
 
+// Disconnect a source (revokes the Google grant when it's the last one).
+export function disconnectProvider(provider) {
+  return api("/api/connections/" + encodeURIComponent(provider) + "/disconnect", { method: "POST" });
+}
+
 // Incremental authorization: connect specific tools for the signed-in user.
 export function connectUrl(providers, returnTo = "/app/integrations") {
   const list = Array.isArray(providers) ? providers : [providers];

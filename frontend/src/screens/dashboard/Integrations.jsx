@@ -1,5 +1,5 @@
 import { useConnections } from "../../lib/useConnections.jsx";
-import { connectUrl } from "../../lib/api.js";
+import { connectUrl, disconnectProvider } from "../../lib/api.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
 
@@ -18,9 +18,15 @@ function StatusPill({ status }) {
 }
 
 export default function Integrations() {
-  const { data, loading } = useConnections();
+  const { data, loading, reload } = useConnections();
   if (loading) return <TabState loading />;
   const items = data?.connections || [];
+
+  const onDisconnect = (provider, name) => {
+    if (window.confirm(`${name} ontkoppelen? De toegang wordt ingetrokken.`)) {
+      disconnectProvider(provider).then(reload).catch(() => reload());
+    }
+  };
 
   return (
     <div>
@@ -45,9 +51,14 @@ export default function Integrations() {
                 </div>
                 <StatusPill status={c.status} />
               </div>
-              <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                 {canConnect && <a className="btn-primary" href={connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>}
-                {c.status === "connected" && <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>}
+                {c.status === "connected" && (
+                  <>
+                    <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>
+                    <button className="btn-ghost" style={{ height: 38, padding: "0 16px", fontSize: 13 }} onClick={() => onDisconnect(c.provider, m.name)}>ontkoppelen</button>
+                  </>
+                )}
                 {c.status === "coming_soon" && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>nog niet beschikbaar</span>}
               </div>
             </div>

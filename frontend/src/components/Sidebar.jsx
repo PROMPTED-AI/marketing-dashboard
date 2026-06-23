@@ -72,7 +72,13 @@ export default function Sidebar({ org, user, connected = 0, total = 4 }) {
       <div style={{ ...userFoot, position: "relative" }}>
         {menuOpen && (
           <div style={userMenu}>
-            <a href={LOGOUT_URL} style={menuItem}>Uitloggen</a>
+            <a
+              href={LOGOUT_URL}
+              style={menuItem}
+              onClick={() => ["kompas-onboarded", "kompas-property", "kompas-gsc-site"].forEach((k) => localStorage.removeItem(k))}
+            >
+              Uitloggen
+            </a>
           </div>
         )}
         <div onClick={() => setMenuOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, cursor: "pointer" }}>
