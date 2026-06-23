@@ -1,9 +1,10 @@
-"""Postgres connection pool and schema.
+"""Postgres connection pool and multi-tenant schema.
 
-Designed for Neon serverless Postgres behind Cloud Run: a small pool that can
-shrink to zero so idle Cloud Run instances hold no connections. Point
-DATABASE_URL at Neon's *pooled* connection string (the one with `-pooler` in
-the host) for best behaviour under autoscaling.
+Tables
+------
+organizations  : one per client company (grouped by email domain)
+users          : people who sign in; each belongs to one organization + role
+connections    : one GA OAuth connection per organization (encrypted, with status)
 """
 from psycopg_pool import ConnectionPool
 
@@ -22,14 +23,40 @@ def get_conn():
 
 
 def init_schema() -> None:
-    """Create the tokens table if it does not exist. Called at startup."""
+    """Create the multi-tenant tables if they do not exist. Called at startup."""
     with get_conn() as conn:
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS ga_tokens (
-                user_id          TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS organizations (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                domain      TEXT UNIQUE,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id               TEXT PRIMARY KEY,
+                email            TEXT UNIQUE NOT NULL,
+                organization_id  TEXT NOT NULL REFERENCES organizations(id),
+                role             TEXT NOT NULL DEFAULT 'client',
+                created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS connections (
+                id               TEXT PRIMARY KEY,
+                organization_id  TEXT NOT NULL REFERENCES organizations(id),
+                provider         TEXT NOT NULL DEFAULT 'google_analytics',
+                google_email     TEXT,
                 encrypted_creds  BYTEA NOT NULL,
-                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+                status           TEXT NOT NULL DEFAULT 'connected',
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                UNIQUE (organization_id, provider)
             )
             """
         )

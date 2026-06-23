@@ -1,9 +1,21 @@
 """Helpers around the Google OAuth 2.0 Authorization Code flow."""
+import requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
 from . import config
+
+
+def fetch_user_email(creds: Credentials) -> str:
+    """Return the email of the account that just authorized (their identity)."""
+    resp = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {creds.token}"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["email"]
 
 
 def build_flow(state: str | None = None) -> Flow:

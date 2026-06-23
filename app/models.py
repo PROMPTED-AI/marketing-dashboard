@@ -1,0 +1,153 @@
+"""Data access for organizations, users, and connections."""
+import json
+import uuid
+
+from . import crypto, db
+
+# ---------------------------------------------------------------- organizations
+
+
+def get_or_create_org_by_domain(domain: str, name: str | None = None) -> dict:
+    """Find the organization for an email domain, creating it on first sight."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, domain FROM organizations WHERE domain = %s",
+            (domain,),
+        ).fetchone()
+        if row:
+            return {"id": row[0], "name": row[1], "domain": row[2]}
+        org_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO organizations (id, name, domain) VALUES (%s, %s, %s)",
+            (org_id, name or domain, domain),
+        )
+        return {"id": org_id, "name": name or domain, "domain": domain}
+
+
+def get_organization(org_id: str) -> dict | None:
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, domain FROM organizations WHERE id = %s", (org_id,)
+        ).fetchone()
+    return {"id": row[0], "name": row[1], "domain": row[2]} if row else None
+
+
+# ----------------------------------------------------------------------- users
+
+
+def upsert_user(email: str, organization_id: str, role: str) -> dict:
+    """Create or update a user, keyed by email."""
+    with db.get_conn() as conn:
+        row = conn.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
+        if row:
+            user_id = row[0]
+            conn.execute(
+                "UPDATE users SET organization_id = %s, role = %s WHERE id = %s",
+                (organization_id, role, user_id),
+            )
+        else:
+            user_id = str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO users (id, email, organization_id, role) "
+                "VALUES (%s, %s, %s, %s)",
+                (user_id, email, organization_id, role),
+            )
+    return {
+        "id": user_id,
+        "email": email,
+        "organization_id": organization_id,
+        "role": role,
+    }
+
+
+def get_user(user_id: str) -> dict | None:
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, email, organization_id, role FROM users WHERE id = %s",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"id": row[0], "email": row[1], "organization_id": row[2], "role": row[3]}
+
+
+# ----------------------------------------------------------------- connections
+
+
+def save_connection(
+    organization_id: str,
+    google_email: str,
+    creds: dict,
+    provider: str = "google_analytics",
+) -> None:
+    """Store (or refresh) an organization's encrypted OAuth connection."""
+    blob = crypto.encrypt(json.dumps(creds))
+    with db.get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO connections (id, organization_id, provider, google_email,
+                                     encrypted_creds, status, updated_at)
+            VALUES (%s, %s, %s, %s, %s, 'connected', now())
+            ON CONFLICT (organization_id, provider)
+            DO UPDATE SET google_email = EXCLUDED.google_email,
+                          encrypted_creds = EXCLUDED.encrypted_creds,
+                          status = 'connected',
+                          updated_at = now()
+            """,
+            (str(uuid.uuid4()), organization_id, provider, google_email, blob),
+        )
+
+
+def get_connection(
+    organization_id: str, provider: str = "google_analytics"
+) -> dict | None:
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT google_email, encrypted_creds, status FROM connections "
+            "WHERE organization_id = %s AND provider = %s",
+            (organization_id, provider),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "google_email": row[0],
+        "creds": json.loads(crypto.decrypt(row[1])),
+        "status": row[2],
+    }
+
+
+def set_connection_status(
+    organization_id: str, status: str, provider: str = "google_analytics"
+) -> None:
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE connections SET status = %s, updated_at = now() "
+            "WHERE organization_id = %s AND provider = %s",
+            (status, organization_id, provider),
+        )
+
+
+def list_organizations_with_status() -> list[dict]:
+    """Agency admin overview: every org and its GA connection status."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT o.id, o.name, o.domain,
+                   c.google_email, c.status, c.updated_at
+            FROM organizations o
+            LEFT JOIN connections c
+              ON c.organization_id = o.id AND c.provider = 'google_analytics'
+            ORDER BY o.name
+            """
+        ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "domain": r[2],
+            "google_email": r[3],
+            "status": r[4] or "not_connected",
+            "updated_at": r[5].isoformat() if r[5] else None,
+        }
+        for r in rows
+    ]
