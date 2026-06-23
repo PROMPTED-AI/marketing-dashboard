@@ -161,6 +161,23 @@ def report(request: Request, property_id: str, org_id: str | None = None):
     return {"org_id": target_org, "property_id": property_id, "rows": rows}
 
 
+@app.get("/api/analytics/overview")
+def analytics_overview(request: Request, property_id: str, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    creds = _org_credentials(target_org)
+    data = analytics.run_ga_overview(creds, property_id)
+    return {"org_id": target_org, "property_id": property_id, **data}
+
+
+@app.get("/api/analytics/realtime")
+def analytics_realtime(request: Request, property_id: str, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    creds = _org_credentials(target_org)
+    return {"property_id": property_id, **analytics.run_realtime(creds, property_id)}
+
+
 @app.get("/api/connections")
 def connections(request: Request, org_id: str | None = None):
     """Per-provider connection status for the onboarding + sidebar progress."""

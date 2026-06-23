@@ -4,6 +4,8 @@ import { useConnections } from "./lib/useConnections.jsx";
 import Login from "./screens/Login.jsx";
 import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
+import Overview from "./screens/dashboard/Overview.jsx";
+import Analytics from "./screens/dashboard/Analytics.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
 
 function FullLoader() {
@@ -38,8 +40,8 @@ export default function App() {
 
       <Route path="/app" element={<RequireAuth><Dashboard /></RequireAuth>}>
         <Route index element={<DashIndex />} />
-        <Route path="overview" element={<Placeholder title="overzicht" note="prestaties van je marketingkanalen" />} />
-        <Route path="analytics" element={<Placeholder title="analytics — gedrag & verkeer" note="automatisch ingeladen via je GA4-koppeling" />} />
+        <Route path="overview" element={<Overview />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<Placeholder title="search console" note="organisch verkeer, posities & zoekwoorden" />} />
         <Route path="google-ads" element={<Placeholder title="google ads" comingSoon />} />
         <Route path="meta" element={<Placeholder title="meta / social" comingSoon />} />
