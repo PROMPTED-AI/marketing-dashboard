@@ -81,6 +81,13 @@ def get_organization(org_id: str) -> dict | None:
     return {"id": row[0], "name": row[1], "domain": row[2]} if row else None
 
 
+def rename_organization(org_id: str, name: str) -> dict | None:
+    """Rename an organization by id (used by the settings screen)."""
+    with db.get_conn() as conn:
+        conn.execute("UPDATE organizations SET name = %s WHERE id = %s", (name, org_id))
+    return get_organization(org_id)
+
+
 # ----------------------------------------------------------------------- users
 
 
