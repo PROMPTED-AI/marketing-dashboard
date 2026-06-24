@@ -12,7 +12,25 @@ from . import config
 
 # open=False so importing this module never blocks on a DB connection;
 # the pool opens lazily on first use.
-_pool = ConnectionPool(config.DATABASE_URL, min_size=0, max_size=4, open=False)
+#
+# Neon (serverless Postgres) scales to zero and drops idle server-side
+# connections. Without guarding for that, the pool hands out a now-dead
+# connection and the request fails with an OperationalError (HTTP 500) —
+# the intermittent "sometimes login works, sometimes it doesn't" symptom,
+# since login is usually the first DB hit after an idle period.
+#
+#   check    : validate (and recycle) a connection before handing it out,
+#              so a dead one never reaches a request.
+#   max_idle : proactively close idle connections before Neon does.
+_pool = ConnectionPool(
+    config.DATABASE_URL,
+    min_size=0,
+    max_size=4,
+    open=False,
+    check=ConnectionPool.check_connection,
+    max_idle=60,
+    reconnect_timeout=10,
+)
 
 
 def get_conn():
