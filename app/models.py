@@ -272,47 +272,62 @@ def list_organizations_with_connections() -> list[dict]:
 
 # ------------------------------------------------------------------- dashboards
 #
-# Custom widget layouts, shared within an organization: any member of the org
-# sees and edits the same set. `page` scopes a dashboard to a screen so the
-# same mechanism can serve other tabs later. At most one default per (org, page).
+# Custom widget layouts. Private by default: only the owner (`created_by`) sees
+# a dashboard, until they flip `visibility` to 'shared' so the rest of their
+# organization can view it. Editing/renaming/deleting/default stay owner-only.
+# `page` scopes a dashboard to a screen. `is_default` is the owner's default
+# for that page (used to pick what opens first).
 
 
-def list_dashboards(organization_id: str, page: str = "overview") -> list[dict]:
-    """All dashboards for an org+page (names + flags, no layout)."""
+def list_dashboards(
+    organization_id: str, viewer_email: str, page: str = "overview"
+) -> list[dict]:
+    """Dashboards the viewer may see: their own + others' shared ones (no layout)."""
     with db.get_conn() as conn:
         rows = conn.execute(
-            "SELECT id, name, is_default, updated_at FROM dashboards "
+            "SELECT id, name, is_default, visibility, created_by, updated_at "
+            "FROM dashboards "
             "WHERE organization_id = %s AND page = %s "
-            "ORDER BY is_default DESC, lower(name)",
-            (organization_id, page),
+            "  AND (created_by = %s OR visibility = 'shared') "
+            "ORDER BY (created_by = %s) DESC, is_default DESC, lower(name)",
+            (organization_id, page, viewer_email, viewer_email),
         ).fetchall()
     return [
         {
             "id": r[0],
             "name": r[1],
             "is_default": r[2],
-            "updated_at": r[3].isoformat() if r[3] else None,
+            "visibility": r[3],
+            "is_owner": r[4] == viewer_email,
+            "updated_at": r[5].isoformat() if r[5] else None,
         }
         for r in rows
     ]
 
 
-def get_dashboard(organization_id: str, dashboard_id: str) -> dict | None:
-    """One dashboard with its full widget layout (org-scoped)."""
+def get_dashboard(
+    organization_id: str, dashboard_id: str, viewer_email: str
+) -> dict | None:
+    """One dashboard with its layout, if the viewer may see it (owner or shared)."""
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, page, name, layout, is_default FROM dashboards "
-            "WHERE id = %s AND organization_id = %s",
+            "SELECT id, page, name, layout, is_default, visibility, created_by "
+            "FROM dashboards WHERE id = %s AND organization_id = %s",
             (dashboard_id, organization_id),
         ).fetchone()
     if not row:
         return None
+    is_owner = row[6] == viewer_email
+    if not is_owner and row[5] != "shared":
+        return None  # private dashboard of another user
     return {
         "id": row[0],
         "page": row[1],
         "name": row[2],
         "layout": row[3],
         "is_default": row[4],
+        "visibility": row[5],
+        "is_owner": is_owner,
     }
 
 
@@ -322,99 +337,109 @@ def create_dashboard(
     layout: dict,
     page: str = "overview",
     created_by: str | None = None,
+    visibility: str = "private",
     is_default: bool = False,
 ) -> dict:
-    """Create a dashboard. The org's first one for a page becomes the default."""
+    """Create a dashboard. The owner's first one for a page becomes their default."""
     dashboard_id = str(uuid.uuid4())
+    visibility = "shared" if visibility == "shared" else "private"
     with db.get_conn() as conn:
         existing = conn.execute(
-            "SELECT count(*) FROM dashboards WHERE organization_id = %s AND page = %s",
-            (organization_id, page),
+            "SELECT count(*) FROM dashboards "
+            "WHERE organization_id = %s AND page = %s AND created_by = %s",
+            (organization_id, page, created_by),
         ).fetchone()[0]
         make_default = is_default or existing == 0
         if make_default:
             conn.execute(
                 "UPDATE dashboards SET is_default = false "
-                "WHERE organization_id = %s AND page = %s",
-                (organization_id, page),
+                "WHERE organization_id = %s AND page = %s AND created_by = %s",
+                (organization_id, page, created_by),
             )
         conn.execute(
             "INSERT INTO dashboards "
-            "(id, organization_id, page, name, layout, is_default, created_by) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (dashboard_id, organization_id, page, name, Jsonb(layout), make_default, created_by),
+            "(id, organization_id, page, name, layout, visibility, is_default, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (dashboard_id, organization_id, page, name, Jsonb(layout), visibility, make_default, created_by),
         )
     return {
         "id": dashboard_id,
         "page": page,
         "name": name,
         "layout": layout,
+        "visibility": visibility,
         "is_default": make_default,
+        "is_owner": True,
     }
 
 
 def update_dashboard(
     organization_id: str,
     dashboard_id: str,
+    owner_email: str,
     name: str | None = None,
     layout: dict | None = None,
+    visibility: str | None = None,
     is_default: bool | None = None,
 ) -> dict | None:
-    """Patch a dashboard's name/layout/default flag (org-scoped). None = unchanged."""
+    """Patch an owned dashboard. Returns None if it doesn't exist or isn't owned."""
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT page FROM dashboards WHERE id = %s AND organization_id = %s",
-            (dashboard_id, organization_id),
+            "SELECT page FROM dashboards "
+            "WHERE id = %s AND organization_id = %s AND created_by = %s",
+            (dashboard_id, organization_id, owner_email),
         ).fetchone()
         if not row:
             return None
         page = row[0]
         if name is not None:
             conn.execute(
-                "UPDATE dashboards SET name = %s, updated_at = now() "
-                "WHERE id = %s AND organization_id = %s",
-                (name, dashboard_id, organization_id),
+                "UPDATE dashboards SET name = %s, updated_at = now() WHERE id = %s",
+                (name, dashboard_id),
             )
         if layout is not None:
             conn.execute(
-                "UPDATE dashboards SET layout = %s, updated_at = now() "
-                "WHERE id = %s AND organization_id = %s",
-                (Jsonb(layout), dashboard_id, organization_id),
+                "UPDATE dashboards SET layout = %s, updated_at = now() WHERE id = %s",
+                (Jsonb(layout), dashboard_id),
+            )
+        if visibility is not None:
+            conn.execute(
+                "UPDATE dashboards SET visibility = %s, updated_at = now() WHERE id = %s",
+                ("shared" if visibility == "shared" else "private", dashboard_id),
             )
         if is_default:
             conn.execute(
                 "UPDATE dashboards SET is_default = false "
-                "WHERE organization_id = %s AND page = %s",
-                (organization_id, page),
+                "WHERE organization_id = %s AND page = %s AND created_by = %s",
+                (organization_id, page, owner_email),
             )
             conn.execute(
-                "UPDATE dashboards SET is_default = true, updated_at = now() "
-                "WHERE id = %s AND organization_id = %s",
-                (dashboard_id, organization_id),
+                "UPDATE dashboards SET is_default = true, updated_at = now() WHERE id = %s",
+                (dashboard_id,),
             )
-    return get_dashboard(organization_id, dashboard_id)
+    return get_dashboard(organization_id, dashboard_id, owner_email)
 
 
-def delete_dashboard(organization_id: str, dashboard_id: str) -> bool:
-    """Delete a dashboard; if it was the default, promote another to default."""
+def delete_dashboard(
+    organization_id: str, dashboard_id: str, owner_email: str
+) -> bool:
+    """Delete an owned dashboard; promote another of the owner's to default if needed."""
     with db.get_conn() as conn:
         row = conn.execute(
             "SELECT page, is_default FROM dashboards "
-            "WHERE id = %s AND organization_id = %s",
-            (dashboard_id, organization_id),
+            "WHERE id = %s AND organization_id = %s AND created_by = %s",
+            (dashboard_id, organization_id, owner_email),
         ).fetchone()
         if not row:
             return False
         page, was_default = row
-        conn.execute(
-            "DELETE FROM dashboards WHERE id = %s AND organization_id = %s",
-            (dashboard_id, organization_id),
-        )
+        conn.execute("DELETE FROM dashboards WHERE id = %s", (dashboard_id,))
         if was_default:
             nxt = conn.execute(
-                "SELECT id FROM dashboards WHERE organization_id = %s AND page = %s "
+                "SELECT id FROM dashboards "
+                "WHERE organization_id = %s AND page = %s AND created_by = %s "
                 "ORDER BY lower(name) LIMIT 1",
-                (organization_id, page),
+                (organization_id, page, owner_email),
             ).fetchone()
             if nxt:
                 conn.execute(

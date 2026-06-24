@@ -370,37 +370,44 @@ def gsc_report(
 
 # ---------------------------------------------------------------- dashboards
 #
-# User-composed widget layouts, shared within an organization. Clients manage
-# their own org's dashboards; agency admins may target any org via ?org_id=.
+# User-composed widget layouts. Private to their owner by default; the owner may
+# share a dashboard with the rest of the organization (visibility='shared').
+# Editing/renaming/deleting/default are owner-only. Agency admins may target any
+# org via ?org_id= (ownership is still keyed on their own email).
 
 
 class DashboardIn(BaseModel):
     name: str
     layout: dict
     page: str = "overview"
+    visibility: str = "private"
     is_default: bool = False
 
 
 class DashboardPatch(BaseModel):
     name: str | None = None
     layout: dict | None = None
+    visibility: str | None = None
     is_default: bool | None = None
 
 
 @app.get("/api/dashboards")
 def list_dashboards(request: Request, page: str = "overview", org_id: str | None = None):
-    """Saved dashboards for the active org + page (names only, no layout)."""
+    """Dashboards the user may see (their own + shared ones), names only."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
-    return {"org_id": target_org, "dashboards": models.list_dashboards(target_org, page)}
+    return {
+        "org_id": target_org,
+        "dashboards": models.list_dashboards(target_org, user["email"], page),
+    }
 
 
 @app.get("/api/dashboards/{dashboard_id}")
 def get_dashboard(request: Request, dashboard_id: str, org_id: str | None = None):
-    """One dashboard with its full widget layout."""
+    """One dashboard with its full widget layout (owner or shared only)."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
-    dash = models.get_dashboard(target_org, dashboard_id)
+    dash = models.get_dashboard(target_org, dashboard_id, user["email"])
     if not dash:
         raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
     return dash
@@ -408,35 +415,47 @@ def get_dashboard(request: Request, dashboard_id: str, org_id: str | None = None
 
 @app.post("/api/dashboards")
 def create_dashboard(request: Request, payload: DashboardIn, org_id: str | None = None):
-    """Create a new dashboard for the active org."""
+    """Create a new dashboard owned by the signed-in user."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Naam is vereist")
-    dash = models.create_dashboard(
+    return models.create_dashboard(
         target_org,
         name,
         payload.layout,
         page=payload.page,
         created_by=user["email"],
+        visibility=payload.visibility,
         is_default=payload.is_default,
     )
-    return dash
 
 
 @app.put("/api/dashboards/{dashboard_id}")
 def update_dashboard(
     request: Request, dashboard_id: str, payload: DashboardPatch, org_id: str | None = None
 ):
-    """Update a dashboard's name, layout, and/or default flag."""
+    """Update an owned dashboard's name, layout, visibility, and/or default flag."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     name = payload.name.strip() if payload.name is not None else None
     if name == "":
         raise HTTPException(status_code=400, detail="Naam mag niet leeg zijn")
+    # Distinguish "not found / not visible" (404) from "not the owner" (403).
+    existing = models.get_dashboard(target_org, dashboard_id, user["email"])
+    if not existing:
+        raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
+    if not existing["is_owner"]:
+        raise HTTPException(status_code=403, detail="Alleen de eigenaar kan dit dashboard wijzigen")
     dash = models.update_dashboard(
-        target_org, dashboard_id, name=name, layout=payload.layout, is_default=payload.is_default
+        target_org,
+        dashboard_id,
+        user["email"],
+        name=name,
+        layout=payload.layout,
+        visibility=payload.visibility,
+        is_default=payload.is_default,
     )
     if not dash:
         raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
@@ -445,11 +464,15 @@ def update_dashboard(
 
 @app.delete("/api/dashboards/{dashboard_id}")
 def delete_dashboard(request: Request, dashboard_id: str, org_id: str | None = None):
-    """Delete a dashboard."""
+    """Delete an owned dashboard."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
-    if not models.delete_dashboard(target_org, dashboard_id):
+    existing = models.get_dashboard(target_org, dashboard_id, user["email"])
+    if not existing:
         raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
+    if not existing["is_owner"]:
+        raise HTTPException(status_code=403, detail="Alleen de eigenaar kan dit dashboard verwijderen")
+    models.delete_dashboard(target_org, dashboard_id, user["email"])
     return {"ok": True}
 
 

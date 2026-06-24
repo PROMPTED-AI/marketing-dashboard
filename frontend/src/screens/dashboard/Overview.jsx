@@ -23,14 +23,17 @@ export default function Overview() {
   const dash = useDashboards(orgId);
 
   const [activeId, setActiveId] = useState(null);
+  const [activeMeta, setActiveMeta] = useState({ is_owner: true, visibility: "private" });
   const [working, setWorking] = useState(null); // { widgets: [...] } currently shown/edited
   const [baseline, setBaseline] = useState(null); // last saved layout (null = unsaved template)
   const [editing, setEditing] = useState(false);
   const [modal, setModal] = useState(null); // 'template' | 'widget' | 'saveas' | 'rename'
   const [busy, setBusy] = useState(false);
+  const [dragId, setDragId] = useState(null);
 
   const storeKey = orgId ? `kompas-dash-overview-${orgId}` : null;
   const initRef = useRef(null);
+  const isOwner = activeId == null || activeMeta.is_owner; // unsaved template -> owner-to-be
 
   // Load a dashboard's layout into the working copy.
   function selectDashboard(id) {
@@ -43,6 +46,7 @@ export default function Overview() {
         const l = sanitizeLayout(d.layout);
         setWorking(l);
         setBaseline(l);
+        setActiveMeta({ is_owner: d.is_owner, visibility: d.visibility });
       })
       .catch(() => setBaseline(null));
   }
@@ -73,15 +77,20 @@ export default function Overview() {
     setWorking((w) => ({ widgets: w.widgets.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
   const removeWidget = (id) =>
     setWorking((w) => ({ widgets: w.widgets.filter((x) => x.id !== id) }));
-  const moveWidget = (id, dir) =>
+  // Drag & drop: drop the dragged widget just before the target widget.
+  const dropOn = (targetId) => {
     setWorking((w) => {
+      if (!dragId || dragId === targetId) return w;
       const arr = [...w.widgets];
-      const i = arr.findIndex((x) => x.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= arr.length) return w;
-      [arr[i], arr[j]] = [arr[j], arr[i]];
+      const from = arr.findIndex((x) => x.id === dragId);
+      if (from < 0) return w;
+      const [moved] = arr.splice(from, 1);
+      const to = arr.findIndex((x) => x.id === targetId);
+      arr.splice(to < 0 ? arr.length : to, 0, moved);
       return { widgets: arr };
     });
+    setDragId(null);
+  };
   const addWidget = (sourceId) => {
     setWorking((w) => ({ widgets: [...(w?.widgets ?? []), newWidget(sourceId)] }));
     setModal(null);
@@ -115,6 +124,7 @@ export default function Overview() {
     setActiveId(created.id);
     if (storeKey) localStorage.setItem(storeKey, created.id);
     setBaseline(working);
+    setActiveMeta({ is_owner: true, visibility: created.visibility });
   });
 
   const createFromTemplate = guard(async (tpl) => {
@@ -125,6 +135,7 @@ export default function Overview() {
     if (storeKey) localStorage.setItem(storeKey, created.id);
     setWorking(layout);
     setBaseline(layout);
+    setActiveMeta({ is_owner: true, visibility: created.visibility });
     setEditing(true);
   });
 
@@ -135,6 +146,13 @@ export default function Overview() {
 
   const makeDefault = guard(async () => {
     if (activeId) await dash.update(activeId, { is_default: true });
+  });
+
+  const toggleShare = guard(async () => {
+    if (!activeId) return;
+    const next = activeMeta.visibility === "shared" ? "private" : "shared";
+    await dash.update(activeId, { visibility: next });
+    setActiveMeta((m) => ({ ...m, visibility: next }));
   });
 
   const removeCurrent = guard(async () => {
@@ -186,6 +204,8 @@ export default function Overview() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <DashboardSwitcher list={dash.list} activeId={activeId} onSwitch={switchTo} onNew={() => setModal("template")} />
+          {activeId && activeMeta.visibility === "shared" && <span className="pill accent">gedeeld</span>}
+          {activeId && !isOwner && <span className="pill muted">van een collega</span>}
           {dirty && <span className="pill muted">niet opgeslagen</span>}
           {!editing ? (
             <button className="btn-ghost" onClick={() => setEditing(true)} style={{ height: 40, padding: "0 16px" }}>Aanpassen</button>
@@ -200,12 +220,14 @@ export default function Overview() {
       {editing && (
         <div className="card" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 16, flexWrap: "wrap" }}>
           <button className="btn-primary" onClick={() => setModal("widget")} style={{ height: 38, padding: "0 16px" }}>＋ Widget toevoegen</button>
-          <button className="btn-ghost" onClick={saveCurrent} disabled={busy || !dirty} style={{ height: 38, padding: "0 16px", opacity: !dirty || busy ? 0.5 : 1 }}>Opslaan</button>
+          <button className="btn-ghost" onClick={saveCurrent} disabled={busy || !dirty || !isOwner} title={!isOwner ? "Alleen de eigenaar kan dit dashboard overschrijven" : undefined} style={{ height: 38, padding: "0 16px", opacity: !dirty || busy || !isOwner ? 0.5 : 1 }}>Opslaan</button>
           <button className="btn-ghost" onClick={() => setModal("saveas")} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Opslaan als…</button>
           <div style={{ flex: 1 }} />
-          {activeId && <button className="btn-ghost" onClick={() => setModal("rename")} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Hernoemen</button>}
-          {activeId && <button className="btn-ghost" onClick={makeDefault} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Als standaard</button>}
-          {activeId && <button className="btn-ghost" onClick={removeCurrent} disabled={busy} style={{ height: 38, padding: "0 14px", color: "var(--c-neg)" }}>Verwijderen</button>}
+          {!isOwner && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Dit is andermans dashboard — gebruik “Opslaan als…” voor je eigen kopie.</span>}
+          {activeId && isOwner && <button className="btn-ghost" onClick={toggleShare} disabled={busy} style={{ height: 38, padding: "0 14px" }}>{activeMeta.visibility === "shared" ? "Delen stoppen" : "Delen met organisatie"}</button>}
+          {activeId && isOwner && <button className="btn-ghost" onClick={() => setModal("rename")} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Hernoemen</button>}
+          {activeId && isOwner && <button className="btn-ghost" onClick={makeDefault} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Als standaard</button>}
+          {activeId && isOwner && <button className="btn-ghost" onClick={removeCurrent} disabled={busy} style={{ height: 38, padding: "0 14px", color: "var(--c-neg)" }}>Verwijderen</button>}
         </div>
       )}
 
@@ -222,7 +244,7 @@ export default function Overview() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: 16, alignItems: "stretch" }}>
-            {widgets.map((w, i) => (
+            {widgets.map((w) => (
               <WidgetFrame
                 key={w.id}
                 widget={w}
@@ -230,10 +252,11 @@ export default function Overview() {
                 editing={editing}
                 onChange={(patch) => patchWidget(w.id, patch)}
                 onRemove={() => removeWidget(w.id)}
-                onMoveLeft={() => moveWidget(w.id, -1)}
-                onMoveRight={() => moveWidget(w.id, +1)}
-                isFirst={i === 0}
-                isLast={i === widgets.length - 1}
+                onDragStart={() => setDragId(w.id)}
+                onDragEnd={() => setDragId(null)}
+                onDropOn={() => dropOn(w.id)}
+                isDragging={dragId === w.id}
+                isDropTarget={dragId != null && dragId !== w.id}
               />
             ))}
           </div>
@@ -285,7 +308,9 @@ function DashboardSwitcher({ list, activeId, onSwitch, onNew }) {
       >
         {!activeId && <option value="">Niet opgeslagen (template)</option>}
         {list.map((d) => (
-          <option key={d.id} value={d.id}>{d.name}{d.is_default ? " ★" : ""}</option>
+          <option key={d.id} value={d.id}>
+            {d.name}{d.is_default ? " ★" : ""}{d.is_owner ? "" : " (collega)"}
+          </option>
         ))}
         <option value="__new__">＋ Nieuw dashboard…</option>
       </select>

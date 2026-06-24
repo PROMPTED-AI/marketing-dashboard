@@ -85,11 +85,12 @@ def init_schema() -> None:
             )
             """
         )
-        # Custom dashboards: a named layout of widgets the user composes. Shared
-        # within an organization (any member sees/edits the org's dashboards).
-        # `page` scopes a dashboard to a screen (e.g. 'overview') so the same
-        # mechanism can later serve other tabs. `layout` holds the widget config
-        # as JSON. At most one dashboard per (org, page) is the default.
+        # Custom dashboards: a named layout of widgets the user composes.
+        # Private by default (only the owner — `created_by` — sees it); the owner
+        # may flip `visibility` to 'shared' so the rest of their organization can
+        # view it. `page` scopes a dashboard to a screen (e.g. 'overview') so the
+        # same mechanism can later serve other tabs. `layout` holds the widget
+        # config as JSON. `is_default` is the owner's default for that page.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS dashboards (
@@ -98,12 +99,18 @@ def init_schema() -> None:
                 page             TEXT NOT NULL DEFAULT 'overview',
                 name             TEXT NOT NULL,
                 layout           JSONB NOT NULL DEFAULT '{"widgets": []}',
+                visibility       TEXT NOT NULL DEFAULT 'private',
                 is_default       BOOLEAN NOT NULL DEFAULT false,
                 created_by       TEXT,
                 created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
             )
             """
+        )
+        # For installs created before private/shared existed.
+        conn.execute(
+            "ALTER TABLE dashboards "
+            "ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'"
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS dashboards_org_page_idx "
