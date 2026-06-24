@@ -95,19 +95,37 @@ def run_ga_overview(
         )
         return client.run_report(req)
 
+    def safe(fn, default):
+        """Run a supplementary report; degrade to `default` if GA rejects it.
+
+        GA4 properties differ in which dimensions/metrics they support and which
+        combinations are compatible, so one unsupported block must never take the
+        whole overview down with a 500. Core blocks (KPIs, time series) are not
+        wrapped — if those fail something fundamental is wrong.
+        """
+        try:
+            return fn()
+        except Exception:
+            return default
+
     # --- KPIs (current + optional comparison) ---
     # One report covers all scalar metrics, so adding more KPI widgets here is
     # effectively free (no extra GA call). `conversions` is the total of all key
-    # events; the per-event breakdown lives in `conversions` further down.
-    kpi_metrics = [
+    # events; the per-event breakdown lives in `conversions` further down. It is
+    # the one metric some migrated properties may lack, so fall back without it.
+    stable_metrics = [
         "totalUsers", "newUsers", "sessions", "screenPageViews",
-        "bounceRate", "averageSessionDuration", "engagementRate",
-        "eventCount", "conversions",
+        "bounceRate", "averageSessionDuration", "engagementRate", "eventCount",
     ]
+    kpi_metrics = stable_metrics + ["conversions"]
     ranges = [cur]
     if compare:
         ranges.append(DateRange(start_date=compare[0], end_date=compare[1], name="previous"))
-    k = report([], kpi_metrics, ranges)
+    try:
+        k = report([], kpi_metrics, ranges)
+    except Exception:
+        kpi_metrics = stable_metrics
+        k = report([], kpi_metrics, ranges)
     cur_vals, prev_vals = {}, {}
     for row in k.rows:
         which = row.dimension_values[0].value if row.dimension_values else "current"
@@ -174,18 +192,21 @@ def run_ga_overview(
             out.append(item)
         return out
 
-    channels = breakdown("sessionDefaultChannelGroup", 6)
-    devices = breakdown("deviceCategory", 5)
-    geography = breakdown("country", 5)
-    source_medium = breakdown("sessionSourceMedium", 6)
-    browsers = breakdown("browser", 5)
-    new_vs_returning = breakdown("newVsReturning", 3)
-    events = breakdown("eventName", 8, metric="eventCount")
+    channels = safe(lambda: breakdown("sessionDefaultChannelGroup", 6), [])
+    devices = safe(lambda: breakdown("deviceCategory", 5), [])
+    geography = safe(lambda: breakdown("country", 5), [])
+    source_medium = safe(lambda: breakdown("sessionSourceMedium", 6), [])
+    browsers = safe(lambda: breakdown("browser", 5), [])
+    new_vs_returning = safe(lambda: breakdown("newVsReturning", 3), [])
+    events = safe(lambda: breakdown("eventName", 8, metric="eventCount"), [])
 
-    def page_table(dim, limit):
+    # `views` holds whatever ranking metric the dimension supports. pagePath ranks
+    # by screenPageViews; landingPage is session-scoped and is NOT compatible with
+    # screenPageViews, so it ranks by sessions instead.
+    def page_table(dim, limit, metric="screenPageViews"):
         rep = report(
-            [dim], ["screenPageViews", "bounceRate"],
-            cur_only, order_bys=[_metric_desc("screenPageViews")], limit=limit,
+            [dim], [metric, "bounceRate"],
+            cur_only, order_bys=[_metric_desc(metric)], limit=limit,
         )
         return [
             {
@@ -196,15 +217,18 @@ def run_ga_overview(
             for r in rep.rows
         ]
 
-    top_pages = page_table("pagePath", 6)
-    landing_pages = page_table("landingPage", 6)
+    top_pages = safe(lambda: page_table("pagePath", 6), [])
+    landing_pages = safe(lambda: page_table("landingPage", 6, metric="sessions"), [])
 
-    cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=8)
-    conversions = [
-        {"name": r.dimension_values[0].value, "count": _int(r.metric_values[0].value)}
-        for r in cv.rows
-        if _int(r.metric_values[0].value) > 0
-    ]
+    def _conversions():
+        cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=8)
+        return [
+            {"name": r.dimension_values[0].value, "count": _int(r.metric_values[0].value)}
+            for r in cv.rows
+            if _int(r.metric_values[0].value) > 0
+        ]
+
+    conversions = safe(_conversions, [])
 
     return {
         "kpis": kpis,
