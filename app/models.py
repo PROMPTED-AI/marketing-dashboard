@@ -1,6 +1,8 @@
-"""Data access for organizations, users, and connections."""
+"""Data access for organizations, users, connections, and dashboards."""
 import json
 import uuid
+
+from psycopg.types.json import Jsonb
 
 from . import config, crypto, db
 
@@ -266,3 +268,156 @@ def list_organizations_with_connections() -> list[dict]:
             }
         )
     return out
+
+
+# ------------------------------------------------------------------- dashboards
+#
+# Custom widget layouts, shared within an organization: any member of the org
+# sees and edits the same set. `page` scopes a dashboard to a screen so the
+# same mechanism can serve other tabs later. At most one default per (org, page).
+
+
+def list_dashboards(organization_id: str, page: str = "overview") -> list[dict]:
+    """All dashboards for an org+page (names + flags, no layout)."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, is_default, updated_at FROM dashboards "
+            "WHERE organization_id = %s AND page = %s "
+            "ORDER BY is_default DESC, lower(name)",
+            (organization_id, page),
+        ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "is_default": r[2],
+            "updated_at": r[3].isoformat() if r[3] else None,
+        }
+        for r in rows
+    ]
+
+
+def get_dashboard(organization_id: str, dashboard_id: str) -> dict | None:
+    """One dashboard with its full widget layout (org-scoped)."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, page, name, layout, is_default FROM dashboards "
+            "WHERE id = %s AND organization_id = %s",
+            (dashboard_id, organization_id),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "page": row[1],
+        "name": row[2],
+        "layout": row[3],
+        "is_default": row[4],
+    }
+
+
+def create_dashboard(
+    organization_id: str,
+    name: str,
+    layout: dict,
+    page: str = "overview",
+    created_by: str | None = None,
+    is_default: bool = False,
+) -> dict:
+    """Create a dashboard. The org's first one for a page becomes the default."""
+    dashboard_id = str(uuid.uuid4())
+    with db.get_conn() as conn:
+        existing = conn.execute(
+            "SELECT count(*) FROM dashboards WHERE organization_id = %s AND page = %s",
+            (organization_id, page),
+        ).fetchone()[0]
+        make_default = is_default or existing == 0
+        if make_default:
+            conn.execute(
+                "UPDATE dashboards SET is_default = false "
+                "WHERE organization_id = %s AND page = %s",
+                (organization_id, page),
+            )
+        conn.execute(
+            "INSERT INTO dashboards "
+            "(id, organization_id, page, name, layout, is_default, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (dashboard_id, organization_id, page, name, Jsonb(layout), make_default, created_by),
+        )
+    return {
+        "id": dashboard_id,
+        "page": page,
+        "name": name,
+        "layout": layout,
+        "is_default": make_default,
+    }
+
+
+def update_dashboard(
+    organization_id: str,
+    dashboard_id: str,
+    name: str | None = None,
+    layout: dict | None = None,
+    is_default: bool | None = None,
+) -> dict | None:
+    """Patch a dashboard's name/layout/default flag (org-scoped). None = unchanged."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT page FROM dashboards WHERE id = %s AND organization_id = %s",
+            (dashboard_id, organization_id),
+        ).fetchone()
+        if not row:
+            return None
+        page = row[0]
+        if name is not None:
+            conn.execute(
+                "UPDATE dashboards SET name = %s, updated_at = now() "
+                "WHERE id = %s AND organization_id = %s",
+                (name, dashboard_id, organization_id),
+            )
+        if layout is not None:
+            conn.execute(
+                "UPDATE dashboards SET layout = %s, updated_at = now() "
+                "WHERE id = %s AND organization_id = %s",
+                (Jsonb(layout), dashboard_id, organization_id),
+            )
+        if is_default:
+            conn.execute(
+                "UPDATE dashboards SET is_default = false "
+                "WHERE organization_id = %s AND page = %s",
+                (organization_id, page),
+            )
+            conn.execute(
+                "UPDATE dashboards SET is_default = true, updated_at = now() "
+                "WHERE id = %s AND organization_id = %s",
+                (dashboard_id, organization_id),
+            )
+    return get_dashboard(organization_id, dashboard_id)
+
+
+def delete_dashboard(organization_id: str, dashboard_id: str) -> bool:
+    """Delete a dashboard; if it was the default, promote another to default."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT page, is_default FROM dashboards "
+            "WHERE id = %s AND organization_id = %s",
+            (dashboard_id, organization_id),
+        ).fetchone()
+        if not row:
+            return False
+        page, was_default = row
+        conn.execute(
+            "DELETE FROM dashboards WHERE id = %s AND organization_id = %s",
+            (dashboard_id, organization_id),
+        )
+        if was_default:
+            nxt = conn.execute(
+                "SELECT id FROM dashboards WHERE organization_id = %s AND page = %s "
+                "ORDER BY lower(name) LIMIT 1",
+                (organization_id, page),
+            ).fetchone()
+            if nxt:
+                conn.execute(
+                    "UPDATE dashboards SET is_default = true WHERE id = %s", (nxt[0],)
+                )
+    return True

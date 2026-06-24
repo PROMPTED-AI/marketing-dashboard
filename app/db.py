@@ -5,6 +5,7 @@ Tables
 organizations  : one per client company (grouped by email domain)
 users          : people who sign in; each belongs to one organization + role
 connections    : one GA OAuth connection per organization (encrypted, with status)
+dashboards     : user-composed widget layouts, shared within an organization
 """
 from psycopg_pool import ConnectionPool
 
@@ -83,4 +84,28 @@ def init_schema() -> None:
                 UNIQUE (organization_id, provider)
             )
             """
+        )
+        # Custom dashboards: a named layout of widgets the user composes. Shared
+        # within an organization (any member sees/edits the org's dashboards).
+        # `page` scopes a dashboard to a screen (e.g. 'overview') so the same
+        # mechanism can later serve other tabs. `layout` holds the widget config
+        # as JSON. At most one dashboard per (org, page) is the default.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dashboards (
+                id               TEXT PRIMARY KEY,
+                organization_id  TEXT NOT NULL REFERENCES organizations(id),
+                page             TEXT NOT NULL DEFAULT 'overview',
+                name             TEXT NOT NULL,
+                layout           JSONB NOT NULL DEFAULT '{"widgets": []}',
+                is_default       BOOLEAN NOT NULL DEFAULT false,
+                created_by       TEXT,
+                created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS dashboards_org_page_idx "
+            "ON dashboards (organization_id, page)"
         )
