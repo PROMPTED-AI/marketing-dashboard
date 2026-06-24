@@ -11,11 +11,14 @@ export function ActiveOrgProvider({ children }) {
   const [orgs, setOrgs] = useState([]);
   const [orgId, setOrgId] = useState(() => localStorage.getItem("kompas-active-org") || "");
 
-  useEffect(() => {
-    if (!me) return;
+  const reload = () =>
     api("/api/organizations")
       .then((d) => setOrgs(d.organizations || []))
       .catch(() => setOrgs([]));
+
+  useEffect(() => {
+    if (!me) return;
+    reload();
   }, [me?.email]);
 
   // Default to (and fall back to) the user's own org.
@@ -35,7 +38,7 @@ export function ActiveOrgProvider({ children }) {
   };
 
   const orgName = orgs.find((o) => o.id === orgId)?.name || me?.organization?.name || "—";
-  return <Ctx.Provider value={{ orgId, orgName, orgs, setOrg }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ orgId, orgName, orgs, setOrg, reload }}>{children}</Ctx.Provider>;
 }
 
 export const useActiveOrg = () => useContext(Ctx);

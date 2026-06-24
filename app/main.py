@@ -202,6 +202,24 @@ def admin_add_organization(request: Request, payload: OrgIn):
     return {"organization": org}
 
 
+class OrgRename(BaseModel):
+    name: str
+
+
+@app.patch("/api/organizations/{org_id}")
+def rename_organization(request: Request, org_id: str, payload: OrgRename):
+    """Rename an organization (agency admins only)."""
+    auth.require_admin(request)
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Naam is vereist")
+    org = models.rename_organization(org_id, name)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden")
+    cache.invalidate_org(org_id)
+    return {"organization": org}
+
+
 @app.get("/api/organizations")
 def organizations(request: Request):
     """Organizations the user may view/switch to (admins: all; clients: own)."""
