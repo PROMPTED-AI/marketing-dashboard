@@ -96,7 +96,14 @@ def run_ga_overview(
         return client.run_report(req)
 
     # --- KPIs (current + optional comparison) ---
-    kpi_metrics = ["totalUsers", "sessions", "bounceRate", "averageSessionDuration"]
+    # One report covers all scalar metrics, so adding more KPI widgets here is
+    # effectively free (no extra GA call). `conversions` is the total of all key
+    # events; the per-event breakdown lives in `conversions` further down.
+    kpi_metrics = [
+        "totalUsers", "newUsers", "sessions", "screenPageViews",
+        "bounceRate", "averageSessionDuration", "engagementRate",
+        "eventCount", "conversions",
+    ]
     ranges = [cur]
     if compare:
         ranges.append(DateRange(start_date=compare[0], end_date=compare[1], name="previous"))
@@ -110,9 +117,14 @@ def run_ga_overview(
 
     kpis = {
         "users": int(cur_vals.get("totalUsers", 0)),
+        "newUsers": int(cur_vals.get("newUsers", 0)),
         "sessions": int(cur_vals.get("sessions", 0)),
+        "pageViews": int(cur_vals.get("screenPageViews", 0)),
         "bounceRate": cur_vals.get("bounceRate", 0.0),
         "avgSessionDuration": cur_vals.get("averageSessionDuration", 0.0),
+        "engagementRate": cur_vals.get("engagementRate", 0.0),
+        "eventCount": int(cur_vals.get("eventCount", 0)),
+        "conversions": int(cur_vals.get("conversions", 0)),
     }
     deltas = None
     if compare:
@@ -121,9 +133,14 @@ def run_ga_overview(
             return ((c - p) / p * 100) if p else None
         deltas = {
             "users": delta("totalUsers"),
+            "newUsers": delta("newUsers"),
             "sessions": delta("sessions"),
+            "pageViews": delta("screenPageViews"),
             "bounceRate": delta("bounceRate"),
             "avgSessionDuration": delta("averageSessionDuration"),
+            "engagementRate": delta("engagementRate"),
+            "eventCount": delta("eventCount"),
+            "conversions": delta("conversions"),
         }
 
     # --- sessions over time (+ comparison series for the dashed line) ---
@@ -143,30 +160,46 @@ def run_ga_overview(
         compare_series = [_int(r.metric_values[0].value) for r in sdp.rows]
 
     # --- breakdowns (current range only) ---
-    def breakdown(dim, limit):
-        rep = report([dim], ["sessions"], cur_only, order_bys=[_metric_desc("sessions")], limit=limit)
+    # Generic: any dimension ranked by any metric. Rows carry `value` (the metric
+    # total) so the frontend can render sessions, events, users, etc. uniformly.
+    def breakdown(dim, limit, metric="sessions"):
+        rep = report([dim], [metric], cur_only, order_bys=[_metric_desc(metric)], limit=limit)
         rows = [(r.dimension_values[0].value, _int(r.metric_values[0].value)) for r in rep.rows]
         total = sum(v for _, v in rows) or 1
-        return [{"label": label, "sessions": v, "pct": _pct(v, total)} for label, v in rows]
+        out = []
+        for label, v in rows:
+            item = {"label": label, "value": v, "pct": _pct(v, total)}
+            if metric == "sessions":
+                item["sessions"] = v  # back-compat: existing screens/exports read .sessions
+            out.append(item)
+        return out
 
     channels = breakdown("sessionDefaultChannelGroup", 6)
     devices = breakdown("deviceCategory", 5)
     geography = breakdown("country", 5)
+    source_medium = breakdown("sessionSourceMedium", 6)
+    browsers = breakdown("browser", 5)
+    new_vs_returning = breakdown("newVsReturning", 3)
+    events = breakdown("eventName", 8, metric="eventCount")
 
-    tp = report(
-        ["pagePath"], ["screenPageViews", "bounceRate"],
-        cur_only, order_bys=[_metric_desc("screenPageViews")], limit=6,
-    )
-    top_pages = [
-        {
-            "path": r.dimension_values[0].value,
-            "views": _int(r.metric_values[0].value),
-            "bounceRate": float(r.metric_values[1].value),
-        }
-        for r in tp.rows
-    ]
+    def page_table(dim, limit):
+        rep = report(
+            [dim], ["screenPageViews", "bounceRate"],
+            cur_only, order_bys=[_metric_desc("screenPageViews")], limit=limit,
+        )
+        return [
+            {
+                "path": r.dimension_values[0].value,
+                "views": _int(r.metric_values[0].value),
+                "bounceRate": float(r.metric_values[1].value),
+            }
+            for r in rep.rows
+        ]
 
-    cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=6)
+    top_pages = page_table("pagePath", 6)
+    landing_pages = page_table("landingPage", 6)
+
+    cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=8)
     conversions = [
         {"name": r.dimension_values[0].value, "count": _int(r.metric_values[0].value)}
         for r in cv.rows
@@ -181,7 +214,12 @@ def run_ga_overview(
         "channels": channels,
         "devices": devices,
         "geography": geography,
+        "source_medium": source_medium,
+        "browsers": browsers,
+        "new_vs_returning": new_vs_returning,
+        "events": events,
         "top_pages": top_pages,
+        "landing_pages": landing_pages,
         "conversions": conversions,
     }
 

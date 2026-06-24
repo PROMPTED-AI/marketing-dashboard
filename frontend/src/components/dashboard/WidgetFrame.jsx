@@ -1,5 +1,6 @@
 // Eén widget in de grid. In bewerkmodus verschijnt een regel met knoppen:
-// sleephandvat (volgorde), titel, type (als de bron meerdere kan), grootte, verwijderen.
+// sleephandvat (volgorde), titel, type, optioneel filter (bv. gebeurtenis),
+// grootte, verwijderen.
 import WidgetRenderer from "../WidgetRenderer.jsx";
 import { SOURCES, KINDS, SIZES } from "../../lib/widgetCatalog.js";
 
@@ -14,6 +15,9 @@ export default function WidgetFrame({
 }) {
   const src = SOURCES[widget.source];
   const kindOptions = src?.kinds || [widget.kind];
+  const cfg = src?.config;
+  const cfgOptions = cfg ? cfg.options(data) : [];
+  const cfgValue = (cfg && widget.config?.[cfg.key]) || cfg?.default;
 
   return (
     <div
@@ -44,6 +48,16 @@ export default function WidgetFrame({
           {kindOptions.length > 1 && (
             <select value={widget.kind} onChange={(e) => onChange({ kind: e.target.value })} style={ctrlStyle} title="Type">
               {kindOptions.map((k) => <option key={k} value={k}>{KINDS[k].label}</option>)}
+            </select>
+          )}
+          {cfg && (
+            <select
+              value={cfgValue}
+              onChange={(e) => onChange({ config: { ...(widget.config || {}), [cfg.key]: e.target.value } })}
+              style={{ ...ctrlStyle, maxWidth: 160 }}
+              title={cfg.label}
+            >
+              {cfgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           )}
           <select value={widget.size} onChange={(e) => onChange({ size: Number(e.target.value) })} style={ctrlStyle} title="Breedte">

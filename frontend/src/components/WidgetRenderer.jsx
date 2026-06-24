@@ -26,7 +26,7 @@ export default function WidgetRenderer({ widget, data }) {
   const spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
 
   if (widget.kind === "kpi") {
-    const s = src.scalar(data);
+    const s = src.scalar(data, widget.config);
     const delta = s.delta != null ? deltaProps(s.delta, s.higherBetter) : {};
     return (
       <KpiCard
@@ -54,15 +54,15 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "donut") {
-    const segs = src.breakdown(data);
-    const total = segs.reduce((a, x) => a + (x.sessions || 0), 0);
+    const segs = src.breakdown(data, widget.config);
+    const total = segs.reduce((a, x) => a + (x.value ?? x.sessions ?? 0), 0);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {segs.length === 0 ? (
           <Empty />
         ) : (
           <>
-            <Donut segments={segs} centerTop={num(total)} centerSub="sessies" />
+            <Donut segments={segs} centerTop={num(total)} centerSub={src.unit ?? "sessies"} />
             <div style={{ marginTop: 14 }}>
               <Legend segments={segs} />
             </div>
@@ -73,7 +73,7 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "bars") {
-    const rows = src.breakdown(data);
+    const rows = src.breakdown(data, widget.config);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {rows.length === 0 ? (
@@ -84,7 +84,7 @@ export default function WidgetRenderer({ widget, data }) {
               <ProgressRow
                 key={i}
                 label={r.label}
-                value={num(r.sessions)}
+                value={num(r.value ?? r.sessions)}
                 pct={r.pct}
                 color={palette[i % palette.length]}
                 labelWidth={120}
@@ -97,7 +97,7 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "table") {
-    const { columns, rows } = src.table(data);
+    const { columns, rows } = src.table(data, widget.config);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {rows.length === 0 ? (
