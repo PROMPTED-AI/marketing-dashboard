@@ -127,7 +127,7 @@ export const SOURCES = {
   landing_pages: {
     label: "Instappagina's", group: "table", kinds: ["table"],
     table: (d) => ({
-      columns: ["Instappagina", "Weergaven", "Bounce"],
+      columns: ["Instappagina", "Sessies", "Bounce"],
       rows: (d?.landing_pages ?? []).map((p) => [p.path, num(p.views), pct1((p.bounceRate || 0) * 100)]),
     }),
   },
