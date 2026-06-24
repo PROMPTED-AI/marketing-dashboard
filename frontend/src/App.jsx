@@ -8,6 +8,7 @@ import Overview from "./screens/dashboard/Overview.jsx";
 import Analytics from "./screens/dashboard/Analytics.jsx";
 import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
 import Integrations from "./screens/dashboard/Integrations.jsx";
+import Reports from "./screens/dashboard/Reports.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
 import Admin from "./screens/Admin.jsx";
@@ -50,7 +51,7 @@ export default function App() {
         <Route path="search-console" element={<SearchConsole />} />
         <Route path="google-ads" element={<Placeholder title="google ads" comingSoon />} />
         <Route path="meta" element={<Placeholder title="meta / social" comingSoon />} />
-        <Route path="reports" element={<Placeholder title="rapporten" />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Settings />} />
       </Route>
