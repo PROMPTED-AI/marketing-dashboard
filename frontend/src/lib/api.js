@@ -25,6 +25,12 @@ export function disconnectProvider(provider, orgId) {
   return api("/api/connections/" + encodeURIComponent(provider) + "/disconnect" + q, { method: "POST" });
 }
 
+// Meta uses its own Facebook Login flow (not the Google connect).
+export function metaLoginUrl(orgId, returnTo = "/app/integrations") {
+  const q = orgId ? "&org_id=" + encodeURIComponent(orgId) : "";
+  return "/api/auth/meta/login?return_to=" + encodeURIComponent(returnTo) + q;
+}
+
 // Incremental authorization: connect specific tools for the signed-in user.
 export function connectUrl(providers, returnTo = "/app/integrations") {
   const list = Array.isArray(providers) ? providers : [providers];

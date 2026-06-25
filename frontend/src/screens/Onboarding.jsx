@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { connectUrl } from "../lib/api.js";
+import { connectUrl, metaLoginUrl } from "../lib/api.js";
 import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
 const TOOLS = [
   { key: "ga", name: "Google Analytics", desc: "bezoekers, sessies, conversies & gedrag (GA4).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
   { key: "gsc", name: "Search Console", desc: "organisch verkeer, posities & zoekwoorden (SEO).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GscGlyph, bg: "#E8F0FE", live: true },
   { key: "ads", name: "Google Ads", desc: "campagnes, kosten, klikken & ROAS.", note: "OAuth via Google · veilig & alleen-lezen", Glyph: AdsGlyph, bg: "#E8F0FE", live: true },
-  { key: "meta", name: "META Ads", desc: "Facebook & Instagram campagnes en social bereik.", note: "binnenkort beschikbaar", Glyph: MetaGlyph, bg: "#E7F0FF", live: false },
+  { key: "meta", name: "META / social", desc: "Facebook & Instagram — campagnes, bereik & betrokkenheid.", note: "Facebook Login · veilig & alleen-lezen", Glyph: MetaGlyph, bg: "#E7F0FF", live: true },
 ];
 
 export default function Onboarding() {
@@ -26,7 +26,10 @@ export default function Onboarding() {
   const cont = () => {
     const googleSel = [sel.ga && "google_analytics", sel.gsc && "search_console", sel.ads && "google_ads"].filter(Boolean);
     localStorage.setItem("kompas-onboarded", "1");
-    if (googleSel.length) window.location.href = connectUrl(googleSel, "/app/overview");
+    // Meta has its own (Facebook) consent. If Google tools are also selected,
+    // connect those first and return to Integraties to add Meta there.
+    if (googleSel.length) window.location.href = connectUrl(googleSel, sel.meta ? "/app/integrations" : "/app/overview");
+    else if (sel.meta) window.location.href = metaLoginUrl(null, "/app/overview");
     else nav("/app/overview");
   };
   const skip = () => {
@@ -92,7 +95,7 @@ export default function Onboarding() {
             </button>
           </div>
           <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 14 }}>
-            Google Analytics, Search Console en Google Ads worden samen in één Google-toestemming gekoppeld. META volgt later.
+            Google Analytics, Search Console en Google Ads worden samen in één Google-toestemming gekoppeld. META loopt via een aparte Facebook-toestemming (koppel je daarna eventueel via Integraties).
           </div>
         </div>
       </div>

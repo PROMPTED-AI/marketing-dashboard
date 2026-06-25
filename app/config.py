@@ -20,7 +20,20 @@ PROVIDER_SCOPES = {
     "google_ads": ["https://www.googleapis.com/auth/adwords"],
 }
 GOOGLE_PROVIDERS = list(PROVIDER_SCOPES.keys())
-PLACEHOLDER_PROVIDERS = ["meta_ads"]
+PLACEHOLDER_PROVIDERS = []
+
+# Meta (Facebook + Instagram) uses its own Facebook Login OAuth flow, separate
+# from Google. App credentials are set on the Cloud Run service, never in repo.
+META_PROVIDERS = ["meta_ads"]
+META_APP_ID = os.environ.get("META_APP_ID", "")
+META_APP_SECRET = os.environ.get("META_APP_SECRET", "")
+META_REDIRECT_URI = os.environ.get("META_REDIRECT_URI", "")
+META_GRAPH_VERSION = os.environ.get("META_GRAPH_VERSION", "v21.0")
+META_SCOPES = [
+    "public_profile", "email", "ads_read", "business_management",
+    "pages_show_list", "pages_read_engagement", "read_insights",
+    "instagram_basic", "instagram_manage_insights",
+]
 
 # Google Ads needs an approved developer token (set on the Cloud Run service,
 # never in the repo). Optional login_customer_id is the manager (MCC) account id

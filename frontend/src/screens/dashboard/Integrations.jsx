@@ -1,6 +1,6 @@
 import { useConnections } from "../../lib/useConnections.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
-import { connectUrl, disconnectProvider } from "../../lib/api.js";
+import { connectUrl, metaLoginUrl, disconnectProvider } from "../../lib/api.js";
 import { invalidateOrg } from "../../lib/swr.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
@@ -56,7 +56,7 @@ export default function Integrations() {
                 <StatusPill status={c.status} />
               </div>
               <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
-                {canConnect && <a className="btn-primary" href={connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>}
+                {canConnect && <a className="btn-primary" href={c.provider === "meta_ads" ? metaLoginUrl(orgId) : connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>}
                 {c.status === "connected" && (
                   <>
                     <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>

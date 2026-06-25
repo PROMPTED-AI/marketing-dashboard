@@ -45,6 +45,27 @@ export function adsReportUrl(customerId, start, end, compare, orgId) {
   );
 }
 
+export function metaAccountsUrl(orgId) {
+  return "/api/meta/accounts" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
+}
+
+export function metaAdsReportUrl(adAccountId, start, end, compare, orgId) {
+  if (!adAccountId) return null;
+  return (
+    "/api/meta/ads-report?ad_account_id=" + encodeURIComponent(adAccountId) +
+    "&start=" + start + "&end=" + end + compareQ(compare) + orgQ(orgId)
+  );
+}
+
+export function metaOrganicReportUrl(pageId, igId, start, end, orgId) {
+  if (!pageId) return null;
+  return (
+    "/api/meta/organic-report?page_id=" + encodeURIComponent(pageId) +
+    (igId ? "&ig_id=" + encodeURIComponent(igId) : "") +
+    "&start=" + start + "&end=" + end + orgQ(orgId)
+  );
+}
+
 export function connectionsUrl(orgId) {
   return "/api/connections" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
 }
