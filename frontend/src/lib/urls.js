@@ -33,6 +33,18 @@ export function sitesUrl(orgId) {
   return "/api/search-console/sites" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
 }
 
+export function adsAccountsUrl(orgId) {
+  return "/api/google-ads/accounts" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
+}
+
+export function adsReportUrl(customerId, start, end, compare, orgId) {
+  if (!customerId) return null;
+  return (
+    "/api/google-ads/report?customer_id=" + encodeURIComponent(customerId) +
+    "&start=" + start + "&end=" + end + compareQ(compare) + orgQ(orgId)
+  );
+}
+
 export function connectionsUrl(orgId) {
   return "/api/connections" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
 }

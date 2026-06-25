@@ -17,9 +17,18 @@ LOGIN_SCOPES = ["https://www.googleapis.com/auth/userinfo.email"]
 PROVIDER_SCOPES = {
     "google_analytics": ["https://www.googleapis.com/auth/analytics.readonly"],
     "search_console": ["https://www.googleapis.com/auth/webmasters.readonly"],
+    "google_ads": ["https://www.googleapis.com/auth/adwords"],
 }
 GOOGLE_PROVIDERS = list(PROVIDER_SCOPES.keys())
-PLACEHOLDER_PROVIDERS = ["google_ads", "meta_ads"]
+PLACEHOLDER_PROVIDERS = ["meta_ads"]
+
+# Google Ads needs an approved developer token (set on the Cloud Run service,
+# never in the repo). Optional login_customer_id is the manager (MCC) account id
+# under which client accounts are accessed — digits only, no dashes.
+GOOGLE_ADS_DEVELOPER_TOKEN = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN", "")
+GOOGLE_ADS_LOGIN_CUSTOMER_ID = "".join(
+    c for c in os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "") if c.isdigit()
+)
 
 # Union used when exchanging the auth code (oauthlib's scope check is relaxed,
 # so the flow object can carry the superset regardless of what was requested).

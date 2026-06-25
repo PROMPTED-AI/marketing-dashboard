@@ -5,6 +5,7 @@ google-auth-oauthlib>=1.2
 google-analytics-data>=0.18
 google-analytics-admin>=0.22
 google-api-python-client>=2.0
+google-ads>=25.0
 itsdangerous>=2.1
 python-dotenv>=1.0
 psycopg[binary]>=3.1

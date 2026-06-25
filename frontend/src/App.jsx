@@ -7,6 +7,7 @@ import Dashboard from "./screens/dashboard/Layout.jsx";
 import Overview from "./screens/dashboard/Overview.jsx";
 import Analytics from "./screens/dashboard/Analytics.jsx";
 import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
+import GoogleAds from "./screens/dashboard/GoogleAds.jsx";
 import Integrations from "./screens/dashboard/Integrations.jsx";
 import Reports from "./screens/dashboard/Reports.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
@@ -49,7 +50,7 @@ export default function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<SearchConsole />} />
-        <Route path="google-ads" element={<Placeholder title="google ads" comingSoon />} />
+        <Route path="google-ads" element={<GoogleAds />} />
         <Route path="meta" element={<Placeholder title="meta / social" comingSoon />} />
         <Route path="reports" element={<Reports />} />
         <Route path="integrations" element={<Integrations />} />
