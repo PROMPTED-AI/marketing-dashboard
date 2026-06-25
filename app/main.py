@@ -28,6 +28,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from google.api_core.exceptions import Unauthenticated
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
@@ -80,6 +81,21 @@ def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credent
     # Persist any refreshed access token.
     models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
     return creds
+
+
+def _google_data(org_id: str, provider: str, fn):
+    """Run a Google data call; turn an auth failure into a clean 'reconnect' 409.
+
+    Tokens can be revoked or rejected at call time (HTTP 401 UNAUTHENTICATED),
+    not just at refresh time. Without this, that 401 surfaces as a raw 500 and
+    takes down Overzicht/Analytics. Here we flip the connection to 'revoked' so
+    the UI shows a reconnect prompt instead.
+    """
+    try:
+        return fn()
+    except (RefreshError, Unauthenticated):
+        models.set_connection_status(org_id, "revoked", provider=provider)
+        raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
 
 
 def _meta_token(org_id: str) -> str:
@@ -259,7 +275,8 @@ def properties(request: Request, org_id: str | None = None):
     if cached is not None:
         return cached
     creds = _org_credentials(target_org)
-    payload = {"org_id": target_org, "properties": analytics.list_properties(creds)}
+    properties_list = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
+    payload = {"org_id": target_org, "properties": properties_list}
     cache.set(key, payload, cache.LIST_TTL)
     return payload
 
@@ -269,7 +286,7 @@ def report(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org)
-    rows = analytics.run_basic_report(creds, property_id)
+    rows = _google_data(target_org, "google_analytics", lambda: analytics.run_basic_report(creds, property_id))
     return {"org_id": target_org, "property_id": property_id, "rows": rows}
 
 
@@ -291,7 +308,7 @@ def analytics_overview(
         return cached
     creds = _org_credentials(target_org)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
-    data = analytics.run_ga_overview(creds, property_id, start, end, compare)
+    data = _google_data(target_org, "google_analytics", lambda: analytics.run_ga_overview(creds, property_id, start, end, compare))
     payload = {"org_id": target_org, "property_id": property_id, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
@@ -302,7 +319,8 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     creds = _org_credentials(target_org)
-    return {"property_id": property_id, **analytics.run_realtime(creds, property_id)}
+    rt = _google_data(target_org, "google_analytics", lambda: analytics.run_realtime(creds, property_id))
+    return {"property_id": property_id, **rt}
 
 
 def _connections_payload(target_org: str) -> dict:
@@ -359,7 +377,8 @@ def gsc_sites(request: Request, org_id: str | None = None):
     if cached is not None:
         return cached
     creds = _org_credentials(target_org, provider="search_console")
-    payload = {"org_id": target_org, "sites": search_console.list_sites(creds)}
+    sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
+    payload = {"org_id": target_org, "sites": sites}
     cache.set(key, payload, cache.LIST_TTL)
     return payload
 
@@ -382,7 +401,7 @@ def gsc_report(
         return cached
     creds = _org_credentials(target_org, provider="search_console")
     compare = (compare_start, compare_end) if compare_start and compare_end else None
-    data = search_console.run_search_analytics(creds, site, start, end, compare)
+    data = _google_data(target_org, "search_console", lambda: search_console.run_search_analytics(creds, site, start, end, compare))
     payload = {"org_id": target_org, "site": site, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
