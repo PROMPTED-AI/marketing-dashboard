@@ -55,11 +55,17 @@ Het dashboard vraagt deze permissies bij het koppelen:
 
 | Permissie | Waarvoor |
 |---|---|
-| `public_profile`, `email` | identiteit van de koppelende gebruiker |
+| `public_profile` | identiteit van de koppelende gebruiker |
 | `ads_read` | META Ads-statistieken |
 | `business_management` | toegang tot advertentieaccounts/pagina's in het bedrijf |
-| `pages_show_list`, `pages_read_engagement`, `read_insights` | Facebook-pagina + insights |
+| `pages_show_list`, `pages_read_engagement` | Facebook-pagina + insights |
 | `instagram_basic`, `instagram_manage_insights` | Instagram-insights |
+
+> De Instagram-permissies verschijnen pas nadat je het **Instagram-product** aan
+> de app hebt toegevoegd én er een zakelijk/creator IG-account aan de
+> Facebook-pagina is gekoppeld. Zoek permissies op via de **zoekbalk** in
+> *App Review → Permissions and Features* (of via *Use cases*). De scopes `email`
+> en `read_insights` zijn voor dit app-type **niet** geldig — gebruik ze niet.
 
 ## 6. App-gegevens veilig op de server zetten
 
@@ -89,7 +95,7 @@ testen vóór App Review.
 Voor gebruik door externe klanten:
 
 1. *App Review → Permissions and Features*: vraag **Advanced Access** aan voor:
-   `ads_read`, `pages_read_engagement`, `read_insights`, `instagram_basic`,
+   `ads_read`, `pages_read_engagement`, `instagram_basic`,
    `instagram_manage_insights`, `business_management`.
 2. Lever de gevraagde uitleg + een **schermopname** van de koppel-flow aan.
 3. Zet de app op **Live** (schakelaar bovenin het app-dashboard).

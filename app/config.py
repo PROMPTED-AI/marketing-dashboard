@@ -29,9 +29,12 @@ META_APP_ID = os.environ.get("META_APP_ID", "")
 META_APP_SECRET = os.environ.get("META_APP_SECRET", "")
 META_REDIRECT_URI = os.environ.get("META_REDIRECT_URI", "")
 META_GRAPH_VERSION = os.environ.get("META_GRAPH_VERSION", "v21.0")
+# Note: `email` and `read_insights` are not valid scopes for this app type
+# (Facebook rejects them and blocks the login dialog). Identity comes from
+# `public_profile`; page insights are covered by `pages_read_engagement`.
 META_SCOPES = [
-    "public_profile", "email", "ads_read", "business_management",
-    "pages_show_list", "pages_read_engagement", "read_insights",
+    "public_profile", "ads_read", "business_management",
+    "pages_show_list", "pages_read_engagement",
     "instagram_basic", "instagram_manage_insights",
 ]
 

@@ -79,12 +79,11 @@ def fetch_identity(access_token: str) -> str:
     """Name (or email) of the Meta user who authorized — used as the label."""
     resp = requests.get(
         _graph("me"),
-        params={"fields": "name,email", "access_token": access_token},
+        params={"fields": "name", "access_token": access_token},
         timeout=15,
     )
     resp.raise_for_status()
-    data = resp.json()
-    return data.get("name") or data.get("email") or "Meta-account"
+    return resp.json().get("name") or "Meta-account"
 
 
 def is_expired(creds: dict) -> bool:
