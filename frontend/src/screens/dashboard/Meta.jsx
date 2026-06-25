@@ -5,7 +5,15 @@ import { useCachedApi } from "../../lib/swr.js";
 import { metaAccountsUrl, metaAdsReportUrl, metaOrganicReportUrl } from "../../lib/urls.js";
 import { num, pct1, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
+import ExportButton from "../../components/ExportButton.jsx";
 import { MetaGlyph } from "../../components/icons.jsx";
+
+const growth = (v) => ((v || 0) >= 0 ? "+" : "") + num(v);
+const statusLabel = (s) => {
+  if (!s) return "—";
+  const map = { ACTIVE: "actief", PAUSED: "gepauzeerd", ARCHIVED: "gearchiveerd", DELETED: "verwijderd" };
+  return map[s] || s.toLowerCase();
+};
 
 const money = (v, cur) =>
   new Intl.NumberFormat("nl-NL", cur ? { style: "currency", currency: cur } : { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
@@ -36,6 +44,40 @@ export default function Meta() {
   const { data: ads, error: adsErr } = useCachedApi(metaAdsReportUrl(adAccount, start, end, compare, orgId));
   const { data: organic, error: orgErr } = useCachedApi(metaOrganicReportUrl(pageId, ig?.id, start, end, orgId));
 
+  const sections = () => {
+    const out = [];
+    if (ads?.kpis) {
+      out.push({ title: "META Ads — " + label });
+      out.push({ columns: ["Metric", "Waarde"], rows: [
+        ["Uitgaven", (ads.kpis.spend || 0).toFixed(2)],
+        ["Vertoningen", ads.kpis.impressions],
+        ["Bereik", ads.kpis.reach],
+        ["Frequentie", (ads.kpis.frequency || 0).toFixed(2)],
+        ["Klikken", ads.kpis.clicks],
+        ["CTR %", (ads.kpis.ctr || 0).toFixed(2)],
+        ["CPC", (ads.kpis.cpc || 0).toFixed(2)],
+        ["CPM", (ads.kpis.cpm || 0).toFixed(2)],
+      ] });
+      if (ads.results?.length)
+        out.push({ title: "Resultaten per doel", columns: ["Doel", "Aantal", "Waarde", "ROAS", "CPA"],
+          rows: ads.results.map((r) => [r.goal, r.count, (r.value || 0).toFixed(2), (r.roas || 0).toFixed(2), (r.cpa || 0).toFixed(2)]) });
+      if (ads.campaigns?.length)
+        out.push({ title: "Campagnes", columns: ["Campagne", "Doelstelling", "Status", "Uitgaven", "Klikken", "CTR %", "Resultaten"],
+          rows: ads.campaigns.map((c) => [c.name, c.objective || "", c.status || "", (c.spend || 0).toFixed(2), c.clicks, (c.ctr || 0).toFixed(2), c.results]) });
+    }
+    if (organic?.facebook && Object.keys(organic.facebook).length)
+      out.push({ title: "Facebook (organisch)", columns: ["Metric", "Waarde"], rows: [
+        ["Volgers", organic.facebook.followers], ["Volgersgroei", organic.facebook.followers_growth],
+        ["Bereik", organic.facebook.reach], ["Vertoningen", organic.facebook.impressions], ["Betrokkenheid", organic.facebook.engagement],
+      ] });
+    if (organic?.instagram)
+      out.push({ title: "Instagram (organisch)", columns: ["Metric", "Waarde"], rows: [
+        ["Volgers", organic.instagram.followers], ["Volgersgroei", organic.instagram.followers_growth],
+        ["Bereik", organic.instagram.reach], ["Vertoningen", organic.instagram.impressions], ["Profielbezoeken", organic.instagram.profile_views],
+      ] });
+    return out;
+  };
+
   if (loading) return <TabState loading />;
   if (assetsErr) return <TabState error={assetsErr} onConnect />;
   if (!adAccounts?.length && !pages?.length)
@@ -64,6 +106,7 @@ export default function Meta() {
                 {pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
+            {(ads || organic) && <ExportButton filename="meta-social" sections={sections} />}
           </div>
         }
       />
@@ -85,6 +128,8 @@ export default function Meta() {
                 <KpiCard label="Klikken" value={num(ads.kpis.clicks)} {...(ads.deltas ? deltaProps(ads.deltas.clicks, true) : {})} />
                 <KpiCard label="CTR" value={pct1(ads.kpis.ctr)} {...(ads.deltas ? deltaProps(ads.deltas.ctr, true) : {})} />
                 <KpiCard label="CPC" value={money(ads.kpis.cpc, currency)} {...(ads.deltas ? deltaProps(ads.deltas.cpc, false) : {})} />
+                <KpiCard label="Frequentie" value={(ads.kpis.frequency || 0).toFixed(2).replace(".", ",")} />
+                <KpiCard label="CPM" value={money(ads.kpis.cpm, currency)} {...(ads.deltas ? deltaProps(ads.deltas.cpm, false) : {})} />
               </div>
 
               <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
@@ -102,9 +147,9 @@ export default function Meta() {
               <SectionCard title="campagnes">
                 {ads.campaigns?.length ? (
                   <Table
-                    head={["Campagne", "Doelstelling", "Uitgaven", "Klikken", "CTR", "Resultaten"]}
-                    cols="2fr 1.2fr 1fr 0.8fr 0.7fr 0.9fr"
-                    rows={ads.campaigns.map((c) => [c.name, c.objective || "—", money(c.spend, currency), num(c.clicks), pct1(c.ctr), num(c.results)])}
+                    head={["Campagne", "Doelstelling", "Status", "Uitgaven", "Klikken", "CTR", "Resultaten"]}
+                    cols="1.8fr 1.1fr 0.9fr 1fr 0.8fr 0.7fr 0.9fr"
+                    rows={ads.campaigns.map((c) => [c.name, c.objective || "—", statusLabel(c.status), money(c.spend, currency), num(c.clicks), pct1(c.ctr), num(c.results)])}
                   />
                 ) : <Empty>geen campagnedata in deze periode.</Empty>}
               </SectionCard>
@@ -127,6 +172,7 @@ export default function Meta() {
               <>
                 <KpiRow items={[
                   ["Volgers", num(organic.facebook.followers)],
+                  ["Volgersgroei", growth(organic.facebook.followers_growth)],
                   ["Bereik", num(organic.facebook.reach)],
                   ["Vertoningen", num(organic.facebook.impressions)],
                   ["Betrokkenheid", num(organic.facebook.engagement)],
@@ -144,6 +190,7 @@ export default function Meta() {
               <>
                 <KpiRow items={[
                   ["Volgers", num(organic.instagram.followers)],
+                  ["Volgersgroei", growth(organic.instagram.followers_growth)],
                   ["Bereik", num(organic.instagram.reach)],
                   ["Vertoningen", num(organic.instagram.impressions)],
                   ["Profielbezoeken", num(organic.instagram.profile_views)],

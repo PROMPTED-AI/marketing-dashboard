@@ -195,19 +195,26 @@ def _fb_page(token: str, page_id: str, start: str, end: str) -> dict:
     followers = int(_num(info.get("followers_count") or info.get("fan_count")))
 
     reach = impressions = engagement = 0
+    fan_adds = fan_removes = 0
     try:
         ins = _get(f"{page_id}/insights", token, {
-            "metric": "page_impressions,page_post_engagements,page_impressions_unique",
+            "metric": ("page_impressions,page_post_engagements,page_impressions_unique,"
+                       "page_fan_adds,page_fan_removes"),
             "period": "day", "since": start, "until": end,
         }).get("data", [])
         for m in ins:
             total = sum(_num(v.get("value")) for v in m.get("values", []))
-            if m.get("name") == "page_impressions":
+            name = m.get("name")
+            if name == "page_impressions":
                 impressions = int(total)
-            elif m.get("name") == "page_impressions_unique":
+            elif name == "page_impressions_unique":
                 reach = int(total)
-            elif m.get("name") == "page_post_engagements":
+            elif name == "page_post_engagements":
                 engagement = int(total)
+            elif name == "page_fan_adds":
+                fan_adds = int(total)
+            elif name == "page_fan_removes":
+                fan_removes = int(total)
     except Exception as exc:  # noqa: BLE001
         log.info("meta fb page insights failed: %s", exc)
 
@@ -231,7 +238,8 @@ def _fb_page(token: str, page_id: str, start: str, end: str) -> dict:
     except Exception as exc:  # noqa: BLE001
         log.info("meta fb posts failed: %s", exc)
 
-    return {"followers": followers, "reach": reach, "impressions": impressions,
+    return {"followers": followers, "followers_growth": fan_adds - fan_removes,
+            "reach": reach, "impressions": impressions,
             "engagement": engagement, "top_posts": posts}
 
 
@@ -239,20 +247,23 @@ def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
     info = _get(ig_id, token, {"fields": "followers_count,media_count,username"})
     followers = int(_num(info.get("followers_count")))
 
-    reach = impressions = profile_views = 0
+    reach = impressions = profile_views = growth = 0
     try:
         ins = _get(f"{ig_id}/insights", token, {
-            "metric": "reach,impressions,profile_views",
+            "metric": "reach,impressions,profile_views,follower_count",
             "period": "day", "since": start, "until": end,
         }).get("data", [])
         for m in ins:
             total = sum(_num(v.get("value")) for v in m.get("values", []))
-            if m.get("name") == "reach":
+            name = m.get("name")
+            if name == "reach":
                 reach = int(total)
-            elif m.get("name") == "impressions":
+            elif name == "impressions":
                 impressions = int(total)
-            elif m.get("name") == "profile_views":
+            elif name == "profile_views":
                 profile_views = int(total)
+            elif name == "follower_count":
+                growth = int(total)
     except Exception as exc:  # noqa: BLE001
         log.info("meta ig insights failed: %s", exc)
 
@@ -275,7 +286,7 @@ def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
         log.info("meta ig media failed: %s", exc)
 
     return {"username": info.get("username"), "followers": followers,
-            "reach": reach, "impressions": impressions,
+            "followers_growth": growth, "reach": reach, "impressions": impressions,
             "profile_views": profile_views, "top_posts": posts}
 
 
