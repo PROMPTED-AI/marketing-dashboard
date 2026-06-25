@@ -21,6 +21,7 @@ GET  /api/admin/organizations       -> (admin) all orgs + connection status
 GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -32,7 +33,10 @@ from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, auth, cache, config, db, google_ads, models, oauth, search_console
+from . import (
+    analytics, auth, cache, config, db, google_ads, meta, meta_oauth, models,
+    oauth, search_console,
+)
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -76,6 +80,21 @@ def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credent
     # Persist any refreshed access token.
     models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
     return creds
+
+
+def _meta_token(org_id: str) -> str:
+    """Load an org's Meta token, flipping status to revoked when expired."""
+    conn = models.get_connection(org_id, provider="meta_ads")
+    if not conn or conn["status"] != "connected":
+        raise HTTPException(status_code=409, detail="No active Meta connection for this organization")
+    creds = conn["creds"]
+    if meta_oauth.is_expired(creds):
+        models.set_connection_status(org_id, "revoked", provider="meta_ads")
+        raise HTTPException(status_code=409, detail="Meta-koppeling verlopen - opnieuw koppelen")
+    token = creds.get("access_token")
+    if not token:
+        raise HTTPException(status_code=409, detail="Meta-koppeling ongeldig - opnieuw koppelen")
+    return token
 
 
 @app.get("/healthz")
@@ -288,7 +307,7 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
 
 def _connections_payload(target_org: str) -> dict:
     items = []
-    for provider in config.GOOGLE_PROVIDERS:
+    for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS:
         conn = models.get_connection(target_org, provider=provider)
         items.append(
             {
@@ -315,14 +334,15 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
     """Remove a source. Revoke the Google grant once the last Google source goes."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
-    if provider not in config.GOOGLE_PROVIDERS:
+    if provider not in config.GOOGLE_PROVIDERS and provider not in config.META_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unknown provider")
 
     conn = models.get_connection(target_org, provider=provider)
     models.delete_connection(target_org, provider)
     cache.invalidate_org(target_org)  # drop cached property/report data for this org
     # If this was the last Google connection, revoke the shared grant at Google.
-    if conn and models.count_google_connections(target_org) == 0:
+    # (Meta has its own grant and is simply removed, no Google revoke.)
+    if provider in config.GOOGLE_PROVIDERS and conn and models.count_google_connections(target_org) == 0:
         try:
             oauth.revoke(oauth.credentials_from_dict(conn["creds"]))
         except Exception:
@@ -364,6 +384,112 @@ def gsc_report(
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = search_console.run_search_analytics(creds, site, start, end, compare)
     payload = {"org_id": target_org, "site": site, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
+
+
+# ---------------------------------------------------------------------- meta
+#
+# Meta (Facebook + Instagram) uses its own Facebook Login flow, separate from the
+# Google OAuth. The long-lived token is stored (encrypted) per org under the
+# 'meta_ads' provider, like the other connections.
+
+
+@app.get("/api/auth/meta/login")
+def meta_login(request: Request, org_id: str | None = None, return_to: str = "/app/integrations"):
+    if not request.session.get("user_id"):
+        return RedirectResponse("/login")
+    if not config.META_APP_ID or not config.META_REDIRECT_URI:
+        raise HTTPException(status_code=503, detail="Meta is nog niet geconfigureerd op de server")
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    state = uuid.uuid4().hex
+    request.session["meta_oauth_state"] = state
+    request.session["meta_oauth_org"] = target_org
+    request.session["meta_oauth_return"] = return_to if return_to.startswith("/") else "/app/integrations"
+    return RedirectResponse(meta_oauth.build_login_url(state))
+
+
+@app.get("/api/auth/meta/callback")
+def meta_callback(request: Request):
+    stored_state = request.session.get("meta_oauth_state")
+    returned_state = request.query_params.get("state")
+    if not stored_state or stored_state != returned_state:
+        raise HTTPException(status_code=400, detail="Invalid Meta OAuth state")
+    org_id = request.session.pop("meta_oauth_org", None)
+    return_to = request.session.pop("meta_oauth_return", "/app/integrations")
+    request.session.pop("meta_oauth_state", None)
+
+    code = request.query_params.get("code")
+    if not code or not org_id:  # user denied or session lost
+        return RedirectResponse(return_to)
+
+    creds = meta_oauth.exchange_code(code)
+    try:
+        name = meta_oauth.fetch_identity(creds["access_token"])
+    except Exception:
+        name = "Meta-account"
+    models.save_connection(org_id, name, creds, provider="meta_ads")
+    cache.invalidate_org(org_id)
+    return RedirectResponse(return_to)
+
+
+@app.get("/api/meta/accounts")
+def meta_accounts(request: Request, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|metaassets"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    token = _meta_token(target_org)
+    payload = {"org_id": target_org, **meta.list_assets(token)}
+    cache.set(key, payload, cache.LIST_TTL)
+    return payload
+
+
+@app.get("/api/meta/ads-report")
+def meta_ads_report(
+    request: Request,
+    ad_account_id: str,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|metaads|{ad_account_id}|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    token = _meta_token(target_org)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    data = meta.ads_overview(token, ad_account_id, start, end, compare)
+    payload = {"org_id": target_org, "ad_account_id": ad_account_id, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
+
+
+@app.get("/api/meta/organic-report")
+def meta_organic_report(
+    request: Request,
+    page_id: str,
+    start: str,
+    end: str,
+    ig_id: str | None = None,
+    org_id: str | None = None,
+):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|metaorg|{page_id}|{ig_id}|{start}|{end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    token = _meta_token(target_org)
+    data = meta.organic_overview(token, page_id, ig_id, start, end)
+    payload = {"org_id": target_org, "page_id": page_id, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
 
