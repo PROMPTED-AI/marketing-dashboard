@@ -1,6 +1,7 @@
 // Eén widget in de grid. In bewerkmodus verschijnt een regel met knoppen:
 // sleephandvat (volgorde), titel, type, optioneel filter (bv. gebeurtenis),
 // grootte, verwijderen.
+import { useEffect, useRef, useState } from "react";
 import WidgetRenderer from "../WidgetRenderer.jsx";
 import { SOURCES, KINDS, SIZES } from "../../lib/widgetCatalog.js";
 
@@ -8,6 +9,68 @@ const ctrlStyle = {
   height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--c-border)",
   background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "inherit", fontWeight: 600,
 };
+
+// Uitklapmenu met aanvinkvakjes: kies één of meer waarden. Een lege selectie
+// betekent "alles" (de bovenste optie). Gebruikt voor het key-event-filter.
+function MultiSelect({ label, options, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const selected = Array.isArray(value)
+    ? value.filter((v) => v && v !== "__all__")
+    : value && value !== "__all__" ? [value] : [];
+  const summary = selected.length === 0
+    ? "Alle key events"
+    : selected.length === 1 ? selected[0] : `${selected.length} gekozen`;
+
+  const toggle = (name) => {
+    const set = new Set(selected);
+    set.has(name) ? set.delete(name) : set.add(name);
+    onChange([...set]);
+  };
+
+  const rowStyle = { display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", fontSize: 12.5, cursor: "pointer", borderRadius: 6, whiteSpace: "nowrap" };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{ ...ctrlStyle, maxWidth: 180, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", overflow: "hidden" }}
+        title={label}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{summary}</span>
+        <span style={{ color: "var(--c-muted)", flex: "none" }}>▾</span>
+      </button>
+      {open && (
+        <div
+          className="card"
+          style={{ position: "absolute", zIndex: 30, top: 34, left: 0, minWidth: 220, maxHeight: 260, overflowY: "auto", padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,.14)" }}
+        >
+          <label style={rowStyle} onClick={(e) => { e.preventDefault(); onChange([]); }}>
+            <input type="checkbox" readOnly checked={selected.length === 0} />
+            <span style={{ fontWeight: 600 }}>Alle key events</span>
+          </label>
+          {options.map((o) => (
+            <label key={o.value} style={rowStyle} onClick={(e) => { e.preventDefault(); toggle(o.value); }}>
+              <input type="checkbox" readOnly checked={selected.includes(o.value)} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</span>
+            </label>
+          ))}
+          {options.length === 0 && (
+            <div style={{ padding: 8, fontSize: 12, color: "var(--c-muted)" }}>geen key events in deze periode</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function WidgetFrame({
   widget, data, editing, onChange, onRemove,
@@ -50,7 +113,14 @@ export default function WidgetFrame({
               {kindOptions.map((k) => <option key={k} value={k}>{KINDS[k].label}</option>)}
             </select>
           )}
-          {cfg && (
+          {cfg && (cfg.multi ? (
+            <MultiSelect
+              label={cfg.label}
+              options={cfgOptions}
+              value={widget.config?.[cfg.key] ?? cfg.default}
+              onChange={(vals) => onChange({ config: { ...(widget.config || {}), [cfg.key]: vals } })}
+            />
+          ) : (
             <select
               value={cfgValue}
               onChange={(e) => onChange({ config: { ...(widget.config || {}), [cfg.key]: e.target.value } })}
@@ -59,7 +129,7 @@ export default function WidgetFrame({
             >
               {cfgOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          )}
+          ))}
           <select value={widget.size} onChange={(e) => onChange({ size: Number(e.target.value) })} style={ctrlStyle} title="Breedte">
             {SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
