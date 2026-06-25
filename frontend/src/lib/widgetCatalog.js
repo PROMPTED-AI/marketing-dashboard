@@ -10,6 +10,14 @@ import { num, pct1 } from "./format.js";
 
 const sumConversions = (d) => (d?.conversions ?? []).reduce((a, c) => a + (c.count || 0), 0);
 
+// Normaliseer de gekozen key events naar een lijst namen. Accepteert de nieuwe
+// array-vorm én oude opgeslagen waarden (losse string of "__all__"); een lege
+// lijst betekent "alle key events".
+function selectedEvents(value) {
+  if (Array.isArray(value)) return value.filter((v) => v && v !== "__all__");
+  return value && value !== "__all__" ? [value] : [];
+}
+
 // group bepaalt hoe de renderer de bron leest en tekent:
 //   scalar     -> één getal (KPI-kaart)
 //   timeseries -> reeks over tijd (lijn-/vlakgrafiek)
@@ -44,21 +52,21 @@ export const SOURCES = {
   },
   conversions_total: {
     label: "Conversies", group: "scalar", kinds: ["kpi"], unit: "conversies",
-    // Filter op één key event; "__all__" telt alle key events bij elkaar op.
+    // Filter op één of meer key events; leeg = alle key events bij elkaar opgeteld.
     config: {
       key: "event",
       label: "Gebeurtenis",
-      default: "__all__",
-      options: (d) => [
-        { value: "__all__", label: "Alle key events" },
-        ...(d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
-      ],
+      multi: true,
+      default: [],
+      options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
     },
     scalar: (d, cfg) => {
-      const ev = cfg?.event;
-      if (ev && ev !== "__all__") {
-        const hit = (d?.conversions ?? []).find((c) => c.name === ev);
-        return { value: hit?.count ?? 0, fmt: "int", delta: null, higherBetter: true };
+      const names = selectedEvents(cfg?.event);
+      if (names.length) {
+        const total = (d?.conversions ?? [])
+          .filter((c) => names.includes(c.name))
+          .reduce((a, c) => a + (c.count || 0), 0);
+        return { value: total, fmt: "int", delta: null, higherBetter: true };
       }
       return { value: sumConversions(d), fmt: "int", delta: d?.deltas?.conversions, higherBetter: true };
     },
@@ -133,19 +141,17 @@ export const SOURCES = {
   },
   conversions: {
     label: "Conversies (lijst)", group: "table", kinds: ["table"],
-    // Filter op één key event; "__all__" toont alle key events.
+    // Filter op één of meer key events; leeg = alle key events.
     config: {
       key: "event",
       label: "Gebeurtenis",
-      default: "__all__",
-      options: (d) => [
-        { value: "__all__", label: "Alle key events" },
-        ...(d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
-      ],
+      multi: true,
+      default: [],
+      options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
     },
     table: (d, cfg) => {
-      const ev = cfg?.event;
-      const list = (d?.conversions ?? []).filter((c) => !ev || ev === "__all__" || c.name === ev);
+      const names = selectedEvents(cfg?.event);
+      const list = (d?.conversions ?? []).filter((c) => !names.length || names.includes(c.name));
       return {
         columns: ["Conversie", "Aantal"],
         rows: list.map((c) => [c.name, num(c.count)]),
