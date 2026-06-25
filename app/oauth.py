@@ -1,4 +1,6 @@
 """Helpers around the Google OAuth 2.0 Authorization Code flow."""
+from datetime import datetime
+
 import requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -87,7 +89,13 @@ def exchange_code(
 
 
 def credentials_to_dict(creds: Credentials) -> dict:
-    """Serialize Credentials for storage (keep the refresh_token!)."""
+    """Serialize Credentials for storage (keep the refresh_token + expiry!).
+
+    `expiry` is essential: without it a rebuilt Credentials object has
+    ``expiry = None``, which google-auth treats as "never expires" — so it keeps
+    handing Google a long-dead access token (HTTP 401 UNAUTHENTICATED) and never
+    refreshes. Persisting expiry lets the standard refresh logic kick in.
+    """
     return {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -95,12 +103,23 @@ def credentials_to_dict(creds: Credentials) -> dict:
         "client_id": creds.client_id,
         "client_secret": creds.client_secret,
         "scopes": creds.scopes,
+        "expiry": creds.expiry.isoformat() if creds.expiry else None,
     }
 
 
 def credentials_from_dict(data: dict) -> Credentials:
     """Rebuild Credentials from storage and refresh the access token if needed."""
+    data = dict(data)
+    expiry = data.pop("expiry", None)
     creds = Credentials(**data)
-    if not creds.valid and creds.refresh_token:
+    if expiry:
+        try:
+            creds.expiry = datetime.fromisoformat(expiry)
+        except (TypeError, ValueError):
+            creds.expiry = None
+    # Refresh when the token is stale. If the expiry is unknown (connections
+    # stored before expiry was persisted), refresh proactively so an
+    # already-expired token never reaches Google — this self-heals old grants.
+    if creds.refresh_token and (not creds.valid or not creds.expiry):
         creds.refresh(Request())
     return creds
