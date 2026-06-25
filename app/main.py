@@ -32,7 +32,7 @@ from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, auth, cache, config, db, models, oauth, search_console
+from . import analytics, auth, cache, config, db, google_ads, models, oauth, search_console
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -364,6 +364,54 @@ def gsc_report(
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = search_console.run_search_analytics(creds, site, start, end, compare)
     payload = {"org_id": target_org, "site": site, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
+
+
+# --------------------------------------------------------------- google ads
+
+
+@app.get("/api/google-ads/accounts")
+def ads_accounts(request: Request, org_id: str | None = None):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|adsaccounts"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    creds = _org_credentials(target_org, provider="google_ads")
+    try:
+        accounts = google_ads.list_accounts(creds)
+    except google_ads.AdsNotConfigured:
+        raise HTTPException(status_code=409, detail="Google Ads is nog niet geconfigureerd op de server")
+    payload = {"org_id": target_org, "accounts": accounts}
+    cache.set(key, payload, cache.LIST_TTL)
+    return payload
+
+
+@app.get("/api/google-ads/report")
+def ads_report(
+    request: Request,
+    customer_id: str,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|ads|{customer_id}|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    creds = _org_credentials(target_org, provider="google_ads")
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    try:
+        data = google_ads.run_overview(creds, customer_id, start, end, compare)
+    except google_ads.AdsNotConfigured:
+        raise HTTPException(status_code=409, detail="Google Ads is nog niet geconfigureerd op de server")
+    payload = {"org_id": target_org, "customer_id": customer_id, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
 
