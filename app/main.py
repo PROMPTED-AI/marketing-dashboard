@@ -356,7 +356,7 @@ def assistant_chat(request: Request, body: ChatBody):
     """Stream the AI assistant's answer (SSE). Tools read the active org's data."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, body.org_id)
-    if not config.ANTHROPIC_API_KEY:
+    if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
 
     def execute(name: str, _tool_input: dict) -> str:
@@ -394,7 +394,8 @@ def assistant_chat(request: Request, body: ChatBody):
 
     stream = assistant.stream_chat(
         body.messages, execute,
-        api_key=config.ANTHROPIC_API_KEY, model=config.ASSISTANT_MODEL,
+        api_key=config.EUROUTER_API_KEY, base_url=config.EUROUTER_BASE_URL,
+        model=config.EUROUTER_MODEL,
     )
     return StreamingResponse(
         stream,
