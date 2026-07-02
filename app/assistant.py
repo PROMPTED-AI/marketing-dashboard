@@ -1,13 +1,13 @@
 """AI-assistent: tool-use chat over de dashboarddata van de actieve klant.
 
-Deze module bevat alleen de LLM-orkestratie (Anthropic-loop + SSE-stream) en de
-tool-definities. De data-ophaling zelf gebeurt in `main.py` via een `execute`
-callback, zodat de org-scoping en de 409 "opnieuw koppelen"-afhandeling op één
-plek blijven.
+Draait via EuRouter, een EU-gehoste OpenAI-compatibele gateway. Deze module bevat
+alleen de LLM-orkestratie (chat-loop + SSE-stream) en de tool-definities. De
+data-ophaling gebeurt in `main.py` via een `execute`-callback, zodat de org-scoping
+en de 409 "opnieuw koppelen"-afhandeling op één plek blijven.
 """
 import json
 
-import anthropic
+from openai import OpenAI
 
 MAX_TOOL_ITERATIONS = 6
 
@@ -27,37 +27,47 @@ SYSTEM_PROMPT = (
     "- Hou antwoorden bondig en to-the-point."
 )
 
+# OpenAI-compatibele function/tool-definities (EuRouter gebruikt dit schema).
 TOOLS = [
     {
-        "name": "list_connections",
-        "description": (
-            "Toont welke databronnen (kanalen) gekoppeld zijn voor deze klant. "
-            "Roep dit aan als je niet zeker weet of een kanaal beschikbaar is, of "
-            "als de gebruiker vraagt wat er gekoppeld is."
-        ),
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "type": "function",
+        "function": {
+            "name": "list_connections",
+            "description": (
+                "Toont welke databronnen (kanalen) gekoppeld zijn voor deze klant. "
+                "Roep dit aan als je niet zeker weet of een kanaal beschikbaar is, of "
+                "als de gebruiker vraagt wat er gekoppeld is."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
     },
     {
-        "name": "get_analytics_overview",
-        "description": (
-            "Haalt het Google Analytics-overzicht van de klant op voor de huidige "
-            "periode: kerncijfers (bezoekers, sessies, conversies, bouncepercentage "
-            "e.d.) met vergelijking t.o.v. de vorige periode, verkeersbronnen, "
-            "apparaten, toppagina's en de trend over tijd. Roep dit aan bij vragen "
-            "over websiteverkeer, bezoekers, conversies of gedrag."
-        ),
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "type": "function",
+        "function": {
+            "name": "get_analytics_overview",
+            "description": (
+                "Haalt het Google Analytics-overzicht van de klant op voor de huidige "
+                "periode: kerncijfers (bezoekers, sessies, conversies, bouncepercentage "
+                "e.d.) met vergelijking t.o.v. de vorige periode, verkeersbronnen, "
+                "apparaten, toppagina's en de trend over tijd. Roep dit aan bij vragen "
+                "over websiteverkeer, bezoekers, conversies of gedrag."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
     },
     {
-        "name": "get_search_console",
-        "description": (
-            "Haalt de Google Search Console-data (SEO / organisch zoekverkeer) van "
-            "de klant op voor de huidige periode: klikken, vertoningen, CTR, "
-            "gemiddelde positie, top-zoekopdrachten en -pagina's, kansen (queries "
-            "net buiten pagina 1) en uitsplitsing per apparaat/land. Roep dit aan "
-            "bij vragen over SEO, zoekopdrachten, posities of quick wins."
-        ),
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "type": "function",
+        "function": {
+            "name": "get_search_console",
+            "description": (
+                "Haalt de Google Search Console-data (SEO / organisch zoekverkeer) van "
+                "de klant op voor de huidige periode: klikken, vertoningen, CTR, "
+                "gemiddelde positie, top-zoekopdrachten en -pagina's, kansen (queries "
+                "net buiten pagina 1) en uitsplitsing per apparaat/land. Roep dit aan "
+                "bij vragen over SEO, zoekopdrachten, posities of quick wins."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
     },
 ]
 
@@ -66,43 +76,60 @@ def _sse(event: str, **data) -> str:
     return "data: " + json.dumps({"type": event, **data}, ensure_ascii=False) + "\n\n"
 
 
-def stream_chat(messages: list, execute, *, api_key: str, model: str):
+def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: str):
     """Yield Server-Sent-Events strings for one chat turn.
 
     `messages` is the conversation history (user/assistant). `execute(name, input)`
     runs a tool and returns a JSON string (already org-scoped, never raises).
     """
-    client = anthropic.Anthropic(api_key=api_key)
-    convo = list(messages)
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    convo = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
     try:
         for _ in range(MAX_TOOL_ITERATIONS):
-            with client.messages.stream(
+            stream = client.chat.completions.create(
                 model=model,
-                max_tokens=6000,
-                system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-                tools=TOOLS,
-                thinking={"type": "adaptive"},
-                output_config={"effort": "medium"},
                 messages=convo,
-            ) as stream:
-                for text in stream.text_stream:
-                    yield _sse("text", text=text)
-                final = stream.get_final_message()
+                tools=TOOLS,
+                max_tokens=1500,
+                stream=True,
+            )
+            content = ""
+            calls = {}  # index -> {id, name, args}
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if getattr(delta, "content", None):
+                    content += delta.content
+                    yield _sse("text", text=delta.content)
+                for tc in (getattr(delta, "tool_calls", None) or []):
+                    slot = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                    if tc.id:
+                        slot["id"] = tc.id
+                    if tc.function and tc.function.name:
+                        slot["name"] = tc.function.name
+                    if tc.function and tc.function.arguments:
+                        slot["args"] += tc.function.arguments
 
-            convo.append({"role": "assistant", "content": final.content})
-            if final.stop_reason != "tool_use":
+            if not calls:
                 break
 
-            results = []
-            for block in final.content:
-                if block.type == "tool_use":
-                    yield _sse("tool", name=block.name)
-                    results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": execute(block.name, block.input),
-                    })
-            convo.append({"role": "user", "content": results})
+            convo.append({
+                "role": "assistant",
+                "content": content or None,
+                "tool_calls": [
+                    {"id": c["id"], "type": "function",
+                     "function": {"name": c["name"], "arguments": c["args"] or "{}"}}
+                    for c in calls.values()
+                ],
+            })
+            for c in calls.values():
+                yield _sse("tool", name=c["name"])
+                convo.append({
+                    "role": "tool",
+                    "tool_call_id": c["id"],
+                    "content": execute(c["name"], {}),
+                })
     except Exception as e:  # never leak a raw stack trace to the client
         yield _sse("error", message=f"Er ging iets mis met de assistent: {e}")
     yield _sse("done")
