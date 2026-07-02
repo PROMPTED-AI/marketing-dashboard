@@ -28,13 +28,13 @@ export default function Onboarding() {
     localStorage.setItem("kompas-onboarded", "1");
     // Meta has its own (Facebook) consent. If Google tools are also selected,
     // connect those first and return to Integraties to add Meta there.
-    if (googleSel.length) window.location.href = connectUrl(googleSel, sel.meta ? "/app/integrations" : "/app/overview");
-    else if (sel.meta) window.location.href = metaLoginUrl(null, "/app/overview");
-    else nav("/app/overview");
+    if (googleSel.length) window.location.href = connectUrl(googleSel, sel.meta ? "/app/integrations" : "/app/analytics");
+    else if (sel.meta) window.location.href = metaLoginUrl(null, "/app/analytics");
+    else nav("/app/analytics");
   };
   const skip = () => {
     localStorage.setItem("kompas-onboarded", "1");
-    nav("/app/overview");
+    nav("/app/analytics");
   };
 
   return (

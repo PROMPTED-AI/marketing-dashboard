@@ -4,7 +4,6 @@ import { useConnections } from "./lib/useConnections.jsx";
 import Login from "./screens/Login.jsx";
 import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
-import Overview from "./screens/dashboard/Overview.jsx";
 import Analytics from "./screens/dashboard/Analytics.jsx";
 import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
 import GoogleAds from "./screens/dashboard/GoogleAds.jsx";
@@ -36,7 +35,7 @@ function DashIndex() {
   if (loading) return <FullLoader />;
   const skipped = localStorage.getItem("kompas-onboarded");
   if (data && data.connected === 0 && !skipped) return <Navigate to="/onboarding" replace />;
-  return <Navigate to="/app/overview" replace />;
+  return <Navigate to="/app/analytics" replace />;
 }
 
 export default function App() {
@@ -48,7 +47,6 @@ export default function App() {
 
       <Route path="/app" element={<RequireAuth><Dashboard /></RequireAuth>}>
         <Route index element={<DashIndex />} />
-        <Route path="overview" element={<Overview />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<SearchConsole />} />
         <Route path="google-ads" element={<GoogleAds />} />

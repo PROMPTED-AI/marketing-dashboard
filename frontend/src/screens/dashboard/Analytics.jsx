@@ -1,15 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api.js";
 import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { useCachedApi } from "../../lib/swr.js";
 import { overviewUrl } from "../../lib/urls.js";
-import { num, pct1, duration, shortDate, deltaProps } from "../../lib/format.js";
-import { KpiCard, ProgressRow, SectionCard, TabState } from "../../components/ui.jsx";
-import { AreaChart, Donut, Legend, RealtimeBars, palette } from "../../components/charts.jsx";
+import { num } from "../../lib/format.js";
+import { SectionCard, TabState } from "../../components/ui.jsx";
+import { RealtimeBars } from "../../components/charts.jsx";
+import WidgetRenderer from "../../components/WidgetRenderer.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
+import { TEMPLATES, instantiateTemplate } from "../../lib/widgetCatalog.js";
+
+// De preset-views op het Analytics-tabblad = de doelgroepgerichte templates
+// (renderen tegen de overview-payload) + een aparte Realtime-view.
+const VIEW_IDS = ["executive", "acquisition", "behavior", "conversion"];
+const VIEWS = [
+  ...TEMPLATES.filter((t) => VIEW_IDS.includes(t.id)).map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
+  { id: "realtime", name: "Realtime", audience: "Live", tpl: null },
+];
 
 export default function Analytics() {
   const { props, selected, choose, loading: pLoading, error: pError } = useProperties();
@@ -17,6 +27,9 @@ export default function Analytics() {
   const { start, end, compare, label } = useDateRange();
   const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
   const [rt, setRt] = useState(null);
+  const [view, setView] = useState(() => localStorage.getItem("kompas-analytics-view") || "executive");
+
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-analytics-view", id); };
 
   // realtime: refresh on load and then poll every 30s (never cached)
   useEffect(() => {
@@ -31,10 +44,12 @@ export default function Analytics() {
     return () => clearInterval(id);
   }, [selected, orgId]);
 
+  const activeView = VIEWS.find((v) => v.id === view) || VIEWS[0];
+  const widgets = useMemo(() => (activeView.tpl ? instantiateTemplate(activeView.tpl).widgets : []), [activeView.id]);
+
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
-  if (!props?.length)
-    return <TabState empty />;
+  if (!props?.length) return <TabState empty />;
 
   const prop = props.find((p) => p.property_id === selected);
 
@@ -50,8 +65,6 @@ export default function Analytics() {
       ] },
       { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: data.channels.map((c) => [c.label, c.sessions, c.pct]) },
       { title: "Toppagina's", columns: ["Pagina", "Weergaven", "Bounce %"], rows: data.top_pages.map((p) => [p.path, p.views, (p.bounceRate * 100).toFixed(1)]) },
-      { title: "Apparaten", columns: ["Apparaat", "%"], rows: data.devices.map((d) => [d.label, d.pct]) },
-      { title: "Geografie", columns: ["Land", "%"], rows: data.geography.map((g) => [g.label, g.pct]) },
       { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: data.sessions_by_date.map((d) => [d.date, d.sessions]) },
     ];
     if (data.conversions?.length)
@@ -61,8 +74,8 @@ export default function Analytics() {
 
   return (
     <div>
-      {/* header: property chip + selector + live badge */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
+      {/* header: property chip + selector + live badge + export */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center" }}><GaGlyph s={20} /></div>
           <div>
@@ -79,113 +92,75 @@ export default function Analytics() {
         <div className="pill pos" style={{ padding: "7px 13px", fontSize: 12.5 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> live verbonden
         </div>
-        <ExportButton filename="analytics" sections={sections} />
+        {data && <ExportButton filename="analytics" sections={sections} />}
       </div>
 
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics — gedrag &amp; verkeer</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>automatisch ingeladen via je GA4-koppeling · {label}</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>automatisch ingeladen via je GA4-koppeling · {label}</div>
 
-      <TabState loading={loading} error={error} onConnect />
-      {!loading && !error && data && (
-        <>
-          {/* KPI ROW */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <KpiCard label="Gebruikers" value={num(data.kpis.users)} {...(data.deltas ? deltaProps(data.deltas.users, true) : {})} />
-            <KpiCard label="Sessies" value={num(data.kpis.sessions)} {...(data.deltas ? deltaProps(data.deltas.sessions, true) : {})} />
-            <KpiCard label="Bouncepercentage" value={pct1(data.kpis.bounceRate * 100)} {...(data.deltas ? deltaProps(data.deltas.bounceRate, false) : {})} />
-            <KpiCard label="Gem. sessieduur" value={duration(data.kpis.avgSessionDuration)} {...(data.deltas ? deltaProps(data.deltas.avgSessionDuration, true) : {})} />
-          </div>
+      {/* view-switcher */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {VIEWS.map((v) => {
+          const on = v.id === view;
+          return (
+            <button
+              key={v.id}
+              onClick={() => pickView(v.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 999,
+                border: "1px solid " + (on ? "var(--c-accent)" : "var(--c-border)"),
+                background: on ? "var(--c-accent)" : "var(--c-surface)",
+                color: on ? "#fff" : "var(--c-ink)", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              {v.name}
+              {v.audience && <span style={{ fontSize: 10.5, fontWeight: 600, opacity: on ? 0.85 : 0.6 }}>{v.audience}</span>}
+            </button>
+          );
+        })}
+      </div>
 
-          {/* SESSIONS CHART + REALTIME */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <SectionCard title="sessies over tijd" style={{ flex: 2, minWidth: 320 }}>
-              <AreaChart
-                values={data.sessions_by_date.map((d) => d.sessions)}
-                compareValues={data.compare_series}
-                labels={pickLabels(data.sessions_by_date.map((d) => shortDate(d.date)))}
-                height={210}
-              />
-            </SectionCard>
-            <SectionCard style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> realtime
-              </div>
-              <div className="display" style={{ fontSize: 40, lineHeight: 1, margin: "6px 0 2px" }}>{rt ? num(rt.active_users) : "—"}</div>
-              <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>actieve gebruikers nu</div>
-              <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>per minuut (laatste 30 min)</div>
-              <RealtimeBars values={rt?.by_minute || []} />
-              {rt?.pages?.length > 0 && (
-                <>
-                  <div style={{ height: 1, background: "var(--c-border)", margin: "14px 0" }} />
-                  <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 8 }}>actieve pagina's</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
-                    {rt.pages.slice(0, 3).map((p, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ color: "var(--c-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name || "—"}</span>
-                        <span style={{ fontWeight: 700 }}>{num(p.active)}</span>
-                      </div>
-                    ))}
+      {/* Realtime view */}
+      {view === "realtime" ? (
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <SectionCard style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> realtime
+            </div>
+            <div className="display" style={{ fontSize: 44, lineHeight: 1, margin: "8px 0 2px" }}>{rt ? num(rt.active_users) : "—"}</div>
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 16 }}>actieve gebruikers nu</div>
+            <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>per minuut (laatste 30 min)</div>
+            <RealtimeBars values={rt?.by_minute || []} />
+          </SectionCard>
+          <SectionCard title="actieve pagina's" style={{ flex: 1, minWidth: 280 }}>
+            {rt?.pages?.length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
+                {rt.pages.slice(0, 8).map((p, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, borderBottom: "1px solid var(--c-border-soft)", paddingBottom: 8 }}>
+                    <span style={{ color: "var(--c-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name || "—"}</span>
+                    <span style={{ fontWeight: 700 }}>{num(p.active)}</span>
                   </div>
-                </>
-              )}
-            </SectionCard>
-          </div>
-
-          {/* TOP PAGES + DONUT */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <SectionCard title="toppagina's" style={{ flex: 1.5, minWidth: 320 }}>
-              <div style={{ ...tableHead, gridTemplateColumns: "2.4fr 1fr 1fr" }}>
-                <span>Pagina</span><span style={{ textAlign: "right" }}>Weergaven</span><span style={{ textAlign: "right" }}>Bounce</span>
+                ))}
               </div>
-              {data.top_pages.map((p, i) => (
-                <div key={i} style={{ ...tableRow, gridTemplateColumns: "2.4fr 1fr 1fr" }}>
-                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.path}</span>
-                  <span style={{ textAlign: "right", fontWeight: 600 }}>{num(p.views)}</span>
-                  <span style={{ textAlign: "right", color: "var(--c-muted)" }}>{pct1(p.bounceRate * 100)}</span>
+            ) : <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen actieve pagina's nu.</div>}
+          </SectionCard>
+        </div>
+      ) : (
+        <>
+          <TabState loading={loading} error={error} onConnect />
+          {!loading && !error && data && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
+              {widgets.map((w) => (
+                <div key={w.id} style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
+                  <WidgetRenderer widget={w} data={data} />
                 </div>
               ))}
-            </SectionCard>
-            <SectionCard title="verkeersbronnen" style={{ flex: 1, minWidth: 240 }}>
-              <Donut segments={data.channels} centerTop={data.channels.length} centerSub="kanalen" size={150} />
-              <div style={{ marginTop: 14 }}><Legend segments={data.channels} /></div>
-            </SectionCard>
-          </div>
-
-          {/* CONVERSIES + DEVICES + GEO */}
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SectionCard title="conversies &amp; doelen" style={{ flex: 1, minWidth: 240 }}>
-              {data.conversions.length ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {data.conversions.slice(0, 4).map((c, i) => {
-                    const max = data.conversions[0].count || 1;
-                    return <ProgressRow key={i} label={c.name} value={num(c.count)} pct={Math.round((c.count / max) * 100)} color={palette[i % palette.length]} />;
-                  })}
-                </div>
-              ) : <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen conversie-events in deze periode.</div>}
-            </SectionCard>
-            <SectionCard title="apparaten" style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {data.devices.map((d, i) => <ProgressRow key={i} label={cap(d.label)} value={`${d.pct}%`} pct={d.pct} color={palette[i % palette.length]} />)}
-              </div>
-            </SectionCard>
-            <SectionCard title="geografie" style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-                {data.geography.map((g, i) => <ProgressRow key={i} label={g.label} value={`${g.pct}%`} pct={g.pct} color={palette[i % palette.length]} labelWidth={78} />)}
-              </div>
-            </SectionCard>
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
-function pickLabels(all) {
-  if (all.length <= 5) return all;
-  const step = (all.length - 1) / 4;
-  return [0, 1, 2, 3, 4].map((i) => all[Math.round(i * step)]);
-}
 const selectStyle = { padding: "8px 12px", fontSize: 13, borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", maxWidth: 320 };
-const tableHead = { display: "grid", gap: 12, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", paddingBottom: 10, borderBottom: "1px solid var(--c-border)" };
-const tableRow = { display: "grid", gap: 12, fontSize: 13, padding: "11px 0", borderBottom: "1px solid var(--c-border-soft)", alignItems: "center" };
