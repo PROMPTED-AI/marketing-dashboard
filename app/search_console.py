@@ -56,7 +56,8 @@ def run_search_analytics(
         deltas = {k: delta(k) for k in ("clicks", "impressions", "ctr", "position")}
 
     by_date = [
-        {"date": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0)}
+        {"date": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
+         "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
         for r in query(start, end, ["date"], row_limit=500)
     ]
     # One broader query fetch feeds the top list + the "opportunities" view.
@@ -78,11 +79,24 @@ def run_search_analytics(
     top_pages = [
         {"page": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
          "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
-        for r in query(start, end, ["page"], row_limit=10)
+        for r in query(start, end, ["page"], row_limit=25)
+    ]
+
+    # Breakdowns for the "Apparaten & landen" view + the overview donut/bars.
+    devices = [
+        {"device": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
+         "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
+        for r in query(start, end, ["device"], row_limit=10)
+    ]
+    countries = [
+        {"country": r["keys"][0], "clicks": r.get("clicks", 0), "impressions": r.get("impressions", 0),
+         "ctr": r.get("ctr", 0), "position": r.get("position", 0)}
+        for r in query(start, end, ["country"], row_limit=10)
     ]
 
     return {
         "totals": totals, "deltas": deltas, "by_date": by_date,
         "top_queries": top_queries, "top_pages": top_pages,
         "opportunities": opportunities, "by_impressions": by_impressions,
+        "devices": devices, "countries": countries,
     }
