@@ -161,21 +161,57 @@ def run_ga_overview(
             "conversions": delta("conversions"),
         }
 
-    # --- sessions over time (+ comparison series for the dashed line) ---
+    # --- metrics over time ---
+    # One dated report covers every scalar KPI, so each KPI-card can show its own
+    # daily trend (sparkline), not just sessions. Same fallback as the KPI block
+    # if `conversions` is unsupported on a migrated property.
     date_order = [OrderBy(dimension=OrderBy.DimensionOrderBy(dimension_name="date"))]
-    sd = report(["date"], ["sessions"], cur_only, order_bys=date_order)
-    sessions_by_date = [
-        {"date": r.dimension_values[0].value, "sessions": _int(r.metric_values[0].value)}
-        for r in sd.rows
-    ]
+    series_metrics = stable_metrics + ["conversions"]
+    try:
+        sd = report(["date"], series_metrics, cur_only, order_bys=date_order)
+    except Exception:
+        series_metrics = stable_metrics
+        sd = report(["date"], series_metrics, cur_only, order_bys=date_order)
+    sidx = {m: i for i, m in enumerate(series_metrics)}
+
+    def _sv(row, metric):
+        i = sidx.get(metric)
+        if i is None:
+            return 0.0
+        try:
+            return float(row.metric_values[i].value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    series_by_date, sessions_by_date = [], []
+    for r in sd.rows:
+        d = r.dimension_values[0].value
+        item = {
+            "date": d,
+            "users": int(_sv(r, "totalUsers")),
+            "newUsers": int(_sv(r, "newUsers")),
+            "sessions": int(_sv(r, "sessions")),
+            "pageViews": int(_sv(r, "screenPageViews")),
+            "eventCount": int(_sv(r, "eventCount")),
+            "conversions": int(_sv(r, "conversions")),
+            "bounceRate": _sv(r, "bounceRate"),
+            "avgSessionDuration": _sv(r, "averageSessionDuration"),
+            "engagementRate": _sv(r, "engagementRate"),
+        }
+        series_by_date.append(item)
+        sessions_by_date.append({"date": d, "sessions": item["sessions"]})
+
     compare_series = None
     if compare:
-        sdp = report(
-            ["date"], ["sessions"],
-            [DateRange(start_date=compare[0], end_date=compare[1])],
-            order_bys=date_order,
-        )
-        compare_series = [_int(r.metric_values[0].value) for r in sdp.rows]
+        try:
+            sdp = report(
+                ["date"], ["sessions"],
+                [DateRange(start_date=compare[0], end_date=compare[1])],
+                order_bys=date_order,
+            )
+            compare_series = [_int(r.metric_values[0].value) for r in sdp.rows]
+        except Exception:
+            compare_series = None
 
     # --- breakdowns (current range only) ---
     # Generic: any dimension ranked by any metric. Rows carry `value` (the metric
@@ -234,6 +270,7 @@ def run_ga_overview(
         "kpis": kpis,
         "deltas": deltas,
         "sessions_by_date": sessions_by_date,
+        "series_by_date": series_by_date,
         "compare_series": compare_series,
         "channels": channels,
         "devices": devices,
