@@ -28,8 +28,10 @@ export default function WidgetRenderer({ widget, data }) {
   if (widget.kind === "kpi") {
     const s = src.scalar(data, widget.config);
     const delta = s.delta != null ? deltaProps(s.delta, s.higherBetter) : {};
-    // Each KPI shows its own metric trend; fall back to the sessions line.
-    const spark = src.spark ? src.spark(data) : (data?.sessions_by_date ?? []).map((p) => p.sessions);
+    // Each KPI shows its own metric trend; fall back to the sessions line when
+    // the per-metric series is missing/empty (e.g. an older cached payload).
+    let spark = src.spark ? src.spark(data) : null;
+    if (!spark || !spark.length) spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
     return (
       <KpiCard
         label={widget.title}
