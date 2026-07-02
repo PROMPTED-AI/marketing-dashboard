@@ -15,6 +15,7 @@ export const IcCog = (p) => (<svg {...S(p)}><circle cx="12" cy="12" r="3.2" /><p
 export const IcUsers = (p) => (<svg {...S(p)}><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /><circle cx="9" cy="8" r="3.2" /><path d="M16 3.5a3.2 3.2 0 0 1 0 6M21 21v-2a4 4 0 0 0-3-3.8" /></svg>);
 export const IcBell = (p) => (<svg {...S(p)} strokeWidth="1.9"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></svg>);
 export const IcMenu = (p) => (<svg {...S(p)} strokeWidth="2.2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>);
+export const IcChat = (p) => (<svg {...S(p)}><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z" /></svg>);
 export const IcCalendar = (p) => (<svg {...S(p)} strokeWidth="1.9"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>);
 export const IcChevDown = (p) => (<svg {...S(p)}><path d="m6 9 6 6 6-6" /></svg>);
 export const IcChevUpDown = (p) => (<svg {...S(p)}><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></svg>);

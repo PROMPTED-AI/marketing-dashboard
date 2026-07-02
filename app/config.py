@@ -22,6 +22,10 @@ PROVIDER_SCOPES = {
 GOOGLE_PROVIDERS = list(PROVIDER_SCOPES.keys())
 PLACEHOLDER_PROVIDERS = []
 
+# AI-assistent (chat in de sidebar). Key wordt als Cloud Run env var gezet.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ASSISTANT_MODEL = os.environ.get("ASSISTANT_MODEL", "claude-sonnet-5")
+
 # Meta (Facebook + Instagram) uses its own Facebook Login OAuth flow, separate
 # from Google. App credentials are set on the Cloud Run service, never in repo.
 META_PROVIDERS = ["meta_ads"]
