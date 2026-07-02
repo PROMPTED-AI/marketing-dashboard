@@ -106,7 +106,7 @@ export default function GoogleAds() {
               background: on ? "var(--c-accent)" : "var(--c-surface)",
               color: on ? "#fff" : "var(--c-ink)", fontSize: 13, fontWeight: 700, cursor: "pointer",
             }}>
-              {v.name}<span style={{ fontSize: 10.5, fontWeight: 600, opacity: on ? 0.85 : 0.6 }}>{v.audience}</span>
+              {v.name}
             </button>
           );
         })}

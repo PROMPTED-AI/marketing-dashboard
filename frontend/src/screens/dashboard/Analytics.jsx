@@ -114,7 +114,6 @@ export default function Analytics() {
               }}
             >
               {v.name}
-              {v.audience && <span style={{ fontSize: 10.5, fontWeight: 600, opacity: on ? 0.85 : 0.6 }}>{v.audience}</span>}
             </button>
           );
         })}
