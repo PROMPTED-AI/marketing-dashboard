@@ -22,6 +22,7 @@ GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
 import uuid
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -38,6 +39,8 @@ from . import (
     analytics, auth, cache, config, db, google_ads, meta, meta_oauth, models,
     oauth, search_console,
 )
+
+log = logging.getLogger("dashboard")
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -75,7 +78,11 @@ def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credent
         raise HTTPException(status_code=409, detail="No active connection for this organization")
     try:
         creds = oauth.credentials_from_dict(conn["creds"])
-    except RefreshError:
+    except RefreshError as e:
+        log.warning(
+            "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
+            org_id, provider, conn.get("google_email"), e,
+        )
         models.set_connection_status(org_id, "revoked", provider=provider)
         raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
     # Persist any refreshed access token.
@@ -93,7 +100,8 @@ def _google_data(org_id: str, provider: str, fn):
     """
     try:
         return fn()
-    except (RefreshError, Unauthenticated):
+    except (RefreshError, Unauthenticated) as e:
+        log.warning("REVOKE org=%s provider=%s at=api-call err=%r", org_id, provider, e)
         models.set_connection_status(org_id, "revoked", provider=provider)
         raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
 
@@ -105,6 +113,7 @@ def _meta_token(org_id: str) -> str:
         raise HTTPException(status_code=409, detail="No active Meta connection for this organization")
     creds = conn["creds"]
     if meta_oauth.is_expired(creds):
+        log.warning("REVOKE org=%s provider=meta_ads at=expiry-check", org_id)
         models.set_connection_status(org_id, "revoked", provider="meta_ads")
         raise HTTPException(status_code=409, detail="Meta-koppeling verlopen - opnieuw koppelen")
     token = creds.get("access_token")
