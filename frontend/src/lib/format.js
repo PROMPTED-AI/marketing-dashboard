@@ -4,6 +4,25 @@ export const num = (v) => nf.format(Math.round(v || 0));
 
 export const pct1 = (v) => `${(v || 0).toFixed(1).replace(".", ",")}%`;
 
+// Dutch singular forms for the count-noun units shown in chart tooltips, so a
+// value of exactly 1 reads "1 bezoeker" instead of "1 bezoekers".
+const UNIT_SINGULARS = {
+  bezoekers: "bezoeker",
+  "nieuwe bezoekers": "nieuwe bezoeker",
+  sessies: "sessie",
+  paginaweergaven: "paginaweergave",
+  gebeurtenissen: "gebeurtenis",
+  conversies: "conversie",
+  klikken: "klik",
+  vertoningen: "vertoning",
+};
+
+// Return `unit` in singular when the (rounded) value is exactly 1, else plural.
+export function unitLabel(value, unit) {
+  if (!unit) return "";
+  return Math.round(value || 0) === 1 ? (UNIT_SINGULARS[unit] || unit) : unit;
+}
+
 // KpiCard delta props from a % change. `higherIsBetter=false` for bounce/position.
 export function deltaProps(pct, higherIsBetter = true) {
   if (pct == null) return {};

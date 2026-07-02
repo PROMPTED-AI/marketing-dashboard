@@ -1,6 +1,6 @@
 // Lightweight SVG charts that mirror the design (no chart library).
 import { useState, useRef } from "react";
-import { num } from "../lib/format.js";
+import { num, unitLabel } from "../lib/format.js";
 
 // Show at most 5 evenly spaced axis labels.
 function pickAxis(all) {
@@ -75,9 +75,9 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
               <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, width: 11, height: 11, borderRadius: "50%", background: "var(--c-accent)", border: "2px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none", boxShadow: "0 0 0 1px var(--c-accent)" }} />
               <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, transform: `translate(${nearRight ? "calc(-100% - 12px)" : "12px"}, -50%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,.18)", zIndex: 5 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{labels[hover] ?? `punt ${hover + 1}`}</div>
-                <div>{num(values[hover])}{unit ? ` ${unit}` : ""}</div>
+                <div>{num(values[hover])}{unit ? ` ${unitLabel(values[hover], unit)}` : ""}</div>
                 {compareValues && compareValues.length > 0 && (
-                  <div style={{ opacity: 0.7, fontSize: 11 }}>vorige: {num(compareValues[hover] ?? 0)}{unit ? ` ${unit}` : ""}</div>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>vorige: {num(compareValues[hover] ?? 0)}{unit ? ` ${unitLabel(compareValues[hover] ?? 0, unit)}` : ""}</div>
                 )}
               </div>
             </>
@@ -178,7 +178,7 @@ export function Sparkline({ values = [], labels = [], unit = "", color = "var(--
           <div style={{ position: "absolute", left: `${hx}%`, top: `${hyPct}%`, width: 8, height: 8, borderRadius: "50%", background: color, border: "1.5px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", left: `${hx}%`, top: -6, transform: `translate(${nearRight ? "calc(-100% - 6px)" : "6px"}, -100%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 6, padding: "4px 7px", fontSize: 11, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(0,0,0,.18)", zIndex: 10 }}>
             {labels[hover] ? <span style={{ opacity: 0.7, marginRight: 5 }}>{labels[hover]}</span> : null}
-            <span style={{ fontWeight: 700 }}>{num(values[hover])}</span>{unit ? <span style={{ opacity: 0.85, marginLeft: 4 }}>{unit}</span> : null}
+            <span style={{ fontWeight: 700 }}>{num(values[hover])}</span>{unit ? <span style={{ opacity: 0.85, marginLeft: 4 }}>{unitLabel(values[hover], unit)}</span> : null}
           </div>
         </>
       )}
