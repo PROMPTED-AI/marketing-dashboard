@@ -5,16 +5,25 @@ import { useCachedApi } from "../../lib/swr.js";
 import { adsAccountsUrl, adsReportUrl } from "../../lib/urls.js";
 import { num, pct1, shortDate, deltaProps } from "../../lib/format.js";
 import { KpiCard, SectionCard, TabState } from "../../components/ui.jsx";
-import { AreaChart } from "../../components/charts.jsx";
+import { AreaChart, Donut, Legend } from "../../components/charts.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { AdsGlyph } from "../../components/icons.jsx";
 
-const eur = (v) =>
-  "€ " + new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+const eur = (v) => "€ " + new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 const roas = (v) => (v || 0).toFixed(2).replace(".", ",") + "×";
+const cpm = (k) => (k?.impressions ? k.cost / k.impressions * 1000 : 0);
+const cpa = (cost, conv) => (conv ? cost / conv : 0);
+
+const VIEWS = [
+  { id: "overview", name: "Ads-overzicht", audience: "Directie" },
+  { id: "campaigns", name: "Campagnes", audience: "Marketeer" },
+  { id: "efficiency", name: "Efficiëntie & budget", audience: "Marketeer" },
+  { id: "conversion", name: "Conversie & ROAS", audience: "Marketeer" },
+];
 
 export default function GoogleAds() {
   const [account, setAccount] = useState(() => localStorage.getItem("kompas-ads-account") || "");
+  const [view, setView] = useState(() => localStorage.getItem("kompas-ads-view") || "overview");
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
@@ -29,6 +38,7 @@ export default function GoogleAds() {
   const { data, error } = useCachedApi(adsReportUrl(account, start, end, compare, orgId));
 
   const choose = (id) => { setAccount(id); localStorage.setItem("kompas-ads-account", id); };
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-ads-view", id); };
 
   if (loading) return <TabState loading />;
   if (accErr) return <TabState error={accErr} onConnect />;
@@ -43,9 +53,15 @@ export default function GoogleAds() {
     );
 
   const k = data?.kpis;
+  const campaigns = data?.campaigns || [];
+  const spendSegments = (() => {
+    const top = campaigns.slice(0, 6);
+    const total = top.reduce((a, c) => a + (c.cost || 0), 0) || 1;
+    return top.map((c) => ({ label: c.name, value: c.cost || 0, pct: Math.round((c.cost || 0) / total * 100) }));
+  })();
 
   const sections = () => {
-    if (!data) return [];
+    if (!data || !k) return [];
     return [
       { title: "Google Ads — " + label },
       { columns: ["Metric", "Waarde"], rows: [
@@ -54,10 +70,12 @@ export default function GoogleAds() {
         ["Vertoningen", k.impressions],
         ["Conversies", (k.conversions || 0).toFixed(1)],
         ["ROAS", (k.roas || 0).toFixed(2)],
+        ["CTR %", (k.ctr || 0).toFixed(2)],
+        ["CPC", (k.cpc || 0).toFixed(2)],
+        ["CPM", cpm(k).toFixed(2)],
       ] },
-      { title: "Campagnes", columns: ["Campagne", "Kosten", "Klikken", "Vertoningen", "Conversies", "ROAS"],
-        rows: (data.campaigns || []).map((c) => [c.name, (c.cost || 0).toFixed(2), c.clicks, c.impressions, (c.conversions || 0).toFixed(1), (c.roas || 0).toFixed(2)]) },
-      { title: "Kosten per dag", columns: ["Datum", "Kosten", "Klikken"], rows: (data.by_date || []).map((d) => [d.date, (d.cost || 0).toFixed(2), d.clicks]) },
+      { title: "Campagnes", columns: ["Campagne", "Kosten", "Klikken", "Conversies", "CPA", "ROAS"],
+        rows: campaigns.map((c) => [c.name, (c.cost || 0).toFixed(2), c.clicks, (c.conversions || 0).toFixed(1), cpa(c.cost, c.conversions).toFixed(2), (c.roas || 0).toFixed(2)]) },
     ];
   };
 
@@ -76,28 +94,86 @@ export default function GoogleAds() {
           </div>
         }
       />
+
+      {/* view-switcher */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        {VIEWS.map((v) => {
+          const on = v.id === view;
+          return (
+            <button key={v.id} onClick={() => pickView(v.id)} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 999,
+              border: "1px solid " + (on ? "var(--c-accent)" : "var(--c-border)"),
+              background: on ? "var(--c-accent)" : "var(--c-surface)",
+              color: on ? "#fff" : "var(--c-ink)", fontSize: 13, fontWeight: 700, cursor: "pointer",
+            }}>
+              {v.name}<span style={{ fontSize: 10.5, fontWeight: 600, opacity: on ? 0.85 : 0.6 }}>{v.audience}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <TabState error={error} onConnect />
       {!error && !data && <TabState loading />}
-      {data && k && (
+
+      {data && k && view === "overview" && (
         <>
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
             <KpiCard label="Kosten" value={eur(k.cost)} {...(data.deltas ? deltaProps(data.deltas.cost, false) : {})} />
             <KpiCard label="Klikken" value={num(k.clicks)} {...(data.deltas ? deltaProps(data.deltas.clicks, true) : {})} />
-            <KpiCard label="Vertoningen" value={num(k.impressions)} {...(data.deltas ? deltaProps(data.deltas.impressions, true) : {})} />
             <KpiCard label="Conversies" value={num(k.conversions)} {...(data.deltas ? deltaProps(data.deltas.conversions, true) : {})} />
             <KpiCard label="ROAS" value={roas(k.roas)} {...(data.deltas ? deltaProps(data.deltas.roas, true) : {})} />
           </div>
-
-          <SectionCard title="kosten over tijd" style={{ marginBottom: 16 }}>
+          <SectionCard title="kosten over tijd">
             <AreaChart
               values={(data.by_date || []).map((d) => d.cost)}
               labels={pickLabels((data.by_date || []).map((d) => shortDate((d.date || "").replaceAll("-", ""))))}
-              height={210}
+              height={230}
             />
           </SectionCard>
+        </>
+      )}
 
-          <SectionCard title="campagnes">
-            <CampaignTable rows={data.campaigns || []} />
+      {data && view === "campaigns" && (
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <SectionCard title="campagnes" style={{ flex: 2, minWidth: 340 }}>
+            <CampaignTable rows={campaigns} cols={["Campagne", "Kosten", "Klikken", "CTR", "Conversies", "ROAS"]}
+              render={(c) => [c.name, eur(c.cost), num(c.clicks), pct1(c.ctr), num(c.conversions), roas(c.roas)]} />
+          </SectionCard>
+          <SectionCard title="aandeel uitgaven" style={{ flex: 1, minWidth: 260 }}>
+            {spendSegments.length ? (
+              <><Donut segments={spendSegments} centerTop={spendSegments.length} centerSub="campagnes" size={150} /><div style={{ marginTop: 14 }}><Legend segments={spendSegments} /></div></>
+            ) : <Empty>geen campagnedata.</Empty>}
+          </SectionCard>
+        </div>
+      )}
+
+      {data && k && view === "efficiency" && (
+        <>
+          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+            <KpiCard label="CTR" value={pct1(k.ctr)} {...(data.deltas ? deltaProps(data.deltas.ctr, true) : {})} />
+            <KpiCard label="CPC" value={eur(k.cpc)} {...(data.deltas ? deltaProps(data.deltas.cpc, false) : {})} />
+            <KpiCard label="CPM" value={eur(cpm(k))} {...(data.deltas ? deltaProps(data.deltas.cpm, false) : {})} />
+            <KpiCard label="CPA" value={eur(cpa(k.cost, k.conversions))} />
+          </div>
+          <SectionCard title="efficiëntie per campagne — hoge uitgaven, weinig conversie bovenaan">
+            <CampaignTable rows={[...campaigns].sort((a, b) => (b.cost || 0) - (a.cost || 0))}
+              cols={["Campagne", "Kosten", "Conversies", "CPA", "CTR"]}
+              render={(c) => [c.name, eur(c.cost), num(c.conversions), eur(cpa(c.cost, c.conversions)), pct1(c.ctr)]} />
+          </SectionCard>
+        </>
+      )}
+
+      {data && k && view === "conversion" && (
+        <>
+          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+            <KpiCard label="Conversies" value={num(k.conversions)} {...(data.deltas ? deltaProps(data.deltas.conversions, true) : {})} />
+            <KpiCard label="Conversiewaarde" value={eur(k.conversionsValue)} {...(data.deltas ? deltaProps(data.deltas.conversionsValue, true) : {})} />
+            <KpiCard label="ROAS" value={roas(k.roas)} {...(data.deltas ? deltaProps(data.deltas.roas, true) : {})} />
+          </div>
+          <SectionCard title="ROAS per campagne">
+            <CampaignTable rows={[...campaigns].sort((a, b) => (b.roas || 0) - (a.roas || 0))}
+              cols={["Campagne", "Kosten", "Conversies", "ROAS"]}
+              render={(c) => [c.name, eur(c.cost), num(c.conversions), roas(c.roas)]} />
           </SectionCard>
         </>
       )}
@@ -115,34 +191,35 @@ function Header({ right, label }) {
         {right}
       </div>
       <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>google ads — campagnes</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>{label} · live via je Google Ads-koppeling</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Google Ads-koppeling</div>
     </div>
   );
 }
 
-function CampaignTable({ rows }) {
-  if (!rows?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen campagnedata in deze periode.</div>;
-  const cols = "2.2fr 1fr 1fr 1fr 0.8fr";
+function CampaignTable({ rows, cols, render }) {
+  if (!rows?.length) return <Empty>geen campagnedata in deze periode.</Empty>;
+  const grid = "2fr " + cols.slice(1).map(() => "1fr").join(" ");
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ ...head, gridTemplateColumns: cols }}>
-        <span>Campagne</span>
-        <span style={{ textAlign: "right" }}>Kosten</span>
-        <span style={{ textAlign: "right" }}>Klikken</span>
-        <span style={{ textAlign: "right" }}>Conversies</span>
-        <span style={{ textAlign: "right" }}>ROAS</span>
+      <div style={{ ...head, gridTemplateColumns: grid }}>
+        {cols.map((c, i) => <span key={i} style={i === 0 ? {} : { textAlign: "right" }}>{c}</span>)}
       </div>
-      {rows.map((c, i) => (
-        <div key={i} style={{ ...row, gridTemplateColumns: cols }}>
-          <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-          <span style={{ textAlign: "right", fontWeight: 600 }}>{eur(c.cost)}</span>
-          <span style={{ textAlign: "right", color: "var(--c-muted)" }}>{num(c.clicks)}</span>
-          <span style={{ textAlign: "right", color: "var(--c-muted)" }}>{num(c.conversions)}</span>
-          <span style={{ textAlign: "right", color: "var(--c-muted)" }}>{roas(c.roas)}</span>
-        </div>
-      ))}
+      {rows.map((r, ri) => {
+        const cells = render(r);
+        return (
+          <div key={ri} style={{ ...row, gridTemplateColumns: grid }}>
+            {cells.map((cell, ci) => (
+              <span key={ci} style={{ textAlign: ci === 0 ? "left" : "right", fontWeight: ci === 0 ? 600 : 600, color: ci === 0 ? "var(--c-ink)" : "var(--c-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cell}</span>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+function Empty({ children }) {
+  return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>{children}</div>;
 }
 
 function pickLabels(all) {
