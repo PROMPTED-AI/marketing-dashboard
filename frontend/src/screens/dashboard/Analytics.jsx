@@ -149,9 +149,9 @@ export default function Analytics() {
         <>
           <TabState loading={loading} error={error} onConnect />
           {!loading && !error && data && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
+            <div className="widget-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
               {widgets.map((w) => (
-                <div key={w.id} style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
+                <div key={w.id} className="widget-cell" style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
                   <WidgetRenderer widget={w} data={data} />
                 </div>
               ))}

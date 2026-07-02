@@ -21,14 +21,14 @@ function initials(name = "") {
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "—";
 }
 
-export default function Sidebar({ user, connected = 0, total = 4 }) {
+export default function Sidebar({ user, connected = 0, total = 4, open = false, onNavigate }) {
   const { orgs, orgId, orgName, setOrg } = useActiveOrg();
   const pct = Math.round((connected / total) * 100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const canSwitch = orgs.length > 1;
   return (
-    <div style={wrap} className="no-print">
+    <div className={`app-sidebar no-print${open ? " open" : ""}`}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
         <div style={logoBox}><IcStar /></div>
         <div className="display" style={{ fontSize: 20 }}>kompas</div>
@@ -59,13 +59,13 @@ export default function Sidebar({ user, connected = 0, total = 4 }) {
       <div style={menuLabel}>Menu</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
         {NAV.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to} style={({ isActive }) => navItem(isActive)}>
+          <NavLink key={to} to={to} onClick={onNavigate} style={({ isActive }) => navItem(isActive)}>
             <Icon s={18} />
             {label}
           </NavLink>
         ))}
         {user?.role === "agency_admin" && (
-          <NavLink to="/admin" style={() => navItem(false)}>
+          <NavLink to="/admin" onClick={onNavigate} style={() => navItem(false)}>
             <IcUsers s={18} />
             Klantenbeheer
           </NavLink>
@@ -109,8 +109,7 @@ export default function Sidebar({ user, connected = 0, total = 4 }) {
   );
 }
 
-const wrap = { width: 240, background: "var(--c-sidebar)", borderRight: "1px solid var(--c-border)", display: "flex", flexDirection: "column", flex: "none" };
-const logoBox = { width: 30, height: 30, borderRadius: 8, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
+const logoBox ={ width: 30, height: 30, borderRadius: 8, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 const switcher = { margin: "4px 14px 14px", padding: "11px 13px", borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" };
 const orgChip = { width: 26, height: 26, borderRadius: 7, background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 const switchMenu = { position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 280, overflow: "auto", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, boxShadow: "var(--sh-md)", zIndex: 30, padding: 6 };

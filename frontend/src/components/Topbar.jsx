@@ -1,14 +1,20 @@
 import { useTheme } from "../lib/ThemeProvider.jsx";
 import DateRangePicker from "./DateRangePicker.jsx";
-import { IcSearch, IcSun, IcMoon, IcBell } from "./icons.jsx";
+import { IcSearch, IcSun, IcMoon, IcBell, IcMenu } from "./icons.jsx";
 
 // Generic dashboard topbar. Pass `left` to replace the default search pill.
-export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true }) {
+// `onMenu` opens the mobile navigation drawer (button only shows on mobile).
+export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true, onMenu }) {
   const { theme, toggle } = useTheme();
   return (
-    <div style={bar} className="no-print">
+    <div style={bar} className="no-print dash-topbar">
+      {onMenu && (
+        <button className="hamburger" style={iconBtn} onClick={onMenu} title="menu" aria-label="menu">
+          <IcMenu s={18} />
+        </button>
+      )}
       {left || (
-        <div style={searchPill}>
+        <div style={searchPill} className="hide-mobile">
           <IcSearch s={16} />
           <span style={{ fontSize: 13, color: "var(--c-muted)" }}>{searchPlaceholder}</span>
         </div>
@@ -18,7 +24,7 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
       <button style={iconBtn} onClick={toggle} title="thema wisselen">
         {theme === "dark" ? <IcSun s={17} /> : <IcMoon s={17} />}
       </button>
-      <div style={{ ...iconBtn, position: "relative", cursor: "pointer" }}>
+      <div style={{ ...iconBtn, position: "relative", cursor: "pointer" }} className="hide-mobile">
         <IcBell s={17} />
         <span style={dot} />
       </div>

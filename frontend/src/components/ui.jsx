@@ -4,7 +4,7 @@ import { connectUrl } from "../lib/api.js";
 
 export function KpiCard({ label, value, delta, positive = true, sparkValues, sparkLabels, sparkUnit, sparkColor }) {
   return (
-    <div className="card" style={{ flex: 1, padding: "16px 18px", minWidth: 0 }}>
+    <div className="card" style={{ flex: "1 1 160px", padding: "16px 18px", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span style={{ fontSize: 12.5, color: "var(--c-muted)", fontWeight: 600 }}>{label}</span>
         {delta != null && (
