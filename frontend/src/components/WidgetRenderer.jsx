@@ -23,18 +23,19 @@ export default function WidgetRenderer({ widget, data }) {
   const src = SOURCES[widget.source];
   if (!src) return <SectionCard title={widget.title}>Onbekende bron.</SectionCard>;
 
-  const spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
-  const sparkLabels = (data?.sessions_by_date ?? []).map((p) => shortDate(p.date));
+  const seriesDates = (data?.series_by_date ?? data?.sessions_by_date ?? []).map((p) => shortDate(p.date));
 
   if (widget.kind === "kpi") {
     const s = src.scalar(data, widget.config);
     const delta = s.delta != null ? deltaProps(s.delta, s.higherBetter) : {};
+    // Each KPI shows its own metric trend; fall back to the sessions line.
+    const spark = src.spark ? src.spark(data) : (data?.sessions_by_date ?? []).map((p) => p.sessions);
     return (
       <KpiCard
         label={widget.title}
         value={fmtScalar(s.value, s.fmt)}
         sparkValues={spark}
-        sparkLabels={sparkLabels}
+        sparkLabels={seriesDates}
         sparkColor="var(--c-accent)"
         {...delta}
       />

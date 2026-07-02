@@ -10,6 +10,9 @@ import { num, pct1 } from "./format.js";
 
 const sumConversions = (d) => (d?.conversions ?? []).reduce((a, c) => a + (c.count || 0), 0);
 
+// Per-metric daily series for a KPI's sparkline (uit series_by_date).
+const seriesOf = (d, key) => (d?.series_by_date ?? []).map((r) => r[key] ?? 0);
+
 // Normaliseer de gekozen key events naar een lijst namen. Accepteert de nieuwe
 // array-vorm én oude opgeslagen waarden (losse string of "__all__"); een lege
 // lijst betekent "alle key events".
@@ -33,22 +36,27 @@ export const SOURCES = {
   users: {
     label: "Bezoekers", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.users ?? 0, fmt: "int", delta: d?.deltas?.users, higherBetter: true }),
+    spark: (d) => seriesOf(d, "users"),
   },
   newUsers: {
     label: "Nieuwe bezoekers", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.newUsers ?? 0, fmt: "int", delta: d?.deltas?.newUsers, higherBetter: true }),
+    spark: (d) => seriesOf(d, "newUsers"),
   },
   sessions: {
     label: "Sessies", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.sessions ?? 0, fmt: "int", delta: d?.deltas?.sessions, higherBetter: true }),
+    spark: (d) => seriesOf(d, "sessions"),
   },
   pageViews: {
     label: "Paginaweergaven", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.pageViews ?? 0, fmt: "int", delta: d?.deltas?.pageViews, higherBetter: true }),
+    spark: (d) => seriesOf(d, "pageViews"),
   },
   eventCount: {
     label: "Gebeurtenissen", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.eventCount ?? 0, fmt: "int", delta: d?.deltas?.eventCount, higherBetter: true }),
+    spark: (d) => seriesOf(d, "eventCount"),
   },
   conversions_total: {
     label: "Conversies", group: "scalar", kinds: ["kpi"], unit: "conversies",
@@ -70,6 +78,7 @@ export const SOURCES = {
       }
       return { value: sumConversions(d), fmt: "int", delta: d?.deltas?.conversions, higherBetter: true };
     },
+    spark: (d) => seriesOf(d, "conversions"),
   },
   conversion_rate: {
     label: "Conversieratio", group: "scalar", kinds: ["kpi"],
@@ -79,18 +88,22 @@ export const SOURCES = {
       const c = d?.kpis?.conversions ?? 0;
       return { value: s ? (c / s) * 100 : 0, fmt: "percent", delta: null, higherBetter: true };
     },
+    spark: (d) => (d?.series_by_date ?? []).map((r) => (r.sessions ? (r.conversions / r.sessions) * 100 : 0)),
   },
   bounceRate: {
     label: "Bouncepercentage", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: (d?.kpis?.bounceRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.bounceRate, higherBetter: false }),
+    spark: (d) => seriesOf(d, "bounceRate"),
   },
   engagementRate: {
     label: "Betrokkenheid", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: (d?.kpis?.engagementRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.engagementRate, higherBetter: true }),
+    spark: (d) => seriesOf(d, "engagementRate"),
   },
   avgSessionDuration: {
     label: "Gem. sessieduur", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.avgSessionDuration ?? 0, fmt: "duration", delta: d?.deltas?.avgSessionDuration, higherBetter: true }),
+    spark: (d) => seriesOf(d, "avgSessionDuration"),
   },
 
   // --- over tijd ---

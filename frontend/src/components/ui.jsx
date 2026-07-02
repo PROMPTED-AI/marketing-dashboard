@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Sparkline } from "./charts.jsx";
 import { connectUrl } from "../lib/api.js";
 
@@ -19,11 +20,17 @@ export function KpiCard({ label, value, delta, positive = true, sparkValues, spa
 }
 
 export function ProgressRow({ label, value, pct, color = "var(--c-accent)", labelWidth }) {
+  const [hover, setHover] = useState(false);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ fontWeight: 600, fontSize: 13, width: labelWidth, flex: labelWidth ? "none" : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={`${label}: ${value ?? `${pct}%`}`}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 6px", margin: "0 -6px", borderRadius: 8, background: hover ? "var(--c-surface-2)" : "transparent", transition: "background .12s" }}
+    >
+      <span style={{ fontWeight: 600, fontSize: 13, width: labelWidth, flex: labelWidth ? "none" : 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: hover ? "var(--c-ink)" : undefined }}>{label}</span>
       <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--c-track)", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+        <div style={{ width: `${pct}%`, height: "100%", background: color, opacity: hover ? 1 : 0.92, transition: "opacity .12s" }} />
       </div>
       <span style={{ fontWeight: 700, fontSize: 13, width: 38, textAlign: "right" }}>{value ?? `${pct}%`}</span>
     </div>
