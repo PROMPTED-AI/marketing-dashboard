@@ -24,6 +24,7 @@ export default function WidgetRenderer({ widget, data }) {
   if (!src) return <SectionCard title={widget.title}>Onbekende bron.</SectionCard>;
 
   const spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
+  const sparkLabels = (data?.sessions_by_date ?? []).map((p) => shortDate(p.date));
 
   if (widget.kind === "kpi") {
     const s = src.scalar(data, widget.config);
@@ -33,6 +34,7 @@ export default function WidgetRenderer({ widget, data }) {
         label={widget.title}
         value={fmtScalar(s.value, s.fmt)}
         sparkValues={spark}
+        sparkLabels={sparkLabels}
         sparkColor="var(--c-accent)"
         {...delta}
       />
