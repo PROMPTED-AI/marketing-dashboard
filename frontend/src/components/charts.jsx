@@ -148,15 +148,41 @@ export function Legend({ segments = [] }) {
   );
 }
 
-export function Sparkline({ values = [], color = "var(--c-accent)", height = 34 }) {
+export function Sparkline({ values = [], labels = [], color = "var(--c-accent)", height = 34 }) {
+  const [hover, setHover] = useState(null);
+  const ref = useRef(null);
   const W = 240, H = 40;
   if (!values.length) return <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} />;
+  const n = values.length;
   const max = Math.max(...values, 1), min = Math.min(...values, 0), span = max - min || 1;
-  const pts = values.map((v, i) => `${((i / (values.length - 1 || 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / span) * (H - 8)).toFixed(1)}`).join(" ");
+  const xp = (i) => (i / (n - 1 || 1)) * W;
+  const yp = (v) => H - 4 - ((v - min) / span) * (H - 8);
+  const pts = values.map((v, i) => `${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(" ");
+
+  const onMove = (e) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r || !r.width) return;
+    setHover(Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width) * (n - 1)))));
+  };
+  const hx = hover != null ? (hover / (n - 1 || 1)) * 100 : 0;
+  const hyPct = hover != null ? (yp(values[hover]) / H) * 100 : 0;
+  const nearRight = hx > 65;
+
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <polyline points={pts} fill="none" style={{ stroke: color }} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div ref={ref} onMouseMove={onMove} onMouseLeave={() => setHover(null)} style={{ position: "relative", cursor: "crosshair" }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block" }}>
+        <polyline points={pts} fill="none" style={{ stroke: color }} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {hover != null && (
+        <>
+          <div style={{ position: "absolute", left: `${hx}%`, top: `${hyPct}%`, width: 8, height: 8, borderRadius: "50%", background: color, border: "1.5px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", left: `${hx}%`, top: -6, transform: `translate(${nearRight ? "calc(-100% - 6px)" : "6px"}, -100%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 6, padding: "4px 7px", fontSize: 11, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(0,0,0,.18)", zIndex: 10 }}>
+            {labels[hover] ? <span style={{ opacity: 0.7, marginRight: 5 }}>{labels[hover]}</span> : null}
+            <span style={{ fontWeight: 700 }}>{num(values[hover])}</span>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
