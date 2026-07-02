@@ -19,9 +19,12 @@ export default function TemplatePicker({ onPick, onClose }) {
               background: "var(--c-surface)", display: "flex", flexDirection: "column", gap: 4,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 15 }}>{t.name}</span>
-              <span className="pill muted">{t.widgets.length} blokken</span>
+              <span style={{ display: "flex", gap: 6, flex: "none" }}>
+                {t.audience && <span className="pill accent">{t.audience}</span>}
+                <span className="pill muted">{t.widgets.length} blokken</span>
+              </span>
             </div>
             <span style={{ fontSize: 13, color: "var(--c-muted)" }}>{t.description}</span>
           </button>

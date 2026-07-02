@@ -71,6 +71,15 @@ export const SOURCES = {
       return { value: sumConversions(d), fmt: "int", delta: d?.deltas?.conversions, higherBetter: true };
     },
   },
+  conversion_rate: {
+    label: "Conversieratio", group: "scalar", kinds: ["kpi"],
+    // Afgeleid: conversies gedeeld door sessies. Deelt door nul -> 0.
+    scalar: (d) => {
+      const s = d?.kpis?.sessions ?? 0;
+      const c = d?.kpis?.conversions ?? 0;
+      return { value: s ? (c / s) * 100 : 0, fmt: "percent", delta: null, higherBetter: true };
+    },
+  },
   bounceRate: {
     label: "Bouncepercentage", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: (d?.kpis?.bounceRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.bounceRate, higherBetter: false }),
@@ -179,7 +188,7 @@ export const SIZES = [
 
 // Bronnen gegroepeerd voor de "widget toevoegen"-keuze.
 export const SOURCE_GROUPS = [
-  { label: "Kerncijfers", ids: ["users", "newUsers", "sessions", "pageViews", "eventCount", "conversions_total", "bounceRate", "engagementRate", "avgSessionDuration"] },
+  { label: "Kerncijfers", ids: ["users", "newUsers", "sessions", "pageViews", "eventCount", "conversions_total", "conversion_rate", "bounceRate", "engagementRate", "avgSessionDuration"] },
   { label: "Over tijd", ids: ["sessions_by_date"] },
   { label: "Verdelingen", ids: ["channels", "source_medium", "devices", "browsers", "new_vs_returning", "geography", "events"] },
   { label: "Tabellen", ids: ["top_pages", "landing_pages", "conversions"] },
@@ -207,21 +216,24 @@ export function newWidget(sourceId, kind) {
 // Kant-en-klare start-templates. De gebruiker kiest er één en past daarna aan.
 export const TEMPLATES = [
   {
-    id: "compact",
-    name: "Compact overzicht",
-    description: "Kerncijfers in één oogopslag plus één grote trendgrafiek.",
+    id: "executive",
+    name: "Directie-overzicht",
+    audience: "Directie",
+    description: "De kerncijfers en trend in één oogopslag, plus waar het verkeer vandaan komt.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
       { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "bounceRate", kind: "kpi", size: 3 },
-      { source: "sessions_by_date", kind: "area", size: 12 },
+      { source: "engagementRate", kind: "kpi", size: 3 },
+      { source: "sessions_by_date", kind: "area", size: 8 },
+      { source: "channels", kind: "donut", size: 4 },
     ],
   },
   {
-    id: "traffic",
-    name: "Verkeer & bronnen",
-    description: "Waar bezoekers vandaan komen: kanalen, bron/medium, apparaten en landen.",
+    id: "acquisition",
+    name: "Acquisitie & verkeer",
+    audience: "Marketeer",
+    description: "Waar bezoekers vandaan komen: kanalen, bron/medium, apparaten, landen en nieuw vs. terugkerend.",
     widgets: [
       { source: "sessions", kind: "kpi", size: 3 },
       { source: "users", kind: "kpi", size: 3 },
@@ -229,46 +241,47 @@ export const TEMPLATES = [
       { source: "source_medium", kind: "bars", size: 6 },
       { source: "devices", kind: "bars", size: 6 },
       { source: "geography", kind: "bars", size: 6 },
-      { source: "sessions_by_date", kind: "area", size: 12 },
-    ],
-  },
-  {
-    id: "content",
-    name: "Inhoud & conversie",
-    description: "Best presterende pagina's en de conversies die ze opleveren.",
-    widgets: [
-      { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "bounceRate", kind: "kpi", size: 3 },
-      { source: "top_pages", kind: "table", size: 6 },
-      { source: "landing_pages", kind: "table", size: 6 },
-      { source: "conversions", kind: "table", size: 6 },
-      { source: "channels", kind: "donut", size: 6 },
-    ],
-  },
-  {
-    id: "engagement",
-    name: "Betrokkenheid & gebeurtenissen",
-    description: "Hoe actief bezoekers zijn: betrokkenheid, gebeurtenissen en key events.",
-    widgets: [
-      { source: "engagementRate", kind: "kpi", size: 3 },
-      { source: "avgSessionDuration", kind: "kpi", size: 3 },
-      { source: "eventCount", kind: "kpi", size: 3 },
-      { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "events", kind: "bars", size: 6 },
-      { source: "conversions", kind: "table", size: 6 },
       { source: "new_vs_returning", kind: "donut", size: 4 },
       { source: "sessions_by_date", kind: "area", size: 8 },
     ],
   },
   {
+    id: "behavior",
+    name: "Gedrag & content",
+    audience: "Marketeer",
+    description: "Welke content werkt en waar bezoekers afhaken: toppagina's, instappagina's en gebeurtenissen.",
+    widgets: [
+      { source: "pageViews", kind: "kpi", size: 3 },
+      { source: "avgSessionDuration", kind: "kpi", size: 3 },
+      { source: "bounceRate", kind: "kpi", size: 3 },
+      { source: "top_pages", kind: "table", size: 6 },
+      { source: "landing_pages", kind: "table", size: 6 },
+      { source: "events", kind: "bars", size: 6 },
+    ],
+  },
+  {
+    id: "conversion",
+    name: "Conversie & doelen",
+    audience: "Marketeer",
+    description: "Sturen op resultaat: conversies, conversieratio en de doelen die kanalen opleveren.",
+    widgets: [
+      { source: "conversions_total", kind: "kpi", size: 3 },
+      { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "bounceRate", kind: "kpi", size: 3 },
+      { source: "conversions", kind: "table", size: 6 },
+      { source: "channels", kind: "donut", size: 6 },
+    ],
+  },
+  {
     id: "full",
     name: "Alles (volledig)",
+    audience: "Specialist",
     description: "Het complete overzicht met alle beschikbare blokken.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
       { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "engagementRate", kind: "kpi", size: 3 },
+      { source: "conversion_rate", kind: "kpi", size: 3 },
       { source: "sessions_by_date", kind: "area", size: 12 },
       { source: "channels", kind: "donut", size: 6 },
       { source: "source_medium", kind: "bars", size: 6 },
