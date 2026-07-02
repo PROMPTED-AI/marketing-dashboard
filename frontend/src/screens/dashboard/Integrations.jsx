@@ -38,7 +38,7 @@ export default function Integrations() {
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginBottom: 22 }}>
         beheer je gekoppelde marketingbronnen · {data?.connected ?? 0} van {data?.total ?? 4} actief
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div className="split-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         {items.map((c) => {
           const m = META[c.provider] || {};
           const canConnect = c.status === "not_connected" || c.status === "revoked";
