@@ -126,7 +126,7 @@ export default function GoogleAds() {
           <SectionCard title="kosten over tijd">
             <AreaChart
               values={(data.by_date || []).map((d) => d.cost)}
-              labels={pickLabels((data.by_date || []).map((d) => shortDate((d.date || "").replaceAll("-", ""))))}
+              labels={(data.by_date || []).map((d) => shortDate((d.date || "").replaceAll("-", "")))}
               height={230}
             />
           </SectionCard>

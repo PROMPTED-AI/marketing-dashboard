@@ -119,7 +119,7 @@ export default function SearchConsole() {
           <SectionCard title="klikken over tijd">
             <AreaChart
               values={data.by_date.map((d) => d.clicks)}
-              labels={pickLabels(data.by_date.map((d) => shortDate(d.date.replaceAll("-", ""))))}
+              labels={data.by_date.map((d) => shortDate(d.date.replaceAll("-", "")))}
               height={230}
             />
           </SectionCard>

@@ -46,7 +46,7 @@ export default function WidgetRenderer({ widget, data }) {
         <AreaChart
           values={s.values}
           compareValues={s.compareValues}
-          labels={pickLabels(s.labels.map(shortDate))}
+          labels={s.labels.map(shortDate)}
           height={232}
         />
       </SectionCard>
