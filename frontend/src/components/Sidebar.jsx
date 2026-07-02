@@ -3,11 +3,10 @@ import { NavLink } from "react-router-dom";
 import { LOGOUT_URL } from "../lib/api.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import {
-  IcStar, IcGrid, IcBars, IcSearch, IcAds, IcShare, IcDoc, IcPlug, IcCog, IcUsers, IcChevUpDown, IcChevDown,
+  IcStar, IcBars, IcSearch, IcAds, IcShare, IcDoc, IcPlug, IcCog, IcUsers, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
 
 const NAV = [
-  { to: "/app/overview", label: "Overzicht", Icon: IcGrid },
   { to: "/app/analytics", label: "Analytics", Icon: IcBars },
   { to: "/app/search-console", label: "Search Console", Icon: IcSearch },
   { to: "/app/google-ads", label: "Google Ads", Icon: IcAds },
