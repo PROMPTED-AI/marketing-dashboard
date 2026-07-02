@@ -21,13 +21,14 @@ GET  /api/admin/organizations       -> (admin) all orgs + connection status
 GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
+import json
 import uuid
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google.api_core.exceptions import Unauthenticated
 from google.auth.exceptions import RefreshError
@@ -36,8 +37,8 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import (
-    analytics, auth, cache, config, db, google_ads, meta, meta_oauth, models,
-    oauth, search_console,
+    analytics, assistant, auth, cache, config, db, google_ads, meta, meta_oauth,
+    models, oauth, search_console,
 )
 
 log = logging.getLogger("dashboard")
@@ -330,6 +331,76 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
     creds = _org_credentials(target_org)
     rt = _google_data(target_org, "google_analytics", lambda: analytics.run_realtime(creds, property_id))
     return {"property_id": property_id, **rt}
+
+
+def _compact(value, cap: int = 12):
+    """Shrink a data payload for the LLM: cap lists, keep it token-cheap."""
+    if isinstance(value, dict):
+        return {k: _compact(v, cap) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_compact(v, cap) for v in value[:cap]]
+    return value
+
+
+class ChatBody(BaseModel):
+    messages: list
+    org_id: str | None = None
+    start: str
+    end: str
+    property_id: str | None = None
+    site: str | None = None
+
+
+@app.post("/api/assistant/chat")
+def assistant_chat(request: Request, body: ChatBody):
+    """Stream the AI assistant's answer (SSE). Tools read the active org's data."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, body.org_id)
+    if not config.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
+
+    def execute(name: str, _tool_input: dict) -> str:
+        """Run one tool, org-scoped. Returns a JSON string; never raises."""
+        try:
+            if name == "list_connections":
+                return json.dumps(_connections_payload(target_org), ensure_ascii=False, default=str)
+            if name == "get_analytics_overview":
+                creds = _org_credentials(target_org)
+                prop = body.property_id
+                if not prop:
+                    props = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
+                    if not props:
+                        return json.dumps({"error": "Geen Analytics-property gekoppeld."})
+                    prop = props[0]["property_id"]
+                data = _google_data(target_org, "google_analytics",
+                                    lambda: analytics.run_ga_overview(creds, prop, body.start, body.end, None))
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            if name == "get_search_console":
+                creds = _org_credentials(target_org, provider="search_console")
+                site = body.site
+                if not site:
+                    sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
+                    if not sites:
+                        return json.dumps({"error": "Geen Search Console-site gekoppeld."})
+                    site = sites[0]["site_url"]
+                data = _google_data(target_org, "search_console",
+                                    lambda: search_console.run_search_analytics(creds, site, body.start, body.end, None))
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            return json.dumps({"error": f"Onbekende tool: {name}"})
+        except HTTPException as e:
+            return json.dumps({"error": str(e.detail)}, ensure_ascii=False)
+        except Exception as e:  # noqa: BLE001 - surface as tool error, don't crash the stream
+            return json.dumps({"error": f"Kon data niet ophalen: {e}"}, ensure_ascii=False)
+
+    stream = assistant.stream_chat(
+        body.messages, execute,
+        api_key=config.ANTHROPIC_API_KEY, model=config.ASSISTANT_MODEL,
+    )
+    return StreamingResponse(
+        stream,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _connections_payload(target_org: str) -> dict:
