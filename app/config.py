@@ -24,10 +24,12 @@ PLACEHOLDER_PROVIDERS = []
 
 # AI-assistent (chat in de sidebar) via EuRouter (EU-gehoste, OpenAI-compatibele
 # gateway). Key + modelslug worden als Cloud Run env vars gezet. Het model is de
-# exacte EuRouter-slug uit hun modelcatalogus (kale slug, geen provider-prefix,
-# bv. "claude-sonnet-4-6", "claude-sonnet-4-5" of "mistral-large-3").
+# exacte EuRouter-slug uit hun modelcatalogus (kale slug, geen provider-prefix).
+# Default is een open-weight model dat sterk is in chat en tool-calling
+# ondersteunt. Andere goede open-weight opties: "qwen3-32b" (meertalig,
+# goedkoper), "qwen3.5-122b-a10b" (groter), "deepseek-v4-flash" (1M context).
 EUROUTER_API_KEY = os.environ.get("EUROUTER_API_KEY", "")
-EUROUTER_MODEL = os.environ.get("EUROUTER_MODEL", "claude-sonnet-4-6")
+EUROUTER_MODEL = os.environ.get("EUROUTER_MODEL", "deepseek-v3.2")
 EUROUTER_BASE_URL = os.environ.get("EUROUTER_BASE_URL", "https://api.eurouter.ai/api/v1")
 
 # Meta (Facebook + Instagram) uses its own Facebook Login OAuth flow, separate
