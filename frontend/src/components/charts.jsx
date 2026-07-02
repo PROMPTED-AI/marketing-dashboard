@@ -25,7 +25,7 @@ function niceMax(v) {
 // reveals the exact value (+ comparison) for that point via a marker + tooltip.
 // `labels` is one entry per value (the full series); the axis is downsampled.
 // `compareValues` adds a dashed "previous" line. Baseline is 0.
-export function AreaChart({ values = [], labels = [], compareValues = null, height = 220 }) {
+export function AreaChart({ values = [], labels = [], compareValues = null, height = 220, unit = "" }) {
   const [hover, setHover] = useState(null);
   const ref = useRef(null);
   if (!values.length) return <Empty height={height} />;
@@ -75,9 +75,9 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
               <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, width: 11, height: 11, borderRadius: "50%", background: "var(--c-accent)", border: "2px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none", boxShadow: "0 0 0 1px var(--c-accent)" }} />
               <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, transform: `translate(${nearRight ? "calc(-100% - 12px)" : "12px"}, -50%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,.18)", zIndex: 5 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{labels[hover] ?? `punt ${hover + 1}`}</div>
-                <div>{num(values[hover])}</div>
+                <div>{num(values[hover])}{unit ? ` ${unit}` : ""}</div>
                 {compareValues && compareValues.length > 0 && (
-                  <div style={{ opacity: 0.7, fontSize: 11 }}>vorige: {num(compareValues[hover] ?? 0)}</div>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>vorige: {num(compareValues[hover] ?? 0)}{unit ? ` ${unit}` : ""}</div>
                 )}
               </div>
             </>
@@ -148,7 +148,7 @@ export function Legend({ segments = [] }) {
   );
 }
 
-export function Sparkline({ values = [], labels = [], color = "var(--c-accent)", height = 34 }) {
+export function Sparkline({ values = [], labels = [], unit = "", color = "var(--c-accent)", height = 34 }) {
   const [hover, setHover] = useState(null);
   const ref = useRef(null);
   const W = 240, H = 40;
@@ -178,7 +178,7 @@ export function Sparkline({ values = [], labels = [], color = "var(--c-accent)",
           <div style={{ position: "absolute", left: `${hx}%`, top: `${hyPct}%`, width: 8, height: 8, borderRadius: "50%", background: color, border: "1.5px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", left: `${hx}%`, top: -6, transform: `translate(${nearRight ? "calc(-100% - 6px)" : "6px"}, -100%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 6, padding: "4px 7px", fontSize: 11, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(0,0,0,.18)", zIndex: 10 }}>
             {labels[hover] ? <span style={{ opacity: 0.7, marginRight: 5 }}>{labels[hover]}</span> : null}
-            <span style={{ fontWeight: 700 }}>{num(values[hover])}</span>
+            <span style={{ fontWeight: 700 }}>{num(values[hover])}</span>{unit ? <span style={{ opacity: 0.85, marginLeft: 4 }}>{unit}</span> : null}
           </div>
         </>
       )}
