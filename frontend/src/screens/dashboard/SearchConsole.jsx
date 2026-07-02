@@ -120,6 +120,7 @@ export default function SearchConsole() {
             <AreaChart
               values={data.by_date.map((d) => d.clicks)}
               labels={data.by_date.map((d) => shortDate(d.date.replaceAll("-", "")))}
+              unit="klikken"
               height={230}
             />
           </SectionCard>

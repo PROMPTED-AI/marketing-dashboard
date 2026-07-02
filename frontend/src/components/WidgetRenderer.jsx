@@ -32,12 +32,15 @@ export default function WidgetRenderer({ widget, data }) {
     // the per-metric series is missing/empty (e.g. an older cached payload).
     let spark = src.spark ? src.spark(data) : null;
     if (!spark || !spark.length) spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
+    // Show the metric name in the tooltip for count metrics (e.g. "4 bezoekers").
+    const sparkUnit = s.fmt === "int" ? (widget.title || "").toLowerCase() : "";
     return (
       <KpiCard
         label={widget.title}
         value={fmtScalar(s.value, s.fmt)}
         sparkValues={spark}
         sparkLabels={seriesDates}
+        sparkUnit={sparkUnit}
         sparkColor="var(--c-accent)"
         {...delta}
       />
@@ -52,6 +55,7 @@ export default function WidgetRenderer({ widget, data }) {
           values={s.values}
           compareValues={s.compareValues}
           labels={s.labels.map(shortDate)}
+          unit="sessies"
           height={232}
         />
       </SectionCard>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Sparkline } from "./charts.jsx";
 import { connectUrl } from "../lib/api.js";
 
-export function KpiCard({ label, value, delta, positive = true, sparkValues, sparkLabels, sparkColor }) {
+export function KpiCard({ label, value, delta, positive = true, sparkValues, sparkLabels, sparkUnit, sparkColor }) {
   return (
     <div className="card" style={{ flex: 1, padding: "16px 18px", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -14,7 +14,7 @@ export function KpiCard({ label, value, delta, positive = true, sparkValues, spa
         )}
       </div>
       <div className="display" style={{ fontSize: 28, margin: "8px 0 6px" }}>{value}</div>
-      {sparkValues && <Sparkline values={sparkValues} labels={sparkLabels} color={sparkColor} />}
+      {sparkValues && <Sparkline values={sparkValues} labels={sparkLabels} unit={sparkUnit} color={sparkColor} />}
     </div>
   );
 }
