@@ -1,38 +1,57 @@
 // Lightweight SVG charts that mirror the design (no chart library).
+import { num } from "../lib/format.js";
 
 const PALETTE = ["var(--c-accent)", "var(--c-sky)", "var(--c-mint)", "var(--c-orange)", "var(--c-purple)", "var(--c-yellow)"];
 export const palette = PALETTE;
 
-// Area chart with soft fill + line. `compareValues` adds a dashed "previous" line.
+// Round a max up to a "nice" axis value so the Y-axis reads cleanly.
+function niceMax(v) {
+  if (!v || v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return step * pow;
+}
+
+// Area chart with soft fill + line, a labelled Y-axis and gridlines.
+// `compareValues` adds a dashed "previous" line. Baseline is 0.
 export function AreaChart({ values = [], labels = [], compareValues = null, height = 220 }) {
-  const W = 940, H = 240;
   if (!values.length) return <Empty height={height} />;
-  const all = compareValues && compareValues.length ? values.concat(compareValues) : values;
-  const max = Math.max(...all, 1);
-  const min = Math.min(...all, 0);
-  const span = max - min || 1;
+  const W = 940, H = 240;
+  const dataMax = Math.max(...values, ...(compareValues || []), 1);
+  const max = niceMax(dataMax);
+  const y = (v) => H - (v / max) * H;
   const xf = (arr, i) => (i / (arr.length - 1 || 1)) * W;
-  const y = (v) => H - 20 - ((v - min) / span) * (H - 50);
   const path = (arr) => "M" + arr.map((v, i) => `${xf(arr, i).toFixed(1)} ${y(v).toFixed(1)}`).join(" L");
   const line = path(values);
   const area = `${line} L${W} ${H} L0 ${H} Z`;
+  // Ticks top -> bottom (max ... 0); gridlines + labels share the same fractions.
+  const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => max * f);
+
   return (
-    <div>
-      <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-        {[40, 100, 160, 220].map((gy) => (
-          <line key={gy} x1="0" y1={gy} x2={W} y2={gy} style={{ stroke: "var(--c-track)" }} strokeWidth="1" />
-        ))}
-        <path d={area} style={{ fill: "var(--c-accent-soft)" }} />
-        {compareValues && compareValues.length > 0 && (
-          <path d={path(compareValues)} fill="none" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-        )}
-        <path d={line} fill="none" style={{ stroke: "var(--c-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      {labels.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginTop: 8 }}>
-          {labels.map((l, i) => <span key={i}>{l}</span>)}
+    <div style={{ display: "flex", gap: 10 }}>
+      <div style={{ height, display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 10.5, color: "var(--c-muted)", fontWeight: 600, textAlign: "right", minWidth: 30, flex: "none" }}>
+        {ticks.map((t, i) => <span key={i}>{num(t)}</span>)}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ position: "relative", height }}>
+          {ticks.map((_, i) => (
+            <div key={i} style={{ position: "absolute", left: 0, right: 0, top: `${(i / (ticks.length - 1)) * 100}%`, borderTop: "1px solid var(--c-track)" }} />
+          ))}
+          <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ position: "relative", display: "block" }}>
+            <path d={area} style={{ fill: "var(--c-accent-soft)" }} />
+            {compareValues && compareValues.length > 0 && (
+              <path d={path(compareValues)} fill="none" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+            )}
+            <path d={line} fill="none" style={{ stroke: "var(--c-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
-      )}
+        {labels.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginTop: 8 }}>
+            {labels.map((l, i) => <span key={i}>{l}</span>)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
