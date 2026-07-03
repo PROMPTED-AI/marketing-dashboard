@@ -6,8 +6,11 @@ data-ophaling gebeurt in `main.py` via een `execute`-callback, zodat de org-scop
 en de 409 "opnieuw koppelen"-afhandeling op één plek blijven.
 """
 import json
+import logging
 
 from openai import OpenAI
+
+log = logging.getLogger("dashboard")
 
 MAX_TOOL_ITERATIONS = 6
 
@@ -130,6 +133,7 @@ def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: 
                     "tool_call_id": c["id"],
                     "content": execute(c["name"], {}),
                 })
-    except Exception as e:  # never leak a raw stack trace to the client
-        yield _sse("error", message=f"Er ging iets mis met de assistent: {e}")
+    except Exception:  # log server-side; keep client message generic
+        log.exception("assistant stream failed (model=%s)", model)
+        yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
     yield _sse("done")

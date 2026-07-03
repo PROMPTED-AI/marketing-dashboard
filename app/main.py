@@ -56,13 +56,29 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Marketing Dashboard - GA4 (multi-tenant)", lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET,
+    https_only=config.SESSION_COOKIE_SECURE,
+    same_site="lax",
+)
 
 # Serve the built SPA's static assets (present in production / after a build).
 if (SPA_DIR / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=SPA_DIR / "assets"), name="assets")
 if (SPA_DIR / "fonts").is_dir():
     app.mount("/fonts", StaticFiles(directory=SPA_DIR / "fonts"), name="fonts")
+
+
+def _safe_return(path: str | None, default: str) -> str:
+    """Allow only same-site absolute paths as a post-OAuth redirect target.
+
+    Blocks protocol-relative (`//host`) and backslash (`/\\host`) forms that
+    browsers resolve to an external origin — otherwise an open redirect.
+    """
+    if path and path.startswith("/") and not path.startswith(("//", "/\\")):
+        return path
+    return default
 
 
 def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
@@ -173,7 +189,7 @@ def connect(request: Request, providers: str, return_to: str = "/app/integration
     request.session["code_verifier"] = code_verifier
     request.session["oauth_mode"] = "connect"
     request.session["oauth_providers"] = requested
-    request.session["oauth_return"] = return_to if return_to.startswith("/") else "/app"
+    request.session["oauth_return"] = _safe_return(return_to, "/app")
     return RedirectResponse(authorization_url)
 
 
@@ -359,6 +375,18 @@ def assistant_chat(request: Request, body: ChatBody):
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
 
+    # Only trust user/assistant text turns from the client — never a client-supplied
+    # "system"/"tool" role (the server owns the system prompt and tool results).
+    safe_messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in body.messages
+        if isinstance(m, dict) and m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+    ]
+    if not safe_messages:
+        raise HTTPException(status_code=400, detail="Geen geldige vraag.")
+    if len(safe_messages) > 40 or sum(len(m["content"]) for m in safe_messages) > 20000:
+        raise HTTPException(status_code=413, detail="Gesprek te lang - begin een nieuw gesprek.")
+
     def execute(name: str, _tool_input: dict) -> str:
         """Run one tool, org-scoped. Returns a JSON string; never raises."""
         try:
@@ -393,7 +421,7 @@ def assistant_chat(request: Request, body: ChatBody):
             return json.dumps({"error": f"Kon data niet ophalen: {e}"}, ensure_ascii=False)
 
     stream = assistant.stream_chat(
-        body.messages, execute,
+        safe_messages, execute,
         api_key=config.EUROUTER_API_KEY, base_url=config.EUROUTER_BASE_URL,
         model=config.EUROUTER_MODEL,
     )
@@ -506,7 +534,7 @@ def meta_login(request: Request, org_id: str | None = None, return_to: str = "/a
     state = uuid.uuid4().hex
     request.session["meta_oauth_state"] = state
     request.session["meta_oauth_org"] = target_org
-    request.session["meta_oauth_return"] = return_to if return_to.startswith("/") else "/app/integrations"
+    request.session["meta_oauth_return"] = _safe_return(return_to, "/app/integrations")
     return RedirectResponse(meta_oauth.build_login_url(state))
 
 
