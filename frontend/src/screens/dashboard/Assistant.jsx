@@ -114,7 +114,8 @@ export default function Assistant() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 140px)" }}>
+    <div className="assistant-layout">
+      <div className="assistant-main">
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--c-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-accent)" }}><IcChat s={19} /></div>
         <div>
@@ -125,29 +126,6 @@ export default function Assistant() {
 
       {/* messages */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "12px 0" }}>
-        {messages.length === 0 && insights?.length > 0 && (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", margin: "2px 2px 10px" }}>
-              opvallend deze periode
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {insights.map((it, i) => (
-                <button key={i} onClick={() => send(it.question)} className="card" style={insightCard}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLOR[it.severity] || "var(--c-accent)", marginTop: 6, flex: "none" }} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 13.5 }}>{it.title}</span>
-                      <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)" }}>{it.channel_label}</span>
-                    </span>
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--c-muted)", marginTop: 2 }}>{it.detail}</span>
-                  </span>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--c-accent)", whiteSpace: "nowrap", alignSelf: "center" }}>vraag →</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {messages.length === 0 && (
           <div className="card" style={{ padding: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Waarmee kan ik je helpen?</div>
@@ -193,12 +171,54 @@ export default function Assistant() {
           De assistent gebruikt de live data van de geselecteerde klant en periode.
         </div>
       </div>
+      </div>
+
+      {/* signals panel — its own fixed place next to (or above) the chat */}
+      <aside className="assistant-side no-print">
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800 }}>Signalen</div>
+            <div style={{ fontSize: 11, color: "var(--c-muted)" }}>{label}</div>
+          </div>
+          {insights === null && (
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>signalen laden…</div>
+          )}
+          {insights?.length === 0 && (
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>
+              Geen opvallende veranderingen deze periode.
+            </div>
+          )}
+          {insights?.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {insights.map((it, i) => (
+                <button
+                  key={i}
+                  onClick={() => send(it.question)}
+                  disabled={streaming}
+                  title={it.detail}
+                  style={{ ...signalRow, opacity: streaming ? 0.6 : 1 }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLOR[it.severity] || "var(--c-accent)", marginTop: 5, flex: "none" }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontWeight: 700, fontSize: 12.5 }}>{it.title}</span>
+                    <span style={{ display: "block", fontSize: 11, color: "var(--c-muted)", marginTop: 1 }}>{it.channel_label}</span>
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--c-accent)", alignSelf: "center" }}>→</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 10.5, color: "var(--c-muted)", marginTop: 12 }}>
+            Klik op een signaal en de assistent zoekt het uit.
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
 
 const chip = { padding: "8px 13px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 600, cursor: "pointer" };
-const insightCard = { display: "flex", gap: 11, alignItems: "flex-start", padding: "13px 15px", textAlign: "left", cursor: "pointer", width: "100%" };
+const signalRow = { display: "flex", gap: 9, alignItems: "flex-start", padding: "9px 10px", textAlign: "left", cursor: "pointer", width: "100%", borderRadius: 10, border: "1px solid var(--c-border-soft)", background: "var(--c-surface-2)", color: "var(--c-ink)" };
 const userBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "var(--c-accent)", color: "#fff", fontSize: 13.5, lineHeight: 1.5 };
 const botBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-ink)", fontSize: 13.5, lineHeight: 1.55 };
 const textareaStyle = { flex: 1, resize: "none", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "Montserrat, sans-serif", lineHeight: 1.4, maxHeight: 160 };
