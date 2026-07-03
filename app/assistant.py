@@ -72,6 +72,45 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_google_ads",
+            "description": (
+                "Haalt de Google Ads-data van de klant op voor de huidige periode: "
+                "uitgaven, vertoningen, klikken, CTR, CPC, conversies, kosten per "
+                "conversie en de campagnes. Roep dit aan bij vragen over betaald "
+                "zoeken, advertentiebudget, campagnes of rendement (ROAS/CPA)."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_meta_ads",
+            "description": (
+                "Haalt de betaalde Meta-advertentiedata (Facebook/Instagram Ads) van "
+                "de klant op voor de huidige periode: uitgaven, bereik, vertoningen, "
+                "klikken, CTR, CPC/CPM, resultaten per conversiedoel en de campagnes. "
+                "Roep dit aan bij vragen over social advertising of Meta-campagnes."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_meta_organic",
+            "description": (
+                "Haalt de organische Meta-data (Facebook-pagina + Instagram) van de "
+                "klant op: volgers en groei, bereik, vertoningen, betrokkenheid en "
+                "top-posts. Roep dit aan bij vragen over organische social, bereik of "
+                "betrokkenheid op Facebook/Instagram."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
 ]
 
 

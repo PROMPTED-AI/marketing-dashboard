@@ -12,7 +12,8 @@ const TOOL_LABELS = {
 const EXAMPLES = [
   "Hoe presteert mijn verkeer deze periode?",
   "Geef me 3 SEO-quick-wins",
-  "Welke pagina's kan ik verbeteren?",
+  "Waar kan ik besparen op mijn advertenties?",
+  "Hoe presteert mijn social media?",
 ];
 
 export default function Assistant() {
