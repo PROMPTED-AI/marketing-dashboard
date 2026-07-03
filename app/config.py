@@ -64,6 +64,9 @@ CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
 REDIRECT_URI = os.environ["GOOGLE_REDIRECT_URI"]
 SESSION_SECRET = os.environ["SESSION_SECRET"]
+# Session cookie is Secure (HTTPS-only) by default. Set SESSION_COOKIE_SECURE=false
+# for local http development.
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
 
 # Postgres connection string (use Neon's pooled URL in production).
 DATABASE_URL = os.environ["DATABASE_URL"]
