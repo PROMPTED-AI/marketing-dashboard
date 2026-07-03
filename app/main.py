@@ -388,8 +388,19 @@ def assistant_chat(request: Request, body: ChatBody):
     if len(safe_messages) > 40 or sum(len(m["content"]) for m in safe_messages) > 20000:
         raise HTTPException(status_code=413, detail="Gesprek te lang - begin een nieuw gesprek.")
 
-    def execute(name: str, _tool_input: dict) -> str:
+    def _tool_period(tool_input: dict) -> tuple[str, str]:
+        """Model-supplied start/end (validated) win over the dashboard period."""
+        s, e = tool_input.get("start"), tool_input.get("end")
+        try:
+            if s and e and date.fromisoformat(s) <= date.fromisoformat(e):
+                return s, e
+        except (TypeError, ValueError):
+            pass
+        return body.start, body.end
+
+    def execute(name: str, tool_input: dict) -> str:
         """Run one tool, org-scoped. Returns a JSON string; never raises."""
+        start, end = _tool_period(tool_input or {})
         try:
             if name == "list_connections":
                 return json.dumps(_connections_payload(target_org), ensure_ascii=False, default=str)
@@ -402,7 +413,7 @@ def assistant_chat(request: Request, body: ChatBody):
                         return json.dumps({"error": "Geen Analytics-property gekoppeld."})
                     prop = props[0]["property_id"]
                 data = _google_data(target_org, "google_analytics",
-                                    lambda: analytics.run_ga_overview(creds, prop, body.start, body.end, None))
+                                    lambda: analytics.run_ga_overview(creds, prop, start, end, None))
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
             if name == "get_search_console":
                 creds = _org_credentials(target_org, provider="search_console")
@@ -413,7 +424,7 @@ def assistant_chat(request: Request, body: ChatBody):
                         return json.dumps({"error": "Geen Search Console-site gekoppeld."})
                     site = sites[0]["site_url"]
                 data = _google_data(target_org, "search_console",
-                                    lambda: search_console.run_search_analytics(creds, site, body.start, body.end, None))
+                                    lambda: search_console.run_search_analytics(creds, site, start, end, None))
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
             if name == "get_google_ads":
                 creds = _org_credentials(target_org, provider="google_ads")
@@ -421,7 +432,7 @@ def assistant_chat(request: Request, body: ChatBody):
                     accounts = google_ads.list_accounts(creds)
                     if not accounts:
                         return json.dumps({"error": "Geen Google Ads-account gekoppeld."})
-                    data = google_ads.run_overview(creds, accounts[0]["customer_id"], body.start, body.end, None)
+                    data = google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, None)
                 except google_ads.AdsNotConfigured:
                     return json.dumps({"error": "Google Ads is nog niet geconfigureerd op de server."})
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
@@ -430,7 +441,7 @@ def assistant_chat(request: Request, body: ChatBody):
                 accounts = (meta.list_assets(token).get("ad_accounts") or [])
                 if not accounts:
                     return json.dumps({"error": "Geen Meta-advertentieaccount gekoppeld."})
-                data = meta.ads_overview(token, accounts[0]["id"], body.start, body.end, None)
+                data = meta.ads_overview(token, accounts[0]["id"], start, end, None)
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
             if name == "get_meta_organic":
                 token = _meta_token(target_org)
@@ -439,7 +450,7 @@ def assistant_chat(request: Request, body: ChatBody):
                     return json.dumps({"error": "Geen Facebook-pagina gekoppeld."})
                 page = pages[0]
                 ig_id = (page.get("instagram") or {}).get("id")
-                data = meta.organic_overview(token, page["id"], ig_id, body.start, body.end)
+                data = meta.organic_overview(token, page["id"], ig_id, start, end)
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
             return json.dumps({"error": f"Onbekende tool: {name}"})
         except HTTPException as e:
@@ -450,7 +461,7 @@ def assistant_chat(request: Request, body: ChatBody):
     stream = assistant.stream_chat(
         safe_messages, execute,
         api_key=config.EUROUTER_API_KEY, base_url=config.EUROUTER_BASE_URL,
-        model=config.EUROUTER_MODEL,
+        model=config.EUROUTER_MODEL, period=(body.start, body.end),
     )
     return StreamingResponse(
         stream,
