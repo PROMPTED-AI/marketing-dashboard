@@ -111,6 +111,17 @@ a { color: inherit; }
   .widget-grid { grid-template-columns: 1fr !important; }
 }
 
+/* ---- Assistant: chat column + fixed signals panel ---- */
+.assistant-layout { display: flex; gap: 18px; align-items: flex-start; }
+.assistant-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: calc(100vh - 140px); }
+.assistant-side { width: 300px; flex: none; position: sticky; top: 14px; }
+@media (max-width: 1000px) {
+  /* Panel above the chat on narrow screens. */
+  .assistant-layout { flex-direction: column-reverse; }
+  .assistant-side { width: 100%; position: static; }
+  .assistant-main { min-height: 0; }
+}
+
 /* Print / Save-as-PDF: drop app chrome, force light, let content flow. */
 @media print {
   .no-print { display: none !important; }
