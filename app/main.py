@@ -24,6 +24,7 @@ GET  /api/analytics/report          -> sample GA4 report for a property
 import json
 import uuid
 import logging
+from datetime import date, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,8 +38,8 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import (
-    analytics, assistant, auth, cache, config, db, google_ads, meta, meta_oauth,
-    models, oauth, search_console,
+    analytics, assistant, auth, cache, config, db, google_ads, insights, meta,
+    meta_oauth, models, oauth, search_console,
 )
 
 log = logging.getLogger("dashboard")
@@ -456,6 +457,94 @@ def assistant_chat(request: Request, body: ChatBody):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _previous_period(start: str, end: str) -> tuple[str, str]:
+    """The equal-length period immediately before [start, end]."""
+    s, e = date.fromisoformat(start), date.fromisoformat(end)
+    length = (e - s).days + 1
+    prev_end = s - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=length - 1)
+    return prev_start.isoformat(), prev_end.isoformat()
+
+
+def _connected(target_org: str, provider: str) -> bool:
+    conn = models.get_connection(target_org, provider=provider)
+    return bool(conn and conn["status"] == "connected")
+
+
+@app.get("/api/insights")
+def insights_endpoint(
+    request: Request, start: str, end: str,
+    org_id: str | None = None, property_id: str | None = None, site: str | None = None,
+):
+    """Proactive, rule-based insights: notable period-over-period changes per channel."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|insights|{start}|{end}|{property_id}|{site}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    try:
+        compare = _previous_period(start, end)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ongeldige periode")
+
+    found: list[dict] = []
+
+    if _connected(target_org, "google_analytics"):
+        try:
+            creds = _org_credentials(target_org)
+            prop = property_id
+            if not prop:
+                props = analytics.list_properties(creds)
+                prop = props[0]["property_id"] if props else None
+            if prop:
+                data = analytics.run_ga_overview(creds, prop, start, end, compare)
+                found += insights.from_channel("analytics", data.get("kpis", {}), data.get("deltas"))
+        except Exception:
+            log.exception("insights: analytics failed org=%s", target_org)
+
+    if _connected(target_org, "search_console"):
+        try:
+            creds = _org_credentials(target_org, provider="search_console")
+            s = site
+            if not s:
+                sites = search_console.list_sites(creds)
+                s = sites[0]["site_url"] if sites else None
+            if s:
+                data = search_console.run_search_analytics(creds, s, start, end, compare)
+                found += insights.from_channel("search_console", data.get("totals", {}), data.get("deltas"))
+                found += insights.search_opportunities(data)
+        except Exception:
+            log.exception("insights: search console failed org=%s", target_org)
+
+    if _connected(target_org, "google_ads"):
+        try:
+            creds = _org_credentials(target_org, provider="google_ads")
+            accounts = google_ads.list_accounts(creds)
+            if accounts:
+                data = google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, compare)
+                found += insights.from_channel("google_ads", data.get("kpis", {}), data.get("deltas"))
+        except google_ads.AdsNotConfigured:
+            pass
+        except Exception:
+            log.exception("insights: google ads failed org=%s", target_org)
+
+    if _connected(target_org, "meta_ads"):
+        try:
+            token = _meta_token(target_org)
+            accounts = meta.list_assets(token).get("ad_accounts") or []
+            if accounts:
+                data = meta.ads_overview(token, accounts[0]["id"], start, end, compare)
+                found += insights.from_channel("meta_ads", data.get("kpis", {}), data.get("deltas"))
+        except Exception:
+            log.exception("insights: meta failed org=%s", target_org)
+
+    payload = {"org_id": target_org, "insights": insights.rank(found)}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
 
 
 def _connections_payload(target_org: str) -> dict:

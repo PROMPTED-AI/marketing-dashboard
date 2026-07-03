@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { IcChat } from "../../components/icons.jsx";
@@ -7,7 +8,12 @@ const TOOL_LABELS = {
   list_connections: "je koppelingen",
   get_analytics_overview: "Analytics",
   get_search_console: "Search Console",
+  get_google_ads: "Google Ads",
+  get_meta_ads: "Meta Ads",
+  get_meta_organic: "Meta organisch",
 };
+
+const SEV_COLOR = { positive: "var(--c-pos)", negative: "var(--c-neg)", neutral: "var(--c-accent)" };
 
 const EXAMPLES = [
   "Hoe presteert mijn verkeer deze periode?",
@@ -23,9 +29,26 @@ export default function Assistant() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [tool, setTool] = useState(null);
+  const [insights, setInsights] = useState(null);
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, tool]);
+
+  // Proactive insights for the active client + period (rule-based, cached server-side).
+  useEffect(() => {
+    let alive = true;
+    setInsights(null);
+    const q = new URLSearchParams({ start, end });
+    if (orgId) q.set("org_id", orgId);
+    const prop = localStorage.getItem("kompas-property");
+    if (prop) q.set("property_id", prop);
+    const site = localStorage.getItem("kompas-gsc-site");
+    if (site) q.set("site", site);
+    api("/api/insights?" + q.toString())
+      .then((d) => { if (alive) setInsights(d.insights || []); })
+      .catch(() => { if (alive) setInsights([]); });
+    return () => { alive = false; };
+  }, [orgId, start, end]);
 
   const setLast = (txt) =>
     setMessages((ms) => {
@@ -102,6 +125,29 @@ export default function Assistant() {
 
       {/* messages */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "12px 0" }}>
+        {messages.length === 0 && insights?.length > 0 && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", margin: "2px 2px 10px" }}>
+              opvallend deze periode
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {insights.map((it, i) => (
+                <button key={i} onClick={() => send(it.question)} className="card" style={insightCard}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLOR[it.severity] || "var(--c-accent)", marginTop: 6, flex: "none" }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, fontSize: 13.5 }}>{it.title}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 600, color: "var(--c-muted)" }}>{it.channel_label}</span>
+                    </span>
+                    <span style={{ display: "block", fontSize: 12.5, color: "var(--c-muted)", marginTop: 2 }}>{it.detail}</span>
+                  </span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--c-accent)", whiteSpace: "nowrap", alignSelf: "center" }}>vraag →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div className="card" style={{ padding: 22 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Waarmee kan ik je helpen?</div>
@@ -152,6 +198,7 @@ export default function Assistant() {
 }
 
 const chip = { padding: "8px 13px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 600, cursor: "pointer" };
+const insightCard = { display: "flex", gap: 11, alignItems: "flex-start", padding: "13px 15px", textAlign: "left", cursor: "pointer", width: "100%" };
 const userBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "var(--c-accent)", color: "#fff", fontSize: 13.5, lineHeight: 1.5 };
 const botBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-ink)", fontSize: 13.5, lineHeight: 1.55 };
 const textareaStyle = { flex: 1, resize: "none", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "Montserrat, sans-serif", lineHeight: 1.4, maxHeight: 160 };
