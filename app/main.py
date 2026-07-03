@@ -414,6 +414,32 @@ def assistant_chat(request: Request, body: ChatBody):
                 data = _google_data(target_org, "search_console",
                                     lambda: search_console.run_search_analytics(creds, site, body.start, body.end, None))
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            if name == "get_google_ads":
+                creds = _org_credentials(target_org, provider="google_ads")
+                try:
+                    accounts = google_ads.list_accounts(creds)
+                    if not accounts:
+                        return json.dumps({"error": "Geen Google Ads-account gekoppeld."})
+                    data = google_ads.run_overview(creds, accounts[0]["customer_id"], body.start, body.end, None)
+                except google_ads.AdsNotConfigured:
+                    return json.dumps({"error": "Google Ads is nog niet geconfigureerd op de server."})
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            if name == "get_meta_ads":
+                token = _meta_token(target_org)
+                accounts = (meta.list_assets(token).get("ad_accounts") or [])
+                if not accounts:
+                    return json.dumps({"error": "Geen Meta-advertentieaccount gekoppeld."})
+                data = meta.ads_overview(token, accounts[0]["id"], body.start, body.end, None)
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            if name == "get_meta_organic":
+                token = _meta_token(target_org)
+                pages = (meta.list_assets(token).get("pages") or [])
+                if not pages:
+                    return json.dumps({"error": "Geen Facebook-pagina gekoppeld."})
+                page = pages[0]
+                ig_id = (page.get("instagram") or {}).get("id")
+                data = meta.organic_overview(token, page["id"], ig_id, body.start, body.end)
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
             return json.dumps({"error": f"Onbekende tool: {name}"})
         except HTTPException as e:
             return json.dumps({"error": str(e.detail)}, ensure_ascii=False)
