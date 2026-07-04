@@ -1,10 +1,18 @@
 // Catalogus voor het Google Analytics-kanaal (GA4-overzichtspayload).
+//
+// Doel: dezelfde bouwstenen als de GA4-interface zelf — de headline-metrics,
+// elke metric als trend over tijd, en de standaard acquisitie-/techniek-/
+// geografie-/demografie-/gedragsdimensies, elk als kaart/grafiek/tabel.
 
 import { num, pct1 } from "../format.js";
 import { seriesDatesFrom } from "./kit.js";
 
 const sumConversions = (d) => (d?.conversions ?? []).reduce((a, c) => a + (c.count || 0), 0);
 const seriesOf = (d, key) => (d?.series_by_date ?? []).map((r) => r[key] ?? 0);
+const pctSeriesOf = (d, key) => (d?.series_by_date ?? []).map((r) => (r[key] ?? 0) * 100);
+
+const dec1 = (v) => (v || 0).toFixed(1).replace(".", ",");
+const eur = (v) => "€ " + new Intl.NumberFormat("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 
 // Normaliseer de gekozen key events naar een lijst namen (leeg = alle).
 function selectedEvents(value) {
@@ -21,12 +29,34 @@ const eventConfig = {
   options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
 };
 
+// Fabriek voor een "over tijd"-bron die tegen series_by_date leest.
+function area(label, key, unit, { pct = false, compare = false } = {}) {
+  return {
+    label, group: "timeseries", kinds: ["area"], unit,
+    series: (d) => ({
+      values: pct ? pctSeriesOf(d, key) : seriesOf(d, key),
+      compareValues: compare ? (d?.compare_series ?? null) : null,
+      unit,
+    }),
+  };
+}
+
+// Fabriek voor een verdeling die een payload-array [{label,value,pct}] leest.
+function dist(label, field, kinds, unit) {
+  return { label, group: "breakdown", kinds, unit, breakdown: (d) => d?.[field] ?? [] };
+}
+
 export const SOURCES = {
   // --- kerncijfers (KPI) ---
   users: {
     label: "Bezoekers", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.users ?? 0, fmt: "int", delta: d?.deltas?.users, higherBetter: true }),
     spark: (d) => seriesOf(d, "users"),
+  },
+  activeUsers: {
+    label: "Actieve gebruikers", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.activeUsers ?? 0, fmt: "int", delta: d?.deltas?.activeUsers, higherBetter: true }),
+    spark: (d) => seriesOf(d, "activeUsers"),
   },
   newUsers: {
     label: "Nieuwe bezoekers", group: "scalar", kinds: ["kpi"],
@@ -38,15 +68,10 @@ export const SOURCES = {
     scalar: (d) => ({ value: d?.kpis?.sessions ?? 0, fmt: "int", delta: d?.deltas?.sessions, higherBetter: true }),
     spark: (d) => seriesOf(d, "sessions"),
   },
-  pageViews: {
-    label: "Paginaweergaven", group: "scalar", kinds: ["kpi"],
-    scalar: (d) => ({ value: d?.kpis?.pageViews ?? 0, fmt: "int", delta: d?.deltas?.pageViews, higherBetter: true }),
-    spark: (d) => seriesOf(d, "pageViews"),
-  },
-  eventCount: {
-    label: "Gebeurtenissen", group: "scalar", kinds: ["kpi"],
-    scalar: (d) => ({ value: d?.kpis?.eventCount ?? 0, fmt: "int", delta: d?.deltas?.eventCount, higherBetter: true }),
-    spark: (d) => seriesOf(d, "eventCount"),
+  engagedSessions: {
+    label: "Betrokken sessies", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.engagedSessions ?? 0, fmt: "int", delta: d?.deltas?.engagedSessions, higherBetter: true }),
+    spark: (d) => seriesOf(d, "engagedSessions"),
   },
   conversions_total: {
     label: "Conversies", group: "scalar", kinds: ["kpi"], unit: "conversies",
@@ -72,68 +97,100 @@ export const SOURCES = {
     },
     spark: (d) => (d?.series_by_date ?? []).map((r) => (r.sessions ? (r.conversions / r.sessions) * 100 : 0)),
   },
-  bounceRate: {
-    label: "Bouncepercentage", group: "scalar", kinds: ["kpi"],
-    scalar: (d) => ({ value: (d?.kpis?.bounceRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.bounceRate, higherBetter: false }),
-    spark: (d) => seriesOf(d, "bounceRate"),
-  },
   engagementRate: {
     label: "Betrokkenheid", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: (d?.kpis?.engagementRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.engagementRate, higherBetter: true }),
-    spark: (d) => seriesOf(d, "engagementRate"),
+    spark: (d) => pctSeriesOf(d, "engagementRate"),
+  },
+  avgEngagementTime: {
+    label: "Gem. betrokkenheidstijd", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.avgEngagementTime ?? 0, fmt: "duration", delta: null, higherBetter: true }),
   },
   avgSessionDuration: {
     label: "Gem. sessieduur", group: "scalar", kinds: ["kpi"],
     scalar: (d) => ({ value: d?.kpis?.avgSessionDuration ?? 0, fmt: "duration", delta: d?.deltas?.avgSessionDuration, higherBetter: true }),
     spark: (d) => seriesOf(d, "avgSessionDuration"),
   },
+  bounceRate: {
+    label: "Bouncepercentage", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: (d?.kpis?.bounceRate ?? 0) * 100, fmt: "percent", delta: d?.deltas?.bounceRate, higherBetter: false }),
+    spark: (d) => pctSeriesOf(d, "bounceRate"),
+  },
+  pageViews: {
+    label: "Paginaweergaven", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.pageViews ?? 0, fmt: "int", delta: d?.deltas?.pageViews, higherBetter: true }),
+    spark: (d) => seriesOf(d, "pageViews"),
+  },
+  viewsPerSession: {
+    label: "Weergaven per sessie", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.viewsPerSession ?? 0, display: dec1(d?.kpis?.viewsPerSession), delta: d?.deltas?.viewsPerSession, higherBetter: true }),
+  },
+  sessionsPerUser: {
+    label: "Sessies per gebruiker", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.sessionsPerUser ?? 0, display: dec1(d?.kpis?.sessionsPerUser), delta: d?.deltas?.sessionsPerUser, higherBetter: true }),
+  },
+  eventCount: {
+    label: "Gebeurtenissen", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.eventCount ?? 0, fmt: "int", delta: d?.deltas?.eventCount, higherBetter: true }),
+    spark: (d) => seriesOf(d, "eventCount"),
+  },
+  revenue: {
+    label: "Opbrengst", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.revenue ?? 0, display: eur(d?.kpis?.revenue), delta: d?.deltas?.revenue, higherBetter: true }),
+    spark: (d) => seriesOf(d, "revenue"),
+  },
 
   // --- over tijd ---
-  sessions_by_date: {
-    label: "Sessies over tijd", group: "timeseries", kinds: ["area"], unit: "sessies",
-    series: (d) => ({
-      values: (d?.sessions_by_date ?? []).map((p) => p.sessions),
-      labels: (d?.sessions_by_date ?? []).map((p) => p.date),
-      compareValues: d?.compare_series ?? null,
-    }),
-  },
+  sessions_by_date: area("Sessies over tijd", "sessions", "sessies", { compare: true }),
+  users_by_date: area("Bezoekers over tijd", "users", "bezoekers"),
+  activeUsers_by_date: area("Actieve gebruikers over tijd", "activeUsers", "gebruikers"),
+  newUsers_by_date: area("Nieuwe bezoekers over tijd", "newUsers", "bezoekers"),
+  engagedSessions_by_date: area("Betrokken sessies over tijd", "engagedSessions", "sessies"),
+  pageViews_by_date: area("Paginaweergaven over tijd", "pageViews", "weergaven"),
+  conversions_by_date: area("Conversies over tijd", "conversions", "conversies"),
+  eventCount_by_date: area("Gebeurtenissen over tijd", "eventCount", "gebeurtenissen"),
+  engagementRate_by_date: area("Betrokkenheid over tijd", "engagementRate", "%", { pct: true }),
+  bounceRate_by_date: area("Bouncepercentage over tijd", "bounceRate", "%", { pct: true }),
+  revenue_by_date: area("Opbrengst over tijd", "revenue", "opbrengst"),
 
-  // --- verdelingen ---
-  channels: {
-    label: "Verkeersbronnen", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
-    breakdown: (d) => d?.channels ?? [],
-  },
-  source_medium: {
-    label: "Bron / medium", group: "breakdown", kinds: ["bars", "table", "donut"], unit: "sessies",
-    breakdown: (d) => d?.source_medium ?? [],
-  },
-  devices: {
-    label: "Apparaten", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
-    breakdown: (d) => d?.devices ?? [],
-  },
-  browsers: {
-    label: "Browsers", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
-    breakdown: (d) => d?.browsers ?? [],
-  },
-  new_vs_returning: {
-    label: "Nieuw vs terugkerend", group: "breakdown", kinds: ["donut", "bars"], unit: "sessies",
-    breakdown: (d) => d?.new_vs_returning ?? [],
-  },
-  geography: {
-    label: "Landen", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
-    breakdown: (d) => d?.geography ?? [],
-  },
-  events: {
-    label: "Gebeurtenissen (top)", group: "breakdown", kinds: ["bars", "table", "donut"], unit: "gebeurtenissen",
-    breakdown: (d) => d?.events ?? [],
-  },
+  // --- acquisitie (verdelingen) ---
+  channels: dist("Verkeersbronnen", "channels", ["donut", "bars", "table"], "sessies"),
+  source_medium: dist("Bron / medium", "source_medium", ["bars", "table", "donut"], "sessies"),
+  session_campaigns: dist("Campagnes (sessie)", "session_campaigns", ["bars", "table", "donut"], "sessies"),
+  first_user_channels: dist("Eerste kanaal", "first_user_channels", ["donut", "bars", "table"], "sessies"),
+  first_user_source_medium: dist("Eerste bron / medium", "first_user_source_medium", ["bars", "table", "donut"], "sessies"),
 
-  // --- tabellen ---
+  // --- gebruikers & techniek (verdelingen) ---
+  devices: dist("Apparaten", "devices", ["donut", "bars", "table"], "sessies"),
+  operating_systems: dist("Besturingssystemen", "operating_systems", ["bars", "table", "donut"], "sessies"),
+  browsers: dist("Browsers", "browsers", ["donut", "bars", "table"], "sessies"),
+  platforms: dist("Platform", "platforms", ["donut", "bars", "table"], "sessies"),
+  screen_resolutions: dist("Schermresolutie", "screen_resolutions", ["bars", "table"], "sessies"),
+
+  // --- geografie & demografie (verdelingen) ---
+  geography: dist("Landen", "geography", ["bars", "donut", "table"], "sessies"),
+  cities: dist("Steden", "cities", ["bars", "table"], "sessies"),
+  languages: dist("Talen", "languages", ["bars", "table", "donut"], "sessies"),
+  age: dist("Leeftijd", "age", ["bars", "table", "donut"], "gebruikers"),
+  gender: dist("Geslacht", "gender", ["donut", "bars"], "gebruikers"),
+
+  // --- gedrag (verdelingen) ---
+  new_vs_returning: dist("Nieuw vs terugkerend", "new_vs_returning", ["donut", "bars"], "sessies"),
+  events: dist("Gebeurtenissen (top)", "events", ["bars", "table", "donut"], "gebeurtenissen"),
+
+  // --- pagina's & conversies (tabellen) ---
   top_pages: {
     label: "Toppagina's", group: "table", kinds: ["table"],
     table: (d) => ({
       columns: ["Pagina", "Weergaven", "Bounce"],
       rows: (d?.top_pages ?? []).map((p) => [p.path, num(p.views), pct1((p.bounceRate || 0) * 100)]),
+    }),
+  },
+  page_titles: {
+    label: "Toppagina's (titel)", group: "table", kinds: ["table"],
+    table: (d) => ({
+      columns: ["Paginatitel", "Weergaven", "Bounce"],
+      rows: (d?.page_titles ?? []).map((p) => [p.path, num(p.views), pct1((p.bounceRate || 0) * 100)]),
     }),
   },
   landing_pages: {
@@ -155,25 +212,28 @@ export const SOURCES = {
 };
 
 export const GROUPS = [
-  { label: "Kerncijfers", ids: ["users", "newUsers", "sessions", "pageViews", "eventCount", "conversions_total", "conversion_rate", "bounceRate", "engagementRate", "avgSessionDuration"] },
-  { label: "Over tijd", ids: ["sessions_by_date"] },
-  { label: "Verdelingen", ids: ["channels", "source_medium", "devices", "browsers", "new_vs_returning", "geography", "events"] },
-  { label: "Tabellen", ids: ["top_pages", "landing_pages", "conversions"] },
+  { label: "Kerncijfers", ids: ["users", "activeUsers", "newUsers", "sessions", "engagedSessions", "conversions_total", "conversion_rate", "engagementRate", "avgEngagementTime", "avgSessionDuration", "bounceRate", "pageViews", "viewsPerSession", "sessionsPerUser", "eventCount", "revenue"] },
+  { label: "Over tijd", ids: ["sessions_by_date", "users_by_date", "activeUsers_by_date", "newUsers_by_date", "engagedSessions_by_date", "pageViews_by_date", "conversions_by_date", "eventCount_by_date", "engagementRate_by_date", "bounceRate_by_date", "revenue_by_date"] },
+  { label: "Acquisitie", ids: ["channels", "source_medium", "session_campaigns", "first_user_channels", "first_user_source_medium"] },
+  { label: "Gebruikers & techniek", ids: ["devices", "operating_systems", "browsers", "platforms", "screen_resolutions"] },
+  { label: "Geografie & demografie", ids: ["geography", "cities", "languages", "age", "gender"] },
+  { label: "Gedrag", ids: ["new_vs_returning", "events"] },
+  { label: "Pagina's & conversies", ids: ["top_pages", "page_titles", "landing_pages", "conversions"] },
 ];
 
 export const TEMPLATES = [
   {
     id: "executive", name: "Directie-overzicht", audience: "Directie",
-    description: "De kerncijfers, trend en herkomst in één compleet directiebeeld.",
+    description: "De headline-cijfers, trend en herkomst in één compleet directiebeeld.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
+      { source: "engagedSessions", kind: "kpi", size: 3 },
       { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "conversion_rate", kind: "kpi", size: 3 },
-      { source: "newUsers", kind: "kpi", size: 3 },
+      { source: "avgEngagementTime", kind: "kpi", size: 3 },
       { source: "engagementRate", kind: "kpi", size: 3 },
-      { source: "bounceRate", kind: "kpi", size: 3 },
-      { source: "avgSessionDuration", kind: "kpi", size: 3 },
+      { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "revenue", kind: "kpi", size: 3 },
       { source: "sessions_by_date", kind: "area", size: 8 },
       { source: "channels", kind: "donut", size: 4 },
       { source: "devices", kind: "donut", size: 4 },
@@ -182,50 +242,67 @@ export const TEMPLATES = [
   },
   {
     id: "acquisition", name: "Acquisitie & verkeer", audience: "Marketeer",
-    description: "Waar bezoekers vandaan komen: kanalen, bron/medium, apparaten, browsers, landen en nieuw vs. terugkerend.",
+    description: "Waar bezoekers vandaan komen: sessie- én eerste-gebruiker-kanalen, bron/medium, campagnes en landen.",
     widgets: [
       { source: "sessions", kind: "kpi", size: 3 },
       { source: "users", kind: "kpi", size: 3 },
       { source: "newUsers", kind: "kpi", size: 3 },
-      { source: "bounceRate", kind: "kpi", size: 3 },
+      { source: "engagementRate", kind: "kpi", size: 3 },
       { source: "sessions_by_date", kind: "area", size: 12 },
       { source: "channels", kind: "donut", size: 4 },
       { source: "source_medium", kind: "bars", size: 8 },
-      { source: "devices", kind: "bars", size: 6 },
+      { source: "first_user_channels", kind: "donut", size: 4 },
+      { source: "first_user_source_medium", kind: "bars", size: 8 },
+      { source: "session_campaigns", kind: "table", size: 6 },
       { source: "geography", kind: "bars", size: 6 },
-      { source: "new_vs_returning", kind: "donut", size: 4 },
-      { source: "browsers", kind: "bars", size: 8 },
     ],
   },
   {
     id: "behavior", name: "Gedrag & content", audience: "Marketeer",
-    description: "Welke content werkt en waar bezoekers afhaken: toppagina's, instappagina's, gebeurtenissen en betrokkenheid.",
+    description: "Welke content werkt en waar bezoekers afhaken: toppagina's, titels, instappagina's en gebeurtenissen.",
     widgets: [
       { source: "pageViews", kind: "kpi", size: 3 },
-      { source: "avgSessionDuration", kind: "kpi", size: 3 },
-      { source: "bounceRate", kind: "kpi", size: 3 },
-      { source: "engagementRate", kind: "kpi", size: 3 },
+      { source: "viewsPerSession", kind: "kpi", size: 3 },
+      { source: "avgEngagementTime", kind: "kpi", size: 3 },
       { source: "eventCount", kind: "kpi", size: 3 },
-      { source: "sessions_by_date", kind: "area", size: 12 },
+      { source: "pageViews_by_date", kind: "area", size: 12 },
       { source: "top_pages", kind: "table", size: 6 },
+      { source: "page_titles", kind: "table", size: 6 },
       { source: "landing_pages", kind: "table", size: 6 },
       { source: "events", kind: "bars", size: 6 },
-      { source: "new_vs_returning", kind: "donut", size: 6 },
     ],
   },
   {
     id: "conversion", name: "Conversie & doelen", audience: "Marketeer",
-    description: "Sturen op resultaat: conversies, conversieratio, de doelen en de bronnen die ze opleveren.",
+    description: "Sturen op resultaat: conversies, ratio, opbrengst, de doelen en de bronnen die ze opleveren.",
     widgets: [
       { source: "conversions_total", kind: "kpi", size: 3 },
       { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "revenue", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
-      { source: "users", kind: "kpi", size: 3 },
       { source: "conversions", kind: "table", size: 6 },
       { source: "channels", kind: "donut", size: 6 },
+      { source: "conversions_by_date", kind: "area", size: 12 },
       { source: "source_medium", kind: "bars", size: 6 },
       { source: "top_pages", kind: "table", size: 6 },
-      { source: "sessions_by_date", kind: "area", size: 12 },
+    ],
+  },
+  {
+    id: "audience", name: "Publiek & techniek", audience: "Specialist",
+    description: "Wie de bezoekers zijn en waarmee ze komen: apparaten, browsers, OS, platform, landen, steden, taal, leeftijd en geslacht.",
+    widgets: [
+      { source: "activeUsers", kind: "kpi", size: 3 },
+      { source: "newUsers", kind: "kpi", size: 3 },
+      { source: "sessionsPerUser", kind: "kpi", size: 3 },
+      { source: "engagementRate", kind: "kpi", size: 3 },
+      { source: "devices", kind: "donut", size: 4 },
+      { source: "operating_systems", kind: "bars", size: 4 },
+      { source: "browsers", kind: "donut", size: 4 },
+      { source: "geography", kind: "bars", size: 6 },
+      { source: "cities", kind: "bars", size: 6 },
+      { source: "languages", kind: "bars", size: 4 },
+      { source: "age", kind: "bars", size: 4 },
+      { source: "gender", kind: "donut", size: 4 },
     ],
   },
   {
@@ -235,7 +312,7 @@ export const TEMPLATES = [
       { source: "users", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
       { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "revenue", kind: "kpi", size: 3 },
       { source: "sessions_by_date", kind: "area", size: 12 },
       { source: "channels", kind: "donut", size: 6 },
       { source: "source_medium", kind: "bars", size: 6 },
@@ -244,6 +321,7 @@ export const TEMPLATES = [
       { source: "events", kind: "bars", size: 6 },
       { source: "new_vs_returning", kind: "donut", size: 6 },
       { source: "top_pages", kind: "table", size: 6 },
+      { source: "page_titles", kind: "table", size: 6 },
       { source: "landing_pages", kind: "table", size: 6 },
       { source: "conversions", kind: "table", size: 6 },
     ],

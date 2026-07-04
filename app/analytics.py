@@ -161,6 +161,48 @@ def run_ga_overview(
             "conversions": delta("conversions"),
         }
 
+    # --- extra KPIs (GA4-interface parity) ---
+    # A second no-dimension report keeps each request under GA4's 10-metric limit
+    # while adding the rest of the headline metrics you see in the GA4 UI. safe():
+    # a property lacking one (e.g. no ecommerce -> totalRevenue) degrades cleanly.
+    extra_metrics = [
+        "activeUsers", "engagedSessions", "userEngagementDuration",
+        "screenPageViewsPerSession", "sessionsPerUser", "totalRevenue",
+    ]
+
+    def _extra_kpis():
+        r = report([], extra_metrics, ranges)
+        for row in r.rows:
+            which = row.dimension_values[0].value if row.dimension_values else "current"
+            target = prev_vals if which == "previous" else cur_vals
+            for i, m in enumerate(extra_metrics):
+                target[m] = float(row.metric_values[i].value)
+
+    safe(_extra_kpis, None)
+
+    au = cur_vals.get("activeUsers", 0.0)
+    kpis.update({
+        "activeUsers": int(au),
+        "engagedSessions": int(cur_vals.get("engagedSessions", 0)),
+        "engagementDuration": cur_vals.get("userEngagementDuration", 0.0),
+        # GA4's headline "gemiddelde betrokkenheidstijd" = engagement time / active user.
+        "avgEngagementTime": (cur_vals.get("userEngagementDuration", 0.0) / au) if au else 0.0,
+        "viewsPerSession": cur_vals.get("screenPageViewsPerSession", 0.0),
+        "sessionsPerUser": cur_vals.get("sessionsPerUser", 0.0),
+        "revenue": cur_vals.get("totalRevenue", 0.0),
+    })
+    if deltas is not None:
+        def edelta(metric):
+            c, p = cur_vals.get(metric, 0.0), prev_vals.get(metric, 0.0)
+            return ((c - p) / p * 100) if p else None
+        deltas.update({
+            "activeUsers": edelta("activeUsers"),
+            "engagedSessions": edelta("engagedSessions"),
+            "viewsPerSession": edelta("screenPageViewsPerSession"),
+            "sessionsPerUser": edelta("sessionsPerUser"),
+            "revenue": edelta("totalRevenue"),
+        })
+
     # --- metrics over time ---
     # One dated report covers every scalar KPI, so each KPI-card can show its own
     # daily trend (sparkline), not just sessions. Same fallback as the KPI block
@@ -201,6 +243,22 @@ def run_ga_overview(
         series_by_date.append(item)
         sessions_by_date.append({"date": d, "sessions": item["sessions"]})
 
+    # Enrich the daily series with the extra headline metrics (their own trend +
+    # sparkline). Separate report to stay within the per-request metric limit.
+    def _extra_series():
+        r = report(["date"], ["activeUsers", "engagedSessions", "totalRevenue"],
+                   cur_only, order_bys=date_order)
+        by_d = {row.dimension_values[0].value: row for row in r.rows}
+        for item in series_by_date:
+            row = by_d.get(item["date"])
+            if not row:
+                continue
+            item["activeUsers"] = _int(row.metric_values[0].value)
+            item["engagedSessions"] = _int(row.metric_values[1].value)
+            item["revenue"] = float(row.metric_values[2].value)
+
+    safe(_extra_series, None)
+
     compare_series = None
     if compare:
         try:
@@ -230,11 +288,23 @@ def run_ga_overview(
 
     channels = safe(lambda: breakdown("sessionDefaultChannelGroup", 6), [])
     devices = safe(lambda: breakdown("deviceCategory", 5), [])
-    geography = safe(lambda: breakdown("country", 5), [])
-    source_medium = safe(lambda: breakdown("sessionSourceMedium", 6), [])
-    browsers = safe(lambda: breakdown("browser", 5), [])
+    geography = safe(lambda: breakdown("country", 8), [])
+    source_medium = safe(lambda: breakdown("sessionSourceMedium", 8), [])
+    browsers = safe(lambda: breakdown("browser", 6), [])
     new_vs_returning = safe(lambda: breakdown("newVsReturning", 3), [])
-    events = safe(lambda: breakdown("eventName", 8, metric="eventCount"), [])
+    events = safe(lambda: breakdown("eventName", 10, metric="eventCount"), [])
+    # Extra GA4-interface dimensions. Each is an independent, safe() report so an
+    # unsupported one (e.g. age/gender need Google Signals) never breaks the rest.
+    cities = safe(lambda: breakdown("city", 8), [])
+    languages = safe(lambda: breakdown("language", 6), [])
+    operating_systems = safe(lambda: breakdown("operatingSystem", 6), [])
+    platforms = safe(lambda: breakdown("platform", 4), [])
+    screen_resolutions = safe(lambda: breakdown("screenResolution", 8), [])
+    session_campaigns = safe(lambda: breakdown("sessionCampaignName", 8), [])
+    first_user_channels = safe(lambda: breakdown("firstUserDefaultChannelGroup", 6), [])
+    first_user_source_medium = safe(lambda: breakdown("firstUserSourceMedium", 8), [])
+    age = safe(lambda: breakdown("userAgeBracket", 6, metric="activeUsers"), [])
+    gender = safe(lambda: breakdown("userGender", 4, metric="activeUsers"), [])
 
     # `views` holds whatever ranking metric the dimension supports. pagePath ranks
     # by screenPageViews; landingPage is session-scoped and is NOT compatible with
@@ -253,8 +323,9 @@ def run_ga_overview(
             for r in rep.rows
         ]
 
-    top_pages = safe(lambda: page_table("pagePath", 6), [])
-    landing_pages = safe(lambda: page_table("landingPage", 6, metric="sessions"), [])
+    top_pages = safe(lambda: page_table("pagePath", 8), [])
+    page_titles = safe(lambda: page_table("pageTitle", 8), [])
+    landing_pages = safe(lambda: page_table("landingPage", 8, metric="sessions"), [])
 
     def _conversions():
         cv = report(["eventName"], ["conversions"], cur_only, order_bys=[_metric_desc("conversions")], limit=8)
@@ -279,7 +350,18 @@ def run_ga_overview(
         "browsers": browsers,
         "new_vs_returning": new_vs_returning,
         "events": events,
+        "cities": cities,
+        "languages": languages,
+        "operating_systems": operating_systems,
+        "platforms": platforms,
+        "screen_resolutions": screen_resolutions,
+        "session_campaigns": session_campaigns,
+        "first_user_channels": first_user_channels,
+        "first_user_source_medium": first_user_source_medium,
+        "age": age,
+        "gender": gender,
         "top_pages": top_pages,
+        "page_titles": page_titles,
         "landing_pages": landing_pages,
         "conversions": conversions,
     }
