@@ -11,13 +11,14 @@ import { RealtimeBars } from "../../components/charts.jsx";
 import WidgetRenderer from "../../components/WidgetRenderer.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
-import { TEMPLATES, instantiateTemplate } from "../../lib/widgetCatalog.js";
+import { analyticsCatalog } from "../../lib/widgets/index.js";
+import { instantiateTemplate } from "../../lib/widgets/kit.js";
 
 // De preset-views op het Analytics-tabblad = de doelgroepgerichte templates
 // (renderen tegen de overview-payload) + een aparte Realtime-view.
 const VIEW_IDS = ["executive", "acquisition", "behavior", "conversion"];
 const VIEWS = [
-  ...TEMPLATES.filter((t) => VIEW_IDS.includes(t.id)).map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
+  ...analyticsCatalog.TEMPLATES.filter((t) => VIEW_IDS.includes(t.id)).map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
   { id: "realtime", name: "Realtime", audience: "Live", tpl: null },
 ];
 
@@ -45,7 +46,7 @@ export default function Analytics() {
   }, [selected, orgId]);
 
   const activeView = VIEWS.find((v) => v.id === view) || VIEWS[0];
-  const widgets = useMemo(() => (activeView.tpl ? instantiateTemplate(activeView.tpl).widgets : []), [activeView.id]);
+  const widgets = useMemo(() => (activeView.tpl ? instantiateTemplate(analyticsCatalog, activeView.tpl).widgets : []), [activeView.id]);
 
   if (pLoading) return <TabState loading />;
   if (pError) return <TabState error={pError} onConnect />;
@@ -151,7 +152,7 @@ export default function Analytics() {
             <div className="widget-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
               {widgets.map((w) => (
                 <div key={w.id} className="widget-cell" style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
-                  <WidgetRenderer widget={w} data={data} />
+                  <WidgetRenderer widget={w} data={data} catalog={analyticsCatalog} />
                 </div>
               ))}
             </div>

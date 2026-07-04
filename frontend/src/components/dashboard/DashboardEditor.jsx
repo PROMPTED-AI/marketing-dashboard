@@ -1,41 +1,41 @@
+// Generieke, samenstelbare dashboard-editor. Werkt voor elk kanaal: geef een
+// catalogus (welke metrics/visualisaties), de kanaalpayload en de bijbehorende
+// asset-keuze mee. Beheer van de opgeslagen indelingen (privé/gedeeld/standaard)
+// gaat via /api/dashboards, gescoped op `page` (= de kanaalsleutel).
+
 import { useEffect, useRef, useState } from "react";
-import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
-import { useDateRange } from "../../lib/PeriodProvider.jsx";
-import { useCachedApi } from "../../lib/swr.js";
 import { useDashboards } from "../../lib/useDashboards.jsx";
-import { overviewUrl } from "../../lib/urls.js";
-import { TabState } from "../../components/ui.jsx";
-import ExportButton from "../../components/ExportButton.jsx";
-import WidgetFrame from "../../components/dashboard/WidgetFrame.jsx";
-import WidgetPicker from "../../components/dashboard/WidgetPicker.jsx";
-import TemplatePicker from "../../components/dashboard/TemplatePicker.jsx";
-import NameDialog from "../../components/dashboard/NameDialog.jsx";
-import { TEMPLATES, instantiateTemplate, sanitizeLayout, newWidget } from "../../lib/widgetCatalog.js";
+import { TabState } from "../ui.jsx";
+import ExportButton from "../ExportButton.jsx";
+import WidgetFrame from "./WidgetFrame.jsx";
+import WidgetPicker from "./WidgetPicker.jsx";
+import TemplatePicker from "./TemplatePicker.jsx";
+import NameDialog from "./NameDialog.jsx";
+import { instantiateTemplate, sanitizeLayout, newWidget } from "../../lib/widgets/kit.js";
 
 const serialize = (l) => JSON.stringify(l?.widgets ?? []);
 
-export default function Overview() {
-  const { props, selected, loading: pLoading, error: pError } = useProperties();
+export default function DashboardEditor({
+  catalog, page, data, loading, error, ctx,
+  title, subtitle, assetControls, exportFilename, exportSections,
+}) {
   const { orgId } = useActiveOrg();
-  const { start, end, compare, label } = useDateRange();
-  const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
-  const dash = useDashboards(orgId);
+  const dash = useDashboards(orgId, page);
 
   const [activeId, setActiveId] = useState(null);
   const [activeMeta, setActiveMeta] = useState({ is_owner: true, visibility: "private" });
-  const [working, setWorking] = useState(null); // { widgets: [...] } currently shown/edited
-  const [baseline, setBaseline] = useState(null); // last saved layout (null = unsaved template)
+  const [working, setWorking] = useState(null);
+  const [baseline, setBaseline] = useState(null);
   const [editing, setEditing] = useState(false);
-  const [modal, setModal] = useState(null); // 'template' | 'widget' | 'saveas' | 'rename'
+  const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState(null);
 
-  const storeKey = orgId ? `kompas-dash-overview-${orgId}` : null;
+  const storeKey = orgId ? `kompas-dash-${page}-${orgId}` : null;
   const initRef = useRef(null);
-  const isOwner = activeId == null || activeMeta.is_owner; // unsaved template -> owner-to-be
+  const isOwner = activeId == null || activeMeta.is_owner;
 
-  // Load a dashboard's layout into the working copy.
   function selectDashboard(id) {
     setActiveId(id);
     if (storeKey) localStorage.setItem(storeKey, id);
@@ -43,7 +43,7 @@ export default function Overview() {
     dash
       .fetchOne(id)
       .then((d) => {
-        const l = sanitizeLayout(d.layout);
+        const l = sanitizeLayout(catalog, d.layout);
         setWorking(l);
         setBaseline(l);
         setActiveMeta({ is_owner: d.is_owner, visibility: d.visibility });
@@ -51,15 +51,16 @@ export default function Overview() {
       .catch(() => setBaseline(null));
   }
 
-  // Initialise selection once per org (after the list has loaded).
+  // Re-initialise selection when the org/page (and thus the dashboard list) changes.
   useEffect(() => {
     if (!orgId || dash.loading) return;
-    if (initRef.current === orgId) return;
-    initRef.current = orgId;
+    const token = `${orgId}|${page}`;
+    if (initRef.current === token) return;
+    initRef.current = token;
     const list = dash.list;
     if (!list.length) {
       setActiveId(null);
-      setWorking(instantiateTemplate(TEMPLATES[0]));
+      setWorking(instantiateTemplate(catalog, catalog.TEMPLATES[0]));
       setBaseline(null);
       setEditing(false);
       return;
@@ -68,16 +69,14 @@ export default function Overview() {
     const pick = list.find((d) => d.id === stored) || list.find((d) => d.is_default) || list[0];
     selectDashboard(pick.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, dash.loading, dash.list]);
+  }, [orgId, page, dash.loading, dash.list]);
 
   const dirty = working != null && (baseline == null || serialize(working) !== serialize(baseline));
 
-  // --- layout edits (working copy only) ---
   const patchWidget = (id, patch) =>
     setWorking((w) => ({ widgets: w.widgets.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
   const removeWidget = (id) =>
     setWorking((w) => ({ widgets: w.widgets.filter((x) => x.id !== id) }));
-  // Drag & drop: drop the dragged widget just before the target widget.
   const dropOn = (targetId) => {
     setWorking((w) => {
       if (!dragId || dragId === targetId) return w;
@@ -92,11 +91,10 @@ export default function Overview() {
     setDragId(null);
   };
   const addWidget = (sourceId) => {
-    setWorking((w) => ({ widgets: [...(w?.widgets ?? []), newWidget(sourceId)] }));
+    setWorking((w) => ({ widgets: [...(w?.widgets ?? []), newWidget(catalog, sourceId)] }));
     setModal(null);
   };
 
-  // --- persistence ---
   const guard = (fn) => async (...args) => {
     setBusy(true);
     try {
@@ -114,7 +112,7 @@ export default function Overview() {
       await dash.update(activeId, { layout: working });
       setBaseline(working);
     } else {
-      setModal("saveas"); // unsaved template -> ask for a name
+      setModal("saveas");
     }
   });
 
@@ -128,7 +126,7 @@ export default function Overview() {
   });
 
   const createFromTemplate = guard(async (tpl) => {
-    const layout = instantiateTemplate(tpl);
+    const layout = instantiateTemplate(catalog, tpl);
     const created = await dash.create({ name: tpl.name, layout });
     setModal(null);
     setActiveId(created.id);
@@ -158,7 +156,7 @@ export default function Overview() {
   const removeCurrent = guard(async () => {
     if (!activeId) return;
     if (!confirm("Dit dashboard verwijderen?")) return;
-    initRef.current = null; // let the init effect pick a new selection
+    initRef.current = null;
     setWorking(null);
     await dash.remove(activeId);
   });
@@ -168,41 +166,19 @@ export default function Overview() {
     selectDashboard(id);
   };
 
-  // Export keeps working off the raw data (independent of the chosen layout).
-  const sections = () => {
-    if (!data) return [];
-    const conversiesTotal = (data.conversions || []).reduce((a, c) => a + c.count, 0);
-    return [
-      { title: "Overzicht — " + label },
-      { columns: ["Metric", "Waarde"], rows: [
-        ["Bezoekers", data.kpis.users],
-        ["Sessies", data.kpis.sessions],
-        ["Conversies", conversiesTotal],
-        ["Bouncepercentage %", (data.kpis.bounceRate * 100).toFixed(1)],
-      ] },
-      { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: (data.channels || []).map((c) => [c.label, c.sessions, c.pct]) },
-      { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: (data.sessions_by_date || []).map((d) => [d.date, d.sessions]) },
-    ];
-  };
-
-  if (pLoading) return <TabState loading />;
-  if (pError) return <TabState error={pError} onConnect />;
-  if (!props?.length) return <TabState empty />;
-  if (working == null) return <TabState loading />; // dashboards still initialising
+  if (working == null) return <TabState loading />;
 
   const widgets = working?.widgets ?? [];
 
   return (
     <div>
-      {/* header + dashboard switcher */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18, gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>overzicht</div>
-          <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
-            prestaties van de {label} · live uit Google Analytics
-          </div>
+          <div className="display" style={{ fontSize: 28 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>{subtitle}</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {assetControls}
           <DashboardSwitcher list={dash.list} activeId={activeId} onSwitch={switchTo} onNew={() => setModal("template")} />
           {activeId && activeMeta.visibility === "shared" && <span className="pill accent">gedeeld</span>}
           {activeId && !isOwner && <span className="pill muted">van een collega</span>}
@@ -212,11 +188,10 @@ export default function Overview() {
           ) : (
             <button className="btn-ghost" onClick={() => setEditing(false)} style={{ height: 40, padding: "0 16px" }}>Klaar</button>
           )}
-          <ExportButton filename="overzicht" sections={sections} />
+          {exportSections && <ExportButton filename={exportFilename || page} sections={exportSections} />}
         </div>
       </div>
 
-      {/* edit toolbar */}
       {editing && (
         <div className="card" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 16, flexWrap: "wrap" }}>
           <button className="btn-primary" onClick={() => setModal("widget")} style={{ height: 38, padding: "0 16px" }}>＋ Widget toevoegen</button>
@@ -237,7 +212,7 @@ export default function Overview() {
         widgets.length === 0 ? (
           <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--c-muted)" }}>
             <div style={{ marginBottom: 14 }}>Dit dashboard heeft nog geen widgets.</div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button className="btn-primary" onClick={() => { setEditing(true); setModal("widget"); }} style={{ height: 40, padding: "0 18px" }}>Widget toevoegen</button>
               <button className="btn-ghost" onClick={() => setModal("template")} style={{ height: 40, padding: "0 18px" }}>Kies een template</button>
             </div>
@@ -249,6 +224,8 @@ export default function Overview() {
                 key={w.id}
                 widget={w}
                 data={data}
+                catalog={catalog}
+                ctx={ctx}
                 editing={editing}
                 onChange={(patch) => patchWidget(w.id, patch)}
                 onRemove={() => removeWidget(w.id)}
@@ -263,32 +240,17 @@ export default function Overview() {
         )
       )}
 
-      {/* modals */}
       {modal === "template" && (
-        <TemplatePicker onPick={createFromTemplate} onClose={() => setModal(null)} />
+        <TemplatePicker catalog={catalog} onPick={createFromTemplate} onClose={() => setModal(null)} />
       )}
       {modal === "widget" && (
-        <WidgetPicker onPick={addWidget} onClose={() => setModal(null)} />
+        <WidgetPicker catalog={catalog} onPick={addWidget} onClose={() => setModal(null)} />
       )}
       {modal === "saveas" && (
-        <NameDialog
-          title="Dashboard opslaan"
-          label="Naam van het dashboard"
-          initial=""
-          confirmLabel="Opslaan"
-          onConfirm={saveAs}
-          onClose={() => setModal(null)}
-        />
+        <NameDialog title="Dashboard opslaan" label="Naam van het dashboard" initial="" confirmLabel="Opslaan" onConfirm={saveAs} onClose={() => setModal(null)} />
       )}
       {modal === "rename" && (
-        <NameDialog
-          title="Dashboard hernoemen"
-          label="Nieuwe naam"
-          initial={dash.list.find((d) => d.id === activeId)?.name || ""}
-          confirmLabel="Opslaan"
-          onConfirm={renameCurrent}
-          onClose={() => setModal(null)}
-        />
+        <NameDialog title="Dashboard hernoemen" label="Nieuwe naam" initial={dash.list.find((d) => d.id === activeId)?.name || ""} confirmLabel="Opslaan" onConfirm={renameCurrent} onClose={() => setModal(null)} />
       )}
     </div>
   );
@@ -296,24 +258,22 @@ export default function Overview() {
 
 function DashboardSwitcher({ list, activeId, onSwitch, onNew }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <select
-        value={activeId || ""}
-        onChange={(e) => (e.target.value === "__new__" ? onNew() : onSwitch(e.target.value))}
-        style={{
-          height: 40, padding: "0 12px", borderRadius: 999, border: "1px solid var(--c-border)",
-          background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontWeight: 600,
-          fontFamily: "inherit", cursor: "pointer", maxWidth: 240,
-        }}
-      >
-        {!activeId && <option value="">Niet opgeslagen (template)</option>}
-        {list.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}{d.is_default ? " ★" : ""}{d.is_owner ? "" : " (collega)"}
-          </option>
-        ))}
-        <option value="__new__">＋ Nieuw dashboard…</option>
-      </select>
-    </div>
+    <select
+      value={activeId || ""}
+      onChange={(e) => (e.target.value === "__new__" ? onNew() : onSwitch(e.target.value))}
+      style={{
+        height: 40, padding: "0 12px", borderRadius: 999, border: "1px solid var(--c-border)",
+        background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontWeight: 600,
+        fontFamily: "inherit", cursor: "pointer", maxWidth: 240,
+      }}
+    >
+      {!activeId && <option value="">Niet opgeslagen (template)</option>}
+      {list.map((d) => (
+        <option key={d.id} value={d.id}>
+          {d.name}{d.is_default ? " ★" : ""}{d.is_owner ? "" : " (collega)"}
+        </option>
+      ))}
+      <option value="__new__">＋ Nieuw dashboard…</option>
+    </select>
   );
 }

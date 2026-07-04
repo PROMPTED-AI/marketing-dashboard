@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { LOGOUT_URL } from "../lib/api.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import {
-  IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcChevUpDown, IcChevDown,
+  IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcGrid, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
 
 const NAV = [
@@ -13,6 +13,7 @@ const NAV = [
   { to: "/app/google-ads", label: "Google Ads", Icon: IcAds },
   { to: "/app/meta-ads", label: "META Ads", Icon: IcShare },
   { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare },
+  { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },
   { to: "/app/integrations", label: "Integraties", Icon: IcPlug },
   { to: "/app/settings", label: "Instellingen", Icon: IcCog },
 ];
