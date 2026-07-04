@@ -7,6 +7,7 @@ en de 409 "opnieuw koppelen"-afhandeling op één plek blijven.
 """
 import json
 import logging
+from datetime import date
 
 from openai import OpenAI
 
@@ -27,8 +28,29 @@ SYSTEM_PROMPT = (
     "- Je ziet uitsluitend de gegevens van de huidige klant.\n"
     "- Als een kanaal niet gekoppeld is, leg dat rustig uit in plaats van te "
     "gokken; noem geen technische foutdetails.\n"
+    "- Periodes: standaard geldt de dashboardperiode. Noemt de gebruiker zelf een "
+    "periode (bijv. 'vorige maand', 'maart', 'afgelopen 7 dagen'), reken die dan om "
+    "naar ISO-datums en geef die als start/end mee aan de tool. Noem in je antwoord "
+    "altijd welke periode je hebt gebruikt.\n"
     "- Hou antwoorden bondig en to-the-point."
 )
+
+# Optionele periode-override per tool: alleen invullen als de gebruiker expliciet
+# een andere periode noemt; anders weglaten (dan geldt de dashboardperiode).
+_PERIOD_PARAMS = {
+    "type": "object",
+    "properties": {
+        "start": {
+            "type": "string",
+            "description": "Begindatum (JJJJ-MM-DD). Alleen meegeven als de gebruiker een andere periode noemt dan de dashboardperiode.",
+        },
+        "end": {
+            "type": "string",
+            "description": "Einddatum (JJJJ-MM-DD). Alleen samen met start meegeven.",
+        },
+    },
+    "additionalProperties": False,
+}
 
 # OpenAI-compatibele function/tool-definities (EuRouter gebruikt dit schema).
 TOOLS = [
@@ -55,7 +77,7 @@ TOOLS = [
                 "apparaten, toppagina's en de trend over tijd. Roep dit aan bij vragen "
                 "over websiteverkeer, bezoekers, conversies of gedrag."
             ),
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            "parameters": _PERIOD_PARAMS,
         },
     },
     {
@@ -69,7 +91,7 @@ TOOLS = [
                 "net buiten pagina 1) en uitsplitsing per apparaat/land. Roep dit aan "
                 "bij vragen over SEO, zoekopdrachten, posities of quick wins."
             ),
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            "parameters": _PERIOD_PARAMS,
         },
     },
     {
@@ -82,7 +104,7 @@ TOOLS = [
                 "conversie en de campagnes. Roep dit aan bij vragen over betaald "
                 "zoeken, advertentiebudget, campagnes of rendement (ROAS/CPA)."
             ),
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            "parameters": _PERIOD_PARAMS,
         },
     },
     {
@@ -95,7 +117,7 @@ TOOLS = [
                 "klikken, CTR, CPC/CPM, resultaten per conversiedoel en de campagnes. "
                 "Roep dit aan bij vragen over social advertising of Meta-campagnes."
             ),
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            "parameters": _PERIOD_PARAMS,
         },
     },
     {
@@ -108,7 +130,7 @@ TOOLS = [
                 "top-posts. Roep dit aan bij vragen over organische social, bereik of "
                 "betrokkenheid op Facebook/Instagram."
             ),
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            "parameters": _PERIOD_PARAMS,
         },
     },
 ]
@@ -118,14 +140,20 @@ def _sse(event: str, **data) -> str:
     return "data: " + json.dumps({"type": event, **data}, ensure_ascii=False) + "\n\n"
 
 
-def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: str):
+def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: str,
+                period: tuple[str, str] | None = None):
     """Yield Server-Sent-Events strings for one chat turn.
 
     `messages` is the conversation history (user/assistant). `execute(name, input)`
     runs a tool and returns a JSON string (already org-scoped, never raises).
+    `period` is the dashboard's (start, end); the model may override it per tool
+    when the user asks about a different date range.
     """
     client = OpenAI(api_key=api_key, base_url=base_url)
-    convo = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    system = SYSTEM_PROMPT + f"\n\nVandaag is {date.today().isoformat()}."
+    if period:
+        system += f" De dashboardperiode is {period[0]} t/m {period[1]}."
+    convo = [{"role": "system", "content": system}] + list(messages)
     try:
         for _ in range(MAX_TOOL_ITERATIONS):
             stream = client.chat.completions.create(
@@ -167,10 +195,16 @@ def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: 
             })
             for c in calls.values():
                 yield _sse("tool", name=c["name"])
+                try:
+                    args = json.loads(c["args"]) if c["args"] else {}
+                    if not isinstance(args, dict):
+                        args = {}
+                except ValueError:
+                    args = {}
                 convo.append({
                     "role": "tool",
                     "tool_call_id": c["id"],
-                    "content": execute(c["name"], {}),
+                    "content": execute(c["name"], args),
                 })
     except Exception:  # log server-side; keep client message generic
         log.exception("assistant stream failed (model=%s)", model)
