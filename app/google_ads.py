@@ -10,6 +10,7 @@ Cost is returned by Google in *micros* (1/1_000_000 of the account currency); we
 convert to whole currency units.
 """
 import logging
+from datetime import date
 
 from google.oauth2.credentials import Credentials
 
@@ -20,6 +21,15 @@ log = logging.getLogger(__name__)
 
 class AdsNotConfigured(Exception):
     """Raised when no developer token is set, so callers can return a clean 409."""
+
+
+def _iso_date(v: str) -> str:
+    """Normalize to YYYY-MM-DD; raises ValueError otherwise.
+
+    Dates are interpolated into GAQL, so this guarantees no query syntax can be
+    injected via a date parameter regardless of the caller (defense-in-depth).
+    """
+    return date.fromisoformat(v).isoformat()
 
 
 def _micros(v) -> float:
@@ -130,6 +140,9 @@ def run_overview(
     rejects it, so one unsupported part never 500s the whole report.
     """
     customer_id = _digits(customer_id)
+    start, end = _iso_date(start), _iso_date(end)
+    if compare:
+        compare = (_iso_date(compare[0]), _iso_date(compare[1]))
     client = _client(creds)
     ga_service = client.get_service("GoogleAdsService")
 
