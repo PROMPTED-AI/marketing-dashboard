@@ -45,6 +45,25 @@ def _num(v) -> float:
         return 0.0
 
 
+def _daily_series(ins_data: list, mapping: dict) -> list:
+    """Fold a Graph insights response (metric -> daily values) into one series.
+
+    `mapping` maps Graph metric names to output keys. Dates are normalised to the
+    compact "YYYYMMDD" the frontend charts expect. One row per day, sorted.
+    """
+    by_date: dict[str, dict] = {}
+    for m in ins_data:
+        out_key = mapping.get(m.get("name"))
+        if not out_key:
+            continue
+        for v in m.get("values", []):
+            day = (v.get("end_time") or "")[:10]
+            if not day:
+                continue
+            by_date.setdefault(day, {})[out_key] = int(_num(v.get("value")))
+    return [{"date": day.replace("-", ""), **vals} for day, vals in sorted(by_date.items())]
+
+
 # ----------------------------------------------------------------- assets
 
 
@@ -136,6 +155,27 @@ def _ads_totals(token: str, ad_account_id: str, start: str, end: str) -> dict:
     return {"kpis": kpis, "results": results}
 
 
+def _ads_by_date(token: str, ad_account_id: str, start: str, end: str) -> list:
+    """Daily spend/impressions/reach/clicks for the account (for trend charts)."""
+    data = _get(f"{ad_account_id}/insights", token, {
+        "fields": "spend,impressions,reach,clicks",
+        "level": "account",
+        "time_increment": 1,
+        "time_range": json.dumps({"since": start, "until": end}),
+        "limit": 500,
+    })
+    out = []
+    for r in data.get("data", []):
+        out.append({
+            "date": (r.get("date_start") or "").replace("-", ""),
+            "spend": _num(r.get("spend")),
+            "impressions": int(_num(r.get("impressions"))),
+            "reach": int(_num(r.get("reach"))),
+            "clicks": int(_num(r.get("clicks"))),
+        })
+    return out
+
+
 def ads_overview(user_token: str, ad_account_id: str, start: str, end: str,
                  compare: tuple[str, str] | None = None) -> dict:
     ad_account_id = _node(ad_account_id)
@@ -197,6 +237,7 @@ def ads_overview(user_token: str, ad_account_id: str, start: str, end: str,
         return out[:10]
 
     return {"kpis": kpis, "results": results, "deltas": deltas,
+            "by_date": safe(lambda: _ads_by_date(user_token, ad_account_id, start, end), []),
             "campaigns": safe(_campaigns, [])}
 
 
@@ -209,12 +250,18 @@ def _fb_page(token: str, page_id: str, start: str, end: str) -> dict:
 
     reach = impressions = engagement = 0
     fan_adds = fan_removes = 0
+    by_date = []
     try:
         ins = _get(f"{page_id}/insights", token, {
             "metric": ("page_impressions,page_post_engagements,page_impressions_unique,"
                        "page_fan_adds,page_fan_removes"),
             "period": "day", "since": start, "until": end,
         }).get("data", [])
+        by_date = _daily_series(ins, {
+            "page_impressions_unique": "reach",
+            "page_impressions": "impressions",
+            "page_post_engagements": "engagement",
+        })
         for m in ins:
             total = sum(_num(v.get("value")) for v in m.get("values", []))
             name = m.get("name")
@@ -253,7 +300,7 @@ def _fb_page(token: str, page_id: str, start: str, end: str) -> dict:
 
     return {"followers": followers, "followers_growth": fan_adds - fan_removes,
             "reach": reach, "impressions": impressions,
-            "engagement": engagement, "top_posts": posts}
+            "engagement": engagement, "by_date": by_date, "top_posts": posts}
 
 
 def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
@@ -261,11 +308,17 @@ def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
     followers = int(_num(info.get("followers_count")))
 
     reach = impressions = profile_views = growth = 0
+    by_date = []
     try:
         ins = _get(f"{ig_id}/insights", token, {
             "metric": "reach,impressions,profile_views,follower_count",
             "period": "day", "since": start, "until": end,
         }).get("data", [])
+        by_date = _daily_series(ins, {
+            "reach": "reach",
+            "impressions": "impressions",
+            "profile_views": "profile_views",
+        })
         for m in ins:
             total = sum(_num(v.get("value")) for v in m.get("values", []))
             name = m.get("name")
@@ -300,7 +353,7 @@ def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
 
     return {"username": info.get("username"), "followers": followers,
             "followers_growth": growth, "reach": reach, "impressions": impressions,
-            "profile_views": profile_views, "top_posts": posts}
+            "profile_views": profile_views, "by_date": by_date, "top_posts": posts}
 
 
 def organic_overview(user_token: str, page_id: str, ig_id: str | None,

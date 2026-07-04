@@ -10,6 +10,7 @@ import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
 import GoogleAds from "./screens/dashboard/GoogleAds.jsx";
 import MetaAds from "./screens/dashboard/MetaAds.jsx";
 import MetaOrganic from "./screens/dashboard/MetaOrganic.jsx";
+import MyDashboards from "./screens/dashboard/MyDashboards.jsx";
 import Integrations from "./screens/dashboard/Integrations.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="meta-ads" element={<MetaAds />} />
         <Route path="meta-organic" element={<MetaOrganic />} />
         <Route path="meta" element={<Navigate to="/app/meta-ads" replace />} />
+        <Route path="dashboards" element={<MyDashboards />} />
         <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Settings />} />
       </Route>

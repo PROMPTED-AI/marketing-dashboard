@@ -1,9 +1,8 @@
 // Eén widget in de grid. In bewerkmodus verschijnt een regel met knoppen:
-// sleephandvat (volgorde), titel, type, optioneel filter (bv. gebeurtenis),
-// grootte, verwijderen.
+// sleephandvat (volgorde), titel, type, optioneel filter, grootte, verwijderen.
 import { useEffect, useRef, useState } from "react";
 import WidgetRenderer from "../WidgetRenderer.jsx";
-import { SOURCES, KINDS, SIZES } from "../../lib/widgetCatalog.js";
+import { KINDS, SIZES } from "../../lib/widgets/kit.js";
 
 const ctrlStyle = {
   height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--c-border)",
@@ -11,8 +10,8 @@ const ctrlStyle = {
 };
 
 // Uitklapmenu met aanvinkvakjes: kies één of meer waarden. Een lege selectie
-// betekent "alles" (de bovenste optie). Gebruikt voor het key-event-filter.
-function MultiSelect({ label, options, value, onChange }) {
+// betekent "alles" (de bovenste optie).
+function MultiSelect({ label, allLabel = "Alles", options, value, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -26,7 +25,7 @@ function MultiSelect({ label, options, value, onChange }) {
     ? value.filter((v) => v && v !== "__all__")
     : value && value !== "__all__" ? [value] : [];
   const summary = selected.length === 0
-    ? "Alle key events"
+    ? allLabel
     : selected.length === 1 ? selected[0] : `${selected.length} gekozen`;
 
   const toggle = (name) => {
@@ -55,7 +54,7 @@ function MultiSelect({ label, options, value, onChange }) {
         >
           <label style={rowStyle} onClick={(e) => { e.preventDefault(); onChange([]); }}>
             <input type="checkbox" readOnly checked={selected.length === 0} />
-            <span style={{ fontWeight: 600 }}>Alle key events</span>
+            <span style={{ fontWeight: 600 }}>{allLabel}</span>
           </label>
           {options.map((o) => (
             <label key={o.value} style={rowStyle} onClick={(e) => { e.preventDefault(); toggle(o.value); }}>
@@ -64,7 +63,7 @@ function MultiSelect({ label, options, value, onChange }) {
             </label>
           ))}
           {options.length === 0 && (
-            <div style={{ padding: 8, fontSize: 12, color: "var(--c-muted)" }}>geen key events in deze periode</div>
+            <div style={{ padding: 8, fontSize: 12, color: "var(--c-muted)" }}>geen opties in deze periode</div>
           )}
         </div>
       )}
@@ -73,10 +72,10 @@ function MultiSelect({ label, options, value, onChange }) {
 }
 
 export default function WidgetFrame({
-  widget, data, editing, onChange, onRemove,
+  widget, data, catalog, ctx, editing, onChange, onRemove,
   onDragStart, onDragEnd, onDropOn, isDragging, isDropTarget,
 }) {
-  const src = SOURCES[widget.source];
+  const src = catalog.SOURCES[widget.source];
   const kindOptions = src?.kinds || [widget.kind];
   const cfg = src?.config;
   const cfgOptions = cfg ? cfg.options(data) : [];
@@ -116,6 +115,7 @@ export default function WidgetFrame({
           {cfg && (cfg.multi ? (
             <MultiSelect
               label={cfg.label}
+              allLabel={cfg.allLabel}
               options={cfgOptions}
               value={widget.config?.[cfg.key] ?? cfg.default}
               onChange={(vals) => onChange({ config: { ...(widget.config || {}), [cfg.key]: vals } })}
@@ -143,7 +143,7 @@ export default function WidgetFrame({
           outlineOffset: 4,
         }}
       >
-        <WidgetRenderer widget={widget} data={data} />
+        <WidgetRenderer widget={widget} data={data} catalog={catalog} ctx={ctx} />
       </div>
     </div>
   );

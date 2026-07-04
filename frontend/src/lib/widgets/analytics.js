@@ -1,36 +1,26 @@
-// Widget catalogus voor het samenstelbare GA-overzicht.
-//
-// Splitst "welke data" (SOURCES) van "hoe getoond" (KINDS). Een dashboard is een
-// lijst widgets; elke widget verwijst naar een bron + een visualisatie + grootte
-// + optionele config (bv. een filter op gebeurtenis). Alle widgets renderen tegen
-// één overview-payload (zie WidgetRenderer), dus er zijn geen extra API-calls per
-// widget — ook niet voor de filters (die werken op data die al binnen is).
+// Catalogus voor het Google Analytics-kanaal (GA4-overzichtspayload).
 
-import { num, pct1 } from "./format.js";
+import { num, pct1 } from "../format.js";
+import { seriesDatesFrom } from "./kit.js";
 
 const sumConversions = (d) => (d?.conversions ?? []).reduce((a, c) => a + (c.count || 0), 0);
-
-// Per-metric daily series for a KPI's sparkline (uit series_by_date).
 const seriesOf = (d, key) => (d?.series_by_date ?? []).map((r) => r[key] ?? 0);
 
-// Normaliseer de gekozen key events naar een lijst namen. Accepteert de nieuwe
-// array-vorm én oude opgeslagen waarden (losse string of "__all__"); een lege
-// lijst betekent "alle key events".
+// Normaliseer de gekozen key events naar een lijst namen (leeg = alle).
 function selectedEvents(value) {
   if (Array.isArray(value)) return value.filter((v) => v && v !== "__all__");
   return value && value !== "__all__" ? [value] : [];
 }
 
-// group bepaalt hoe de renderer de bron leest en tekent:
-//   scalar     -> één getal (KPI-kaart)
-//   timeseries -> reeks over tijd (lijn-/vlakgrafiek)
-//   breakdown  -> verdeling [{label, value, pct}] (donut / balken / tabel)
-//   table      -> kant-en-klare kolommen + rijen
-// kinds = visualisaties die de gebruiker voor deze bron mag kiezen.
-// unit  = eenheid die de donut in het midden toont (default "sessies").
-// config = optioneel filter dat de gebruiker per widget instelt; `options(d)`
-//          levert de keuzes uit de data, `scalar`/`breakdown`/`table` krijgen de
-//          gekozen config als tweede argument.
+const eventConfig = {
+  key: "event",
+  label: "Gebeurtenis",
+  allLabel: "Alle key events",
+  multi: true,
+  default: [],
+  options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
+};
+
 export const SOURCES = {
   // --- kerncijfers (KPI) ---
   users: {
@@ -60,14 +50,7 @@ export const SOURCES = {
   },
   conversions_total: {
     label: "Conversies", group: "scalar", kinds: ["kpi"], unit: "conversies",
-    // Filter op één of meer key events; leeg = alle key events bij elkaar opgeteld.
-    config: {
-      key: "event",
-      label: "Gebeurtenis",
-      multi: true,
-      default: [],
-      options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
-    },
+    config: eventConfig,
     scalar: (d, cfg) => {
       const names = selectedEvents(cfg?.event);
       if (names.length) {
@@ -82,7 +65,6 @@ export const SOURCES = {
   },
   conversion_rate: {
     label: "Conversieratio", group: "scalar", kinds: ["kpi"],
-    // Afgeleid: conversies gedeeld door sessies. Deelt door nul -> 0.
     scalar: (d) => {
       const s = d?.kpis?.sessions ?? 0;
       const c = d?.kpis?.conversions ?? 0;
@@ -108,7 +90,7 @@ export const SOURCES = {
 
   // --- over tijd ---
   sessions_by_date: {
-    label: "Sessies over tijd", group: "timeseries", kinds: ["area"],
+    label: "Sessies over tijd", group: "timeseries", kinds: ["area"], unit: "sessies",
     series: (d) => ({
       values: (d?.sessions_by_date ?? []).map((p) => p.sessions),
       labels: (d?.sessions_by_date ?? []).map((p) => p.date),
@@ -118,27 +100,27 @@ export const SOURCES = {
 
   // --- verdelingen ---
   channels: {
-    label: "Verkeersbronnen", group: "breakdown", kinds: ["donut", "bars", "table"],
+    label: "Verkeersbronnen", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
     breakdown: (d) => d?.channels ?? [],
   },
   source_medium: {
-    label: "Bron / medium", group: "breakdown", kinds: ["bars", "table", "donut"],
+    label: "Bron / medium", group: "breakdown", kinds: ["bars", "table", "donut"], unit: "sessies",
     breakdown: (d) => d?.source_medium ?? [],
   },
   devices: {
-    label: "Apparaten", group: "breakdown", kinds: ["donut", "bars", "table"],
+    label: "Apparaten", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
     breakdown: (d) => d?.devices ?? [],
   },
   browsers: {
-    label: "Browsers", group: "breakdown", kinds: ["donut", "bars", "table"],
+    label: "Browsers", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
     breakdown: (d) => d?.browsers ?? [],
   },
   new_vs_returning: {
-    label: "Nieuw vs terugkerend", group: "breakdown", kinds: ["donut", "bars"],
+    label: "Nieuw vs terugkerend", group: "breakdown", kinds: ["donut", "bars"], unit: "sessies",
     breakdown: (d) => d?.new_vs_returning ?? [],
   },
   geography: {
-    label: "Landen", group: "breakdown", kinds: ["donut", "bars", "table"],
+    label: "Landen", group: "breakdown", kinds: ["donut", "bars", "table"], unit: "sessies",
     breakdown: (d) => d?.geography ?? [],
   },
   events: {
@@ -163,75 +145,25 @@ export const SOURCES = {
   },
   conversions: {
     label: "Conversies (lijst)", group: "table", kinds: ["table"],
-    // Filter op één of meer key events; leeg = alle key events.
-    config: {
-      key: "event",
-      label: "Gebeurtenis",
-      multi: true,
-      default: [],
-      options: (d) => (d?.conversions ?? []).map((c) => ({ value: c.name, label: c.name })),
-    },
+    config: eventConfig,
     table: (d, cfg) => {
       const names = selectedEvents(cfg?.event);
       const list = (d?.conversions ?? []).filter((c) => !names.length || names.includes(c.name));
-      return {
-        columns: ["Conversie", "Aantal"],
-        rows: list.map((c) => [c.name, num(c.count)]),
-      };
+      return { columns: ["Conversie", "Aantal"], rows: list.map((c) => [c.name, num(c.count)]) };
     },
   },
 };
 
-// Visualisaties + hun standaardgrootte (kolommen in een 12-koloms raster).
-export const KINDS = {
-  kpi: { label: "KPI-kaart", defaultSize: 3 },
-  area: { label: "Lijngrafiek", defaultSize: 12 },
-  donut: { label: "Cirkeldiagram", defaultSize: 4 },
-  bars: { label: "Balkenlijst", defaultSize: 6 },
-  table: { label: "Tabel", defaultSize: 6 },
-};
-
-// Groottes die de gebruiker per widget kan kiezen (breedte in kolommen).
-export const SIZES = [
-  { value: 3, label: "1/4" },
-  { value: 4, label: "1/3" },
-  { value: 6, label: "1/2" },
-  { value: 12, label: "Vol" },
-];
-
-// Bronnen gegroepeerd voor de "widget toevoegen"-keuze.
-export const SOURCE_GROUPS = [
+export const GROUPS = [
   { label: "Kerncijfers", ids: ["users", "newUsers", "sessions", "pageViews", "eventCount", "conversions_total", "conversion_rate", "bounceRate", "engagementRate", "avgSessionDuration"] },
   { label: "Over tijd", ids: ["sessions_by_date"] },
   { label: "Verdelingen", ids: ["channels", "source_medium", "devices", "browsers", "new_vs_returning", "geography", "events"] },
   { label: "Tabellen", ids: ["top_pages", "landing_pages", "conversions"] },
 ];
 
-let _seq = 0;
-export function newId() {
-  return "w" + Date.now().toString(36) + (_seq++).toString(36);
-}
-
-// Standaard-config voor een bron (alleen als die een filter heeft).
-function defaultConfig(src) {
-  return src.config ? { [src.config.key]: src.config.default } : undefined;
-}
-
-export function newWidget(sourceId, kind) {
-  const src = SOURCES[sourceId];
-  const k = kind && src.kinds.includes(kind) ? kind : src.kinds[0];
-  const w = { id: newId(), source: sourceId, kind: k, title: src.label, size: KINDS[k].defaultSize };
-  const cfg = defaultConfig(src);
-  if (cfg) w.config = cfg;
-  return w;
-}
-
-// Kant-en-klare start-templates. De gebruiker kiest er één en past daarna aan.
 export const TEMPLATES = [
   {
-    id: "executive",
-    name: "Directie-overzicht",
-    audience: "Directie",
+    id: "executive", name: "Directie-overzicht", audience: "Directie",
     description: "De kerncijfers, trend en herkomst in één compleet directiebeeld.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
@@ -249,9 +181,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "acquisition",
-    name: "Acquisitie & verkeer",
-    audience: "Marketeer",
+    id: "acquisition", name: "Acquisitie & verkeer", audience: "Marketeer",
     description: "Waar bezoekers vandaan komen: kanalen, bron/medium, apparaten, browsers, landen en nieuw vs. terugkerend.",
     widgets: [
       { source: "sessions", kind: "kpi", size: 3 },
@@ -268,9 +198,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "behavior",
-    name: "Gedrag & content",
-    audience: "Marketeer",
+    id: "behavior", name: "Gedrag & content", audience: "Marketeer",
     description: "Welke content werkt en waar bezoekers afhaken: toppagina's, instappagina's, gebeurtenissen en betrokkenheid.",
     widgets: [
       { source: "pageViews", kind: "kpi", size: 3 },
@@ -286,9 +214,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "conversion",
-    name: "Conversie & doelen",
-    audience: "Marketeer",
+    id: "conversion", name: "Conversie & doelen", audience: "Marketeer",
     description: "Sturen op resultaat: conversies, conversieratio, de doelen en de bronnen die ze opleveren.",
     widgets: [
       { source: "conversions_total", kind: "kpi", size: 3 },
@@ -303,9 +229,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "full",
-    name: "Alles (volledig)",
-    audience: "Specialist",
+    id: "full", name: "Alles (volledig)", audience: "Specialist",
     description: "Het complete overzicht met alle beschikbare blokken.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
@@ -326,46 +250,9 @@ export const TEMPLATES = [
   },
 ];
 
-// Maak een verse layout (met eigen widget-id's) uit een template.
-export function instantiateTemplate(tpl) {
-  return {
-    widgets: (tpl.widgets || []).map((w) => {
-      const src = SOURCES[w.source];
-      const out = {
-        id: newId(),
-        source: w.source,
-        kind: w.kind,
-        size: w.size,
-        title: w.title || src?.label || w.source,
-      };
-      const cfg = w.config || (src && defaultConfig(src));
-      if (cfg) out.config = cfg;
-      return out;
-    }),
-  };
-}
-
-// Verwijder onbekende bronnen/typen (robuust tegen oude opgeslagen layouts).
-export function sanitizeLayout(layout) {
-  const widgets = Array.isArray(layout?.widgets) ? layout.widgets : [];
-  return {
-    widgets: widgets
-      .filter((w) => w && SOURCES[w.source] && SOURCES[w.source].kinds.includes(w.kind))
-      .map((w) => {
-        const src = SOURCES[w.source];
-        const out = {
-          id: w.id || newId(),
-          source: w.source,
-          kind: w.kind,
-          size: SIZES.some((s) => s.value === w.size) ? w.size : KINDS[w.kind].defaultSize,
-          title: w.title || src.label,
-        };
-        if (w.config && typeof w.config === "object") out.config = w.config;
-        else {
-          const cfg = defaultConfig(src);
-          if (cfg) out.config = cfg;
-        }
-        return out;
-      }),
-  };
-}
+export const analyticsCatalog = {
+  key: "analytics",
+  label: "Analytics",
+  SOURCES, GROUPS, TEMPLATES,
+  seriesDates: (d) => seriesDatesFrom(d?.series_by_date ?? d?.sessions_by_date ?? []),
+};

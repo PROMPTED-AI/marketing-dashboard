@@ -1,7 +1,8 @@
-// Tekent één widget tegen de overview-payload. Presentatie-only: bewerk-knoppen
-// (verwijderen, grootte, herorden) zitten in de Overview-grid eromheen.
+// Tekent één widget tegen de payload van het actieve kanaal. Presentatie-only:
+// bewerk-knoppen zitten in de grid eromheen (WidgetFrame). De juiste catalogus
+// (welke bron -> welke accessor) komt als prop mee, plus een optionele
+// render-context `ctx` (bijv. de valuta van een Meta-advertentieaccount).
 
-import { SOURCES } from "../lib/widgetCatalog.js";
 import { num, pct1, duration, deltaProps, shortDate } from "../lib/format.js";
 import { KpiCard, SectionCard, ProgressRow } from "./ui.jsx";
 import { AreaChart, Donut, Legend, palette } from "./charts.jsx";
@@ -12,32 +13,23 @@ function fmtScalar(value, fmt) {
   return num(value);
 }
 
-// Toon hooguit 5 gelijkmatig verdeelde labels onder een grafiek.
-function pickLabels(all) {
-  if (all.length <= 5) return all;
-  const step = (all.length - 1) / 4;
-  return [0, 1, 2, 3, 4].map((i) => all[Math.round(i * step)]);
-}
-
-export default function WidgetRenderer({ widget, data }) {
-  const src = SOURCES[widget.source];
+export default function WidgetRenderer({ widget, data, catalog, ctx }) {
+  const src = catalog?.SOURCES?.[widget.source];
   if (!src) return <SectionCard title={widget.title}>Onbekende bron.</SectionCard>;
 
-  const seriesDates = (data?.series_by_date ?? data?.sessions_by_date ?? []).map((p) => shortDate(p.date));
+  const seriesDates = catalog.seriesDates ? catalog.seriesDates(data) : [];
 
   if (widget.kind === "kpi") {
-    const s = src.scalar(data, widget.config);
+    const s = src.scalar(data, widget.config, ctx);
     const delta = s.delta != null ? deltaProps(s.delta, s.higherBetter) : {};
-    // Each KPI shows its own metric trend; fall back to the sessions line when
-    // the per-metric series is missing/empty (e.g. an older cached payload).
-    let spark = src.spark ? src.spark(data) : null;
-    if (!spark || !spark.length) spark = (data?.sessions_by_date ?? []).map((p) => p.sessions);
-    // Show the metric name in the tooltip for count metrics (e.g. "4 bezoekers").
+    const rawSpark = src.spark ? src.spark(data) : null;
+    const spark = rawSpark && rawSpark.length ? rawSpark : null;
+    // Toon de metricnaam in de tooltip bij telbare metrics (bv. "4 bezoekers").
     const sparkUnit = s.fmt === "int" ? (widget.title || "").toLowerCase() : "";
     return (
       <KpiCard
         label={widget.title}
-        value={fmtScalar(s.value, s.fmt)}
+        value={s.display ?? fmtScalar(s.value, s.fmt)}
         sparkValues={spark}
         sparkLabels={seriesDates}
         sparkUnit={sparkUnit}
@@ -48,14 +40,15 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "area") {
-    const s = src.series(data);
+    const s = src.series(data, widget.config, ctx);
+    const labels = (s.labels ?? seriesDates).map((x) => (x?.length === 8 ? shortDate(x) : x));
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         <AreaChart
           values={s.values}
           compareValues={s.compareValues}
-          labels={s.labels.map(shortDate)}
-          unit="sessies"
+          labels={labels}
+          unit={s.unit ?? src.unit ?? ""}
           height={232}
         />
       </SectionCard>
@@ -63,7 +56,7 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "donut") {
-    const segs = src.breakdown(data, widget.config);
+    const segs = src.breakdown(data, widget.config, ctx);
     const total = segs.reduce((a, x) => a + (x.value ?? x.sessions ?? 0), 0);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
@@ -71,7 +64,7 @@ export default function WidgetRenderer({ widget, data }) {
           <Empty />
         ) : (
           <>
-            <Donut segments={segs} centerTop={num(total)} centerSub={src.unit ?? "sessies"} />
+            <Donut segments={segs} centerTop={num(total)} centerSub={src.unit ?? ""} />
             <div style={{ marginTop: 14 }}>
               <Legend segments={segs} />
             </div>
@@ -82,7 +75,7 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "bars") {
-    const rows = src.breakdown(data, widget.config);
+    const rows = src.breakdown(data, widget.config, ctx);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {rows.length === 0 ? (
@@ -106,7 +99,7 @@ export default function WidgetRenderer({ widget, data }) {
   }
 
   if (widget.kind === "table") {
-    const { columns, rows } = src.table(data, widget.config);
+    const { columns, rows } = src.table(data, widget.config, ctx);
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {rows.length === 0 ? (
