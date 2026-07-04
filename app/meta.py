@@ -7,12 +7,23 @@ tuning against a live app once App Review is granted.
 """
 import json
 import logging
+import re
 
 import requests
 
 from . import config
 
 log = logging.getLogger(__name__)
+
+# Graph node ids are alphanumeric/underscore (e.g. "act_12345", "1789..."); reject
+# anything else so a caller-supplied id can't manipulate the Graph request path.
+_NODE_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def _node(node_id: str) -> str:
+    if not node_id or not _NODE_RE.match(node_id):
+        raise ValueError(f"invalid graph node id: {node_id!r}")
+    return node_id
 
 
 def _graph(path: str) -> str:
@@ -127,6 +138,8 @@ def _ads_totals(token: str, ad_account_id: str, start: str, end: str) -> dict:
 
 def ads_overview(user_token: str, ad_account_id: str, start: str, end: str,
                  compare: tuple[str, str] | None = None) -> dict:
+    ad_account_id = _node(ad_account_id)
+
     def safe(fn, default):
         try:
             return fn()
@@ -293,6 +306,9 @@ def _instagram(token: str, ig_id: str, start: str, end: str) -> dict:
 def organic_overview(user_token: str, page_id: str, ig_id: str | None,
                      start: str, end: str) -> dict:
     """Facebook page + (optional) Instagram organic metrics for the range."""
+    page_id = _node(page_id)
+    if ig_id:
+        ig_id = _node(ig_id)
     token = _page_token(user_token, page_id) or user_token
 
     def safe(fn, default):

@@ -89,6 +89,22 @@ def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
     return user["organization_id"]
 
 
+def _require_period(*dates: str | None) -> None:
+    """Reject non-ISO dates before they reach any downstream query.
+
+    Google Ads reports interpolate dates into GAQL, so validating the format
+    here (plus in google_ads) closes that injection path; the other channels
+    just get a clean 400 instead of a raw API error on malformed input.
+    """
+    for v in dates:
+        if v is None:
+            continue
+        try:
+            date.fromisoformat(v)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Ongeldige datum (verwacht JJJJ-MM-DD)")
+
+
 def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credentials:
     """Load + refresh an org's credentials, flipping status to revoked on failure."""
     conn = models.get_connection(org_id, provider=provider)
@@ -328,6 +344,7 @@ def analytics_overview(
     org_id: str | None = None,
 ):
     user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     key = f"{target_org}|overview|{property_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
@@ -455,8 +472,9 @@ def assistant_chat(request: Request, body: ChatBody):
             return json.dumps({"error": f"Onbekende tool: {name}"})
         except HTTPException as e:
             return json.dumps({"error": str(e.detail)}, ensure_ascii=False)
-        except Exception as e:  # noqa: BLE001 - surface as tool error, don't crash the stream
-            return json.dumps({"error": f"Kon data niet ophalen: {e}"}, ensure_ascii=False)
+        except Exception:  # noqa: BLE001 - surface a generic tool error, log detail server-side
+            log.exception("assistant tool failed name=%s org=%s", name, target_org)
+            return json.dumps({"error": "Kon deze gegevens niet ophalen."}, ensure_ascii=False)
 
     stream = assistant.stream_chat(
         safe_messages, execute,
@@ -629,6 +647,7 @@ def gsc_report(
     org_id: str | None = None,
 ):
     user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     key = f"{target_org}|gsc|{site}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
@@ -713,6 +732,7 @@ def meta_ads_report(
     org_id: str | None = None,
 ):
     user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     key = f"{target_org}|metaads|{ad_account_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
@@ -736,6 +756,7 @@ def meta_organic_report(
     org_id: str | None = None,
 ):
     user = auth.current_user(request)
+    _require_period(start, end)
     target_org = _resolve_org_id(user, org_id)
     key = f"{target_org}|metaorg|{page_id}|{ig_id}|{start}|{end}"
     cached = cache.get(key)
@@ -780,6 +801,7 @@ def ads_report(
     org_id: str | None = None,
 ):
     user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     key = f"{target_org}|ads|{customer_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
