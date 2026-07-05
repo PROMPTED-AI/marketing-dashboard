@@ -25,6 +25,8 @@ export const IcSun = (p) => (<svg {...S(p)}><circle cx="12" cy="12" r="4" /><pat
 export const IcMoon = (p) => (<svg {...S(p)}><path d="M20 14a8 8 0 0 1-9.8-9.8A8 8 0 1 0 20 14z" /></svg>);
 export const IcDownload = ({ s = 16, stroke = "#fff" }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 11l5 4 5-4" /><path d="M4 19h16" /></svg>);
 export const IcPlus = ({ s = 16, stroke = "#fff" }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>);
+export const IcMegaphone = (p) => (<svg {...S(p)}><path d="M3 11v2a1 1 0 0 0 1 1h2l6 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 8.5a4 4 0 0 1 0 7" /></svg>);
+export const IcCart = (p) => (<svg {...S(p)}><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2 3h2.2l2.2 12.2a1.5 1.5 0 0 0 1.5 1.3h9.1a1.5 1.5 0 0 0 1.5-1.2L20.5 7H5.2" /></svg>);
 
 // Brand/tool glyphs (colored)
 export const GaGlyph = ({ s = 30 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><rect x="3" y="11" width="4.5" height="10" rx="2.2" fill="#F9AB00" /><rect x="9.7" y="6" width="4.5" height="15" rx="2.2" fill="#E37400" /><rect x="16.4" y="3" width="4.5" height="18" rx="2.2" fill="#F9AB00" /></svg>);

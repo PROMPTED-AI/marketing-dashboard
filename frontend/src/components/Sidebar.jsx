@@ -1,18 +1,30 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { LOGOUT_URL } from "../lib/api.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import {
-  IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcGrid, IcChevUpDown, IcChevDown,
+  IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcGrid,
+  IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
 
+// De sidebar is gegroepeerd: losse items + uitklapbare groepen (Marketing met
+// alle marketingkanalen, Verkoop met de webshop).
 const NAV = [
   { to: "/app/assistant", label: "Assistent", Icon: IcChat },
-  { to: "/app/analytics", label: "Analytics", Icon: IcBars },
-  { to: "/app/search-console", label: "Search Console", Icon: IcSearch },
-  { to: "/app/google-ads", label: "Google Ads", Icon: IcAds },
-  { to: "/app/meta-ads", label: "META Ads", Icon: IcShare },
-  { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare },
+  {
+    group: "Marketing", Icon: IcMegaphone, children: [
+      { to: "/app/analytics", label: "Analytics", Icon: IcBars },
+      { to: "/app/search-console", label: "Search Console", Icon: IcSearch },
+      { to: "/app/google-ads", label: "Google Ads", Icon: IcAds },
+      { to: "/app/meta-ads", label: "META Ads", Icon: IcShare },
+      { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare },
+    ],
+  },
+  {
+    group: "Verkoop", Icon: IcCart, children: [
+      { to: "/app/woocommerce", label: "WooCommerce", Icon: IcCart },
+    ],
+  },
   { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },
   { to: "/app/integrations", label: "Integraties", Icon: IcPlug },
   { to: "/app/settings", label: "Instellingen", Icon: IcCog },
@@ -60,11 +72,15 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
 
       <div style={menuLabel}>Menu</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
-        {NAV.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to} onClick={onNavigate} style={({ isActive }) => navItem(isActive)}>
-            <Icon s={18} />
-            {label}
-          </NavLink>
+        {NAV.map((item) => (
+          item.group ? (
+            <NavGroup key={item.group} item={item} onNavigate={onNavigate} />
+          ) : (
+            <NavLink key={item.to} to={item.to} onClick={onNavigate} style={({ isActive }) => navItem(isActive)}>
+              <item.Icon s={18} />
+              {item.label}
+            </NavLink>
+          )
         ))}
         {user?.role === "agency_admin" && (
           <NavLink to="/admin" onClick={onNavigate} style={() => navItem(false)}>
@@ -131,5 +147,44 @@ function navItem(isActive) {
     fontWeight: isActive ? 700 : 600,
     background: isActive ? "var(--c-accent-soft)" : "transparent",
     color: isActive ? "var(--c-accent)" : "var(--c-muted)",
+  };
+}
+
+// Uitklapbare navigatiegroep (bv. Marketing, Verkoop). Standaard open; klap in/uit
+// via de kop. Bevat de groep een actieve route, dan blijft hij zichtbaar.
+function NavGroup({ item, onNavigate }) {
+  const { pathname } = useLocation();
+  const hasActive = item.children.some((c) => pathname === c.to || pathname.startsWith(c.to + "/"));
+  const [open, setOpen] = useState(true);
+  const show = open || hasActive;
+  return (
+    <div>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={groupHeader(hasActive)}>
+        <item.Icon s={18} />
+        <span style={{ flex: 1, textAlign: "left" }}>{item.group}</span>
+        <span style={{ display: "flex", color: "var(--c-muted)", transform: show ? "none" : "rotate(-90deg)", transition: "transform .15s" }}>
+          <IcChevDown s={15} />
+        </span>
+      </button>
+      {show && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 3 }}>
+          {item.children.map((c) => (
+            <NavLink key={c.to} to={c.to} onClick={onNavigate} style={({ isActive }) => ({ ...navItem(isActive), paddingLeft: 32 })}>
+              <c.Icon s={16} />
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function groupHeader(active) {
+  return {
+    display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10,
+    width: "100%", border: "none", background: "transparent", cursor: "pointer",
+    fontFamily: "inherit", fontSize: 14, fontWeight: active ? 700 : 600,
+    color: active ? "var(--c-accent)" : "var(--c-muted)",
   };
 }
