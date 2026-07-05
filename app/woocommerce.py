@@ -17,6 +17,7 @@ externe winkel. Alleen de HTTP-laag wordt daarbij overgeslagen.
 import ipaddress
 import logging
 import random
+import socket
 from datetime import date, timedelta
 from urllib.parse import urlparse
 
@@ -40,6 +41,26 @@ class WooError(Exception):
 # ------------------------------------------------------------------ SSRF-guard
 
 
+def _assert_public_host(host: str) -> None:
+    """Weiger een host die (nu) naar een niet-globaal IP resolvet.
+
+    De literal-check in `validate_store_url` vangt alleen IP-adressen in de URL;
+    een hostnaam die via DNS naar een privé/loopback/link-local adres wijst
+    (bijv. het cloud-metadata-endpoint) zou anders alsnog bereikt worden. We
+    resolven daarom vlak vóór elke uitgaande call en eisen dat álle adressen
+    globaal zijn. (Volledige bescherming tegen DNS-rebinding vereist IP-pinning,
+    wat botst met TLS-certvalidatie; dit sluit het praktische gat.)
+    """
+    try:
+        infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise WooError("Kan de winkel niet bereiken - controleer de URL.") from exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise WooError("Deze host is niet toegestaan.")
+
+
 def validate_store_url(url: str) -> str:
     """Normaliseer en valideer een door de gebruiker opgegeven shop-URL.
 
@@ -61,8 +82,25 @@ def validate_store_url(url: str) -> str:
         if not ip.is_global:
             raise WooError("Deze host is niet toegestaan.")
     except ValueError:
-        pass  # hostnaam, geen IP-literal — prima
+        _assert_public_host(lowered)  # hostnaam: controleer waar hij naar wijst
     return f"https://{host}{parsed.path.rstrip('/')}"
+
+
+def _host_of(store_url: str) -> str:
+    return urlparse(store_url).hostname or ""
+
+
+def _guarded_get(store_url: str, path: str, auth: tuple[str, str], params: dict):
+    """GET met SSRF-guards: host opnieuw valideren, geen redirects volgen."""
+    _assert_public_host(_host_of(store_url))
+    resp = requests.get(
+        f"{store_url}/{path}", params=params, auth=auth,
+        timeout=_TIMEOUT, allow_redirects=False,
+    )
+    if resp.is_redirect or 300 <= resp.status_code < 400:
+        # Een winkel die doorverwijst (mogelijk naar een intern doel) vertrouwen we niet.
+        raise WooError("De winkel stuurt door naar een ander adres - niet toegestaan.")
+    return resp
 
 
 # ---------------------------------------------------------------- echte winkel
@@ -72,9 +110,9 @@ def _fetch_orders(store_url: str, ck: str, cs: str, start: str, end: str) -> lis
     """Alle orders in [start, end] ophalen (gepagineerd, met plafond)."""
     out = []
     for page in range(1, _MAX_PAGES + 1):
-        resp = requests.get(
-            f"{store_url}/wp-json/wc/v3/orders",
-            params={
+        resp = _guarded_get(
+            store_url, "wp-json/wc/v3/orders", (ck, cs),
+            {
                 "after": f"{start}T00:00:00",
                 "before": f"{end}T23:59:59",
                 "per_page": 100,
@@ -82,8 +120,6 @@ def _fetch_orders(store_url: str, ck: str, cs: str, start: str, end: str) -> lis
                 "orderby": "date",
                 "order": "asc",
             },
-            auth=(ck, cs),
-            timeout=_TIMEOUT,
         )
         if resp.status_code in (401, 403):
             raise WooError("WooCommerce weigert de sleutel - controleer key/secret en leesrechten.")
@@ -102,12 +138,7 @@ def test_connection(store_url: str, ck: str, cs: str) -> None:
     if store_url == DEMO_STORE:
         return
     try:
-        resp = requests.get(
-            f"{store_url}/wp-json/wc/v3/orders",
-            params={"per_page": 1},
-            auth=(ck, cs),
-            timeout=_TIMEOUT,
-        )
+        resp = _guarded_get(store_url, "wp-json/wc/v3/orders", (ck, cs), {"per_page": 1})
     except requests.RequestException as exc:
         raise WooError("Kan de winkel niet bereiken - controleer de URL.") from exc
     if resp.status_code in (401, 403):
