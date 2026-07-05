@@ -8,6 +8,7 @@ import { searchConsoleCatalog } from "./searchConsole.js";
 import { googleAdsCatalog } from "./googleAds.js";
 import { metaAdsCatalog } from "./metaAds.js";
 import { metaOrganicCatalog } from "./metaOrganic.js";
+import { woocommerceCatalog } from "./woocommerce.js";
 
 // Volgorde = volgorde van de kanaaltabs in "Mijn dashboards".
 export const CHANNELS = [
@@ -16,6 +17,7 @@ export const CHANNELS = [
   { key: "google-ads", label: "Google Ads", catalog: googleAdsCatalog },
   { key: "meta-ads", label: "META Ads", catalog: metaAdsCatalog },
   { key: "meta-organic", label: "META Organisch", catalog: metaOrganicCatalog },
+  { key: "woocommerce", label: "WooCommerce", catalog: woocommerceCatalog },
 ];
 
 export const CATALOGS = Object.fromEntries(CHANNELS.map((c) => [c.key, c.catalog]));
@@ -26,4 +28,5 @@ export {
   googleAdsCatalog,
   metaAdsCatalog,
   metaOrganicCatalog,
+  woocommerceCatalog,
 };

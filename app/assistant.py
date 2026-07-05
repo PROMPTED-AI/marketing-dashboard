@@ -133,6 +133,20 @@ TOOLS = [
             "parameters": _PERIOD_PARAMS,
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_woocommerce",
+            "description": (
+                "Haalt de webshopdata (WooCommerce) van de klant op voor de huidige "
+                "periode: omzet, aantal bestellingen, gemiddelde orderwaarde, verkochte "
+                "artikelen, klanten, terugbetalingen, omzet per dag, orderstatussen, "
+                "betaalmethoden en bestverkochte producten. Roep dit aan bij vragen "
+                "over de webshop, omzet, bestellingen of producten."
+            ),
+            "parameters": _PERIOD_PARAMS,
+        },
+    },
 ]
 
 

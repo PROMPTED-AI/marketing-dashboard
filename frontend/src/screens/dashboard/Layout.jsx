@@ -23,7 +23,7 @@ export default function Layout() {
       <Sidebar
         user={me}
         connected={data?.connected ?? 0}
-        total={data?.total ?? 4}
+        total={data?.total ?? 5}
         open={drawer}
         onNavigate={() => setDrawer(false)}
       />

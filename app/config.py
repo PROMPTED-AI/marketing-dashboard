@@ -48,6 +48,10 @@ META_SCOPES = [
     "instagram_basic", "instagram_manage_insights",
 ]
 
+# WooCommerce koppelt met een consumer key/secret (geen OAuth); de gegevens
+# worden per organisatie versleuteld opgeslagen zoals de andere providers.
+SHOP_PROVIDERS = ["woocommerce"]
+
 # Google Ads needs an approved developer token (set on the Cloud Run service,
 # never in the repo). Optional login_customer_id is the manager (MCC) account id
 # under which client accounts are accessed — digits only, no dashes.
