@@ -39,7 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import (
     analytics, assistant, auth, cache, config, db, google_ads, insights, meta,
-    meta_oauth, models, oauth, search_console,
+    meta_oauth, models, oauth, search_console, woocommerce,
 )
 
 log = logging.getLogger("dashboard")
@@ -154,6 +154,15 @@ def _meta_token(org_id: str) -> str:
     if not token:
         raise HTTPException(status_code=409, detail="Meta-koppeling ongeldig - opnieuw koppelen")
     return token
+
+
+def _wc_creds(org_id: str) -> tuple[str, str, str]:
+    """Load an org's WooCommerce store credentials (store_url, key, secret)."""
+    conn = models.get_connection(org_id, provider="woocommerce")
+    if not conn or conn["status"] != "connected":
+        raise HTTPException(status_code=409, detail="Geen actieve WooCommerce-koppeling voor deze organisatie")
+    c = conn["creds"]
+    return c.get("store_url", ""), c.get("consumer_key", ""), c.get("consumer_secret", "")
 
 
 @app.get("/healthz")
@@ -469,6 +478,10 @@ def assistant_chat(request: Request, body: ChatBody):
                 ig_id = (page.get("instagram") or {}).get("id")
                 data = meta.organic_overview(token, page["id"], ig_id, start, end)
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
+            if name == "get_woocommerce":
+                store, ck, cs = _wc_creds(target_org)
+                data = woocommerce.run_overview(store, ck, cs, start, end, None)
+                return json.dumps(_compact(data), ensure_ascii=False, default=str)
             return json.dumps({"error": f"Onbekende tool: {name}"})
         except HTTPException as e:
             return json.dumps({"error": str(e.detail)}, ensure_ascii=False)
@@ -578,7 +591,7 @@ def insights_endpoint(
 
 def _connections_payload(target_org: str) -> dict:
     items = []
-    for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS:
+    for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
         conn = models.get_connection(target_org, provider=provider)
         items.append(
             {
@@ -605,7 +618,7 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
     """Remove a source. Revoke the Google grant once the last Google source goes."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
-    if provider not in config.GOOGLE_PROVIDERS and provider not in config.META_PROVIDERS:
+    if provider not in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unknown provider")
 
     conn = models.get_connection(target_org, provider=provider)
@@ -814,6 +827,90 @@ def ads_report(
     except google_ads.AdsNotConfigured:
         raise HTTPException(status_code=409, detail="Google Ads is nog niet geconfigureerd op de server")
     payload = {"org_id": target_org, "customer_id": customer_id, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
+
+
+# -------------------------------------------------------------- woocommerce
+#
+# WooCommerce koppelt met een read-only consumer key/secret (geen OAuth). De
+# gegevens worden versleuteld per org opgeslagen onder provider 'woocommerce'.
+# De ingebouwde demowinkel (store_url = woocommerce.DEMO_STORE) genereert
+# deterministische demodata door hetzelfde rapportpad, zodat het kanaal
+# end-to-end getest kan worden zonder externe winkel.
+
+
+class WooConnectIn(BaseModel):
+    store_url: str
+    consumer_key: str
+    consumer_secret: str
+
+
+@app.post("/api/woocommerce/connect")
+def wc_connect(request: Request, payload: WooConnectIn, org_id: str | None = None):
+    """Koppel een echte WooCommerce-winkel (valideert URL + sleutel)."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    ck, cs = payload.consumer_key.strip(), payload.consumer_secret.strip()
+    if not ck or not cs:
+        raise HTTPException(status_code=400, detail="Consumer key en secret zijn vereist")
+    try:
+        store = woocommerce.validate_store_url(payload.store_url)
+        woocommerce.test_connection(store, ck, cs)
+    except woocommerce.WooError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        log.exception("woocommerce connect test failed org=%s", target_org)
+        raise HTTPException(status_code=400, detail="Kan de winkel niet bereiken - controleer de URL.")
+    host = store.split("//", 1)[-1].split("/", 1)[0]
+    models.save_connection(
+        target_org, host,
+        {"store_url": store, "consumer_key": ck, "consumer_secret": cs},
+        provider="woocommerce",
+    )
+    cache.invalidate_org(target_org)
+    return _connections_payload(target_org)
+
+
+@app.post("/api/woocommerce/connect-demo")
+def wc_connect_demo(request: Request, org_id: str | None = None):
+    """Koppel de ingebouwde demowinkel (voor testen zonder echte shop)."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    models.save_connection(
+        target_org, "Demowinkel (voorbeelddata)",
+        {"store_url": woocommerce.DEMO_STORE, "consumer_key": "", "consumer_secret": ""},
+        provider="woocommerce",
+    )
+    cache.invalidate_org(target_org)
+    return _connections_payload(target_org)
+
+
+@app.get("/api/woocommerce/report")
+def wc_report(
+    request: Request,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
+    user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|woo|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    store, ck, cs = _wc_creds(target_org)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    try:
+        data = woocommerce.run_overview(store, ck, cs, start, end, compare)
+    except woocommerce.WooError as e:
+        log.warning("REVOKE org=%s provider=woocommerce at=report err=%r", target_org, e)
+        models.set_connection_status(target_org, "revoked", provider="woocommerce")
+        raise HTTPException(status_code=409, detail="WooCommerce-koppeling werkt niet meer - opnieuw koppelen")
+    payload = {"org_id": target_org, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
 

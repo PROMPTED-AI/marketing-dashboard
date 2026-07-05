@@ -66,6 +66,10 @@ export function metaOrganicReportUrl(pageId, igId, start, end, orgId) {
   );
 }
 
+export function wcReportUrl(start, end, compare, orgId) {
+  return "/api/woocommerce/report?start=" + start + "&end=" + end + compareQ(compare) + orgQ(orgId);
+}
+
 export function connectionsUrl(orgId) {
   return "/api/connections" + (orgId ? "?org_id=" + encodeURIComponent(orgId) : "");
 }

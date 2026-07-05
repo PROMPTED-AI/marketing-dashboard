@@ -13,7 +13,7 @@ import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { useCachedApi } from "../../lib/swr.js";
 import {
   overviewUrl, gscReportUrl, sitesUrl, adsAccountsUrl, adsReportUrl,
-  metaAccountsUrl, metaAdsReportUrl, metaOrganicReportUrl,
+  metaAccountsUrl, metaAdsReportUrl, metaOrganicReportUrl, wcReportUrl,
 } from "../../lib/urls.js";
 import { TabState } from "../../components/ui.jsx";
 import DashboardEditor from "../../components/dashboard/DashboardEditor.jsx";
@@ -236,10 +236,31 @@ function MetaOrganicData({ catalog }) {
   );
 }
 
+function WooCommerceData({ catalog }) {
+  const { orgId } = useActiveOrg();
+  const { start, end, compare, label } = useDateRange();
+  const { data, loading, error } = useCachedApi(wcReportUrl(start, end, compare, orgId));
+
+  const sections = () => data?.kpis ? [
+    { title: "WooCommerce — " + label },
+    { columns: ["Metric", "Waarde"], rows: [["Omzet", (data.kpis.revenue || 0).toFixed(2)], ["Bestellingen", data.kpis.orders], ["Gem. orderwaarde", (data.kpis.avgOrderValue || 0).toFixed(2)]] },
+    { title: "Topproducten", columns: ["Product", "Aantal", "Omzet"], rows: (data.top_products || []).map((p) => [p.name, p.qty, (p.revenue || 0).toFixed(2)]) },
+  ] : [];
+
+  return (
+    <DashboardEditor
+      catalog={catalog} page="woocommerce" data={data} loading={loading} error={error}
+      title="woocommerce" subtitle={"eigen indeling · " + label + (data?.is_demo ? " · demowinkel" : "")}
+      exportFilename="woocommerce-dashboard" exportSections={sections}
+    />
+  );
+}
+
 const WRAPPERS = {
   "analytics": AnalyticsData,
   "search-console": SearchConsoleData,
   "google-ads": GoogleAdsData,
   "meta-ads": MetaAdsData,
   "meta-organic": MetaOrganicData,
+  "woocommerce": WooCommerceData,
 };
