@@ -9,6 +9,7 @@ import json
 import logging
 from datetime import date
 
+import openai
 from openai import OpenAI
 
 log = logging.getLogger("dashboard")
@@ -220,7 +221,25 @@ def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: 
                     "tool_call_id": c["id"],
                     "content": execute(c["name"], args),
                 })
-    except Exception:  # log server-side; keep client message generic
+    except openai.AuthenticationError:
+        log.exception("assistant: EuRouter auth geweigerd (model=%s)", model)
+        yield _sse("error", message="De assistent kan niet inloggen bij de taalmodel-service. Controleer de EuRouter-sleutel (EUROUTER_API_KEY).")
+    except openai.NotFoundError:
+        log.exception("assistant: model niet gevonden (model=%s)", model)
+        yield _sse("error", message=f"Het ingestelde taalmodel is niet beschikbaar (model '{model}'). Controleer EUROUTER_MODEL.")
+    except openai.PermissionDeniedError:
+        log.exception("assistant: EuRouter toegang geweigerd (model=%s)", model)
+        yield _sse("error", message=f"Geen toegang tot dit taalmodel ('{model}') op EuRouter. Controleer je abonnement of EUROUTER_MODEL.")
+    except openai.RateLimitError:
+        log.exception("assistant: EuRouter rate limit / tegoed (model=%s)", model)
+        yield _sse("error", message="De taalmodel-service is tijdelijk overbelast of het tegoed is op. Probeer het later opnieuw.")
+    except openai.APIConnectionError:
+        log.exception("assistant: EuRouter onbereikbaar (model=%s, base=%s)", model, base_url)
+        yield _sse("error", message="Kan de taalmodel-service (EuRouter) niet bereiken. Controleer EUROUTER_BASE_URL of probeer het later opnieuw.")
+    except openai.APIStatusError as e:
+        log.exception("assistant: EuRouter fout %s (model=%s)", getattr(e, "status_code", "?"), model)
+        yield _sse("error", message=f"De taalmodel-service gaf een fout (status {getattr(e, 'status_code', '?')}). Probeer het later opnieuw.")
+    except Exception:  # onbekende fout; log server-side, generieke melding
         log.exception("assistant stream failed (model=%s)", model)
         yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
     yield _sse("done")
