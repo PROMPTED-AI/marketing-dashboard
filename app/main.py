@@ -1132,12 +1132,19 @@ def delete_dashboard(request: Request, dashboard_id: str, org_id: str | None = N
 
 # Catch-all: serve the SPA's index.html for any non-API route so the client-side
 # router can handle deep links. Declared last so it never shadows /api or mounts.
+#
+# index.html MUST NOT be cached by the browser: de gehashte JS/CSS-assets krijgen
+# bij elke build een nieuwe naam, dus een oude (gecachte) index.html verwijst na
+# een deploy naar een verdwenen bundle -> die laadt niet en je krijgt een wit
+# scherm. `no-cache` dwingt de browser de index elke keer te revalideren, zodat
+# hij altijd de actuele asset-hashes ophaalt. De assets zelf (onder /assets,
+# immutable per hash) mogen wél gewoon gecachet blijven.
 @app.get("/{full_path:path}")
 def spa(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     if SPA_INDEX.exists():
-        return FileResponse(SPA_INDEX)
+        return FileResponse(SPA_INDEX, headers={"Cache-Control": "no-cache"})
     return JSONResponse(
         {"detail": "Frontend not built. Run `npm run build` in frontend/."},
         status_code=503,
