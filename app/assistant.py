@@ -174,72 +174,130 @@ def _err_detail(exc) -> str:
     return f": {msg[:200]}" if msg else ""
 
 
-def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: str,
-                period: tuple[str, str] | None = None):
+def _tool_unsupported(exc) -> bool:
+    """Herken de 400 'model does not support tool calling' van de gateway."""
+    txt = (_err_detail(exc) or "").lower()
+    return "tool" in txt and ("support" in txt or "function" in txt)
+
+
+def _run_tool_loop(client, model, convo, execute, state):
+    """Tool-use-modus: het model roept tools aan die de data ophalen.
+
+    `state["text"]` wordt True zodra er antwoordtekst is gestreamd, zodat de
+    aanroeper weet of een fallback nog veilig is.
+    """
+    for _ in range(MAX_TOOL_ITERATIONS):
+        stream = client.chat.completions.create(
+            model=model, messages=convo, tools=TOOLS, max_tokens=1500, stream=True,
+        )
+        content = ""
+        calls = {}  # index -> {id, name, args}
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if getattr(delta, "content", None):
+                content += delta.content
+                state["text"] = True
+                yield _sse("text", text=delta.content)
+            for tc in (getattr(delta, "tool_calls", None) or []):
+                slot = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                if tc.id:
+                    slot["id"] = tc.id
+                if tc.function and tc.function.name:
+                    slot["name"] = tc.function.name
+                if tc.function and tc.function.arguments:
+                    slot["args"] += tc.function.arguments
+
+        if not calls:
+            break
+
+        convo.append({
+            "role": "assistant",
+            "content": content or None,
+            "tool_calls": [
+                {"id": c["id"], "type": "function",
+                 "function": {"name": c["name"], "arguments": c["args"] or "{}"}}
+                for c in calls.values()
+            ],
+        })
+        for c in calls.values():
+            yield _sse("tool", name=c["name"])
+            try:
+                args = json.loads(c["args"]) if c["args"] else {}
+                if not isinstance(args, dict):
+                    args = {}
+            except ValueError:
+                args = {}
+            convo.append({
+                "role": "tool",
+                "tool_call_id": c["id"],
+                "content": execute(c["name"], args),
+            })
+
+
+def _run_context_mode(client, model, system, messages, gather_context):
+    """Tool-loze modus voor modellen zonder function-calling.
+
+    De backend haalt zelf de data van de gekoppelde kanalen op en geeft die als
+    context mee; het model formuleert het antwoord. Werkt met elk chatmodel.
+    """
+    yield _sse("tool", name="alle gekoppelde kanalen")
+    context = gather_context() if gather_context else ""
+    sys2 = system + (
+        "\n\nJe kunt geen tools aanroepen. Gebruik uitsluitend de onderstaande "
+        "actuele cijfers van deze klant om de vraag te beantwoorden. Noem alleen "
+        "cijfers die hieronder staan.\n\n=== ACTUELE CIJFERS ===\n" + context
+    )
+    convo = [{"role": "system", "content": sys2}] + list(messages)
+    stream = client.chat.completions.create(
+        model=model, messages=convo, max_tokens=1500, stream=True,
+    )
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if getattr(delta, "content", None):
+            yield _sse("text", text=delta.content)
+
+
+def stream_chat(messages: list, execute, gather_context=None, *, api_key: str,
+                base_url: str, model: str, period: tuple[str, str] | None = None):
     """Yield Server-Sent-Events strings for one chat turn.
 
     `messages` is the conversation history (user/assistant). `execute(name, input)`
     runs a tool and returns a JSON string (already org-scoped, never raises).
-    `period` is the dashboard's (start, end); the model may override it per tool
-    when the user asks about a different date range.
+    `gather_context()` returns a text blob of the connected channels' data, used
+    as a fallback for models zonder tool-calling. `period` is the dashboard's
+    (start, end); the model may override it per tool when the user asks about a
+    different date range.
     """
     client = OpenAI(api_key=api_key, base_url=base_url)
     system = SYSTEM_PROMPT + f"\n\nVandaag is {date.today().isoformat()}."
     if period:
         system += f" De dashboardperiode is {period[0]} t/m {period[1]}."
     convo = [{"role": "system", "content": system}] + list(messages)
+    state = {"text": False}
     try:
-        for _ in range(MAX_TOOL_ITERATIONS):
-            stream = client.chat.completions.create(
-                model=model,
-                messages=convo,
-                tools=TOOLS,
-                max_tokens=1500,
-                stream=True,
-            )
-            content = ""
-            calls = {}  # index -> {id, name, args}
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if getattr(delta, "content", None):
-                    content += delta.content
-                    yield _sse("text", text=delta.content)
-                for tc in (getattr(delta, "tool_calls", None) or []):
-                    slot = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
-                    if tc.id:
-                        slot["id"] = tc.id
-                    if tc.function and tc.function.name:
-                        slot["name"] = tc.function.name
-                    if tc.function and tc.function.arguments:
-                        slot["args"] += tc.function.arguments
-
-            if not calls:
-                break
-
-            convo.append({
-                "role": "assistant",
-                "content": content or None,
-                "tool_calls": [
-                    {"id": c["id"], "type": "function",
-                     "function": {"name": c["name"], "arguments": c["args"] or "{}"}}
-                    for c in calls.values()
-                ],
-            })
-            for c in calls.values():
-                yield _sse("tool", name=c["name"])
-                try:
-                    args = json.loads(c["args"]) if c["args"] else {}
-                    if not isinstance(args, dict):
-                        args = {}
-                except ValueError:
-                    args = {}
-                convo.append({
-                    "role": "tool",
-                    "tool_call_id": c["id"],
-                    "content": execute(c["name"], args),
-                })
+        yield from _run_tool_loop(client, model, convo, execute, state)
+    except openai.BadRequestError as e:
+        # Ondersteunt het model geen tools? Val (voordat er tekst is) terug op de
+        # tool-loze contextmodus, zodat de assistent met elk model blijft werken.
+        if not state["text"] and _tool_unsupported(e):
+            log.info("assistant: %s ondersteunt geen tools; contextmodus", model)
+            try:
+                yield from _run_context_mode(client, model, system, messages, gather_context)
+            except Exception:
+                log.exception("assistant contextmodus faalde (model=%s)", model)
+                yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
+        else:
+            log.exception("assistant: EuRouter 400 (model=%s)", model)
+            yield _sse("error", message=(
+                f"De taalmodel-service weigerde het verzoek (400){_err_detail(e)}. "
+                f"Controleer EUROUTER_MODEL ('{model}')."
+            ))
+        yield _sse("done")
+        return
     except openai.AuthenticationError:
         log.exception("assistant: EuRouter auth geweigerd (model=%s)", model)
         yield _sse("error", message="De assistent kan niet inloggen bij de taalmodel-service. Controleer de EuRouter-sleutel (EUROUTER_API_KEY).")
@@ -255,15 +313,6 @@ def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: 
     except openai.APIConnectionError:
         log.exception("assistant: EuRouter onbereikbaar (model=%s, base=%s)", model, base_url)
         yield _sse("error", message="Kan de taalmodel-service (EuRouter) niet bereiken. Controleer EUROUTER_BASE_URL of probeer het later opnieuw.")
-    except openai.BadRequestError as e:
-        # 400: verzoek geweigerd. Meestal ondersteunt het model geen tool-calling
-        # of is de model-slug ongeldig. Toon EuRouter's eigen reden (geen secret).
-        log.exception("assistant: EuRouter 400 (model=%s)", model)
-        yield _sse("error", message=(
-            f"De taalmodel-service weigerde het verzoek (400){_err_detail(e)}. "
-            f"Vaak ondersteunt het gekozen model '{model}' geen tool-calling of is de "
-            "model-slug ongeldig — kies een ander EUROUTER_MODEL dat functies ondersteunt."
-        ))
     except openai.APIStatusError as e:
         code = getattr(e, "status_code", "?")
         log.exception("assistant: EuRouter fout %s (model=%s)", code, model)
