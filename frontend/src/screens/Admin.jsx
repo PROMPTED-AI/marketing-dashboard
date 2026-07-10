@@ -125,6 +125,8 @@ export default function Admin() {
             })}
             {orgs && orgs.length === 0 && <div style={{ padding: 24, color: "var(--c-muted)" }}>Nog geen organisaties.</div>}
           </div>
+
+          <ModelDiagnostics />
         </div>
       </div>
 
@@ -186,6 +188,89 @@ function AddClientModal({ onClose, onDone }) {
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+// AI-model-diagnostiek: lijst EuRouter-modellen en probe tool-calling-support,
+// zodat je op basis van feiten een model kiest dat de assistent-tools aankan.
+function ModelDiagnostics() {
+  const [current, setCurrent] = useState(null);
+  const [models, setModels] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState({}); // model -> true tijdens probe
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    api("/api/admin/assistant/models")
+      .then((d) => { setModels(d.models || []); setCurrent(d.current); })
+      .catch((e) => setError(e))
+      .finally(() => setLoading(false));
+  };
+
+  const probe = (id) => {
+    setBusy((b) => ({ ...b, [id]: true }));
+    return api("/api/admin/assistant/models/probe", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: id }),
+    })
+      .then((r) => setModels((ms) => ms.map((m) => (m.id === id ? { ...m, supports_tools: r.supports_tools, detail: r.detail } : m))))
+      .catch(() => {})
+      .finally(() => setBusy((b) => ({ ...b, [id]: false })));
+  };
+
+  const probeAll = async () => {
+    const todo = (models || []).filter((m) => m.supports_tools == null).map((m) => m.id);
+    for (const id of todo) await probe(id); // serieel: elke probe kost een mini-call
+  };
+
+  const badge = (v) => {
+    if (v === true) return <span className="pill pos" style={{ fontSize: 11 }}>tools ✓</span>;
+    if (v === false) return <span className="pill muted" style={{ fontSize: 11 }}>geen tools</span>;
+    return <span className="pill accent" style={{ fontSize: 11 }}>onbekend</span>;
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 20, padding: 0, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 20px", borderBottom: "1px solid var(--c-border)", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>AI-model diagnostiek</div>
+          <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginTop: 2 }}>
+            Welke EuRouter-modellen ondersteunen tool-calling{current ? ` · huidig: ${current}` : ""}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {models && <button className="btn-ghost" onClick={probeAll} style={{ height: 38, padding: "0 14px", fontSize: 13 }}>Alles proben</button>}
+          <button className="btn-primary" onClick={load} disabled={loading} style={{ height: 38, padding: "0 16px", fontSize: 13, opacity: loading ? 0.6 : 1 }}>
+            {loading ? "laden…" : models ? "vernieuwen" : "modellen ophalen"}
+          </button>
+        </div>
+      </div>
+
+      {error && <div style={{ padding: 20, color: "var(--c-neg)", fontSize: 13 }}>{String(error.message || error)}</div>}
+      {models && models.length === 0 && <div style={{ padding: 20, color: "var(--c-muted)", fontSize: 13 }}>Geen modellen teruggegeven.</div>}
+      {models && models.length > 0 && (
+        <div>
+          {models.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 }}>
+              <span style={{ flex: 1, minWidth: 0, fontWeight: m.id === current ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {m.id}{m.id === current && <span style={{ color: "var(--c-accent)", fontSize: 11, fontWeight: 700 }}> · huidig</span>}
+              </span>
+              {m.detail && m.supports_tools == null && <span title={m.detail} style={{ fontSize: 11, color: "var(--c-muted)" }}>{m.detail}</span>}
+              {badge(m.supports_tools)}
+              <button className="btn-ghost" onClick={() => probe(m.id)} disabled={busy[m.id]} style={{ height: 30, padding: "0 10px", fontSize: 12 }}>
+                {busy[m.id] ? "…" : "probe"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {!models && !loading && !error && (
+        <div style={{ padding: 20, color: "var(--c-muted)", fontSize: 13 }}>
+          Klik op “modellen ophalen” om EuRouters modellen te laden en per model tool-calling te testen.
+        </div>
+      )}
     </div>
   );
 }

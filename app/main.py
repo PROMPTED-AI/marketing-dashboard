@@ -307,6 +307,45 @@ def rename_organization(request: Request, org_id: str, payload: OrgRename):
     return {"organization": org}
 
 
+@app.get("/api/admin/assistant/models")
+def assistant_models(request: Request):
+    """Agency-admin diagnostiek: welke EuRouter-modellen ondersteunen tool-calling.
+
+    Lijst de beschikbare modellen; tool-support komt uit de in-process cache
+    (None = nog niet geprobed). Probe je een model via het probe-endpoint, dan
+    verschijnt het resultaat hier."""
+    auth.require_admin(request)
+    if not config.EUROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
+    try:
+        ids = assistant.list_models(config.EUROUTER_API_KEY, config.EUROUTER_BASE_URL)
+    except Exception:
+        log.exception("assistant: modellenlijst ophalen faalde")
+        raise HTTPException(status_code=502, detail="Kan de modellenlijst niet ophalen bij EuRouter.")
+    return {
+        "current": config.EUROUTER_MODEL,
+        "models": [{"id": m, "supports_tools": assistant.cached_tool_support(m)} for m in ids],
+    }
+
+
+class ProbeIn(BaseModel):
+    model: str
+
+
+@app.post("/api/admin/assistant/models/probe")
+def assistant_probe(request: Request, payload: ProbeIn):
+    """Probe één model op tool-calling (kost een mini API-call); cachet het."""
+    auth.require_admin(request)
+    if not config.EUROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
+    model = payload.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model is vereist")
+    if not ratelimit.allow("assistant-probe", limit=60, window_s=60):
+        raise HTTPException(status_code=429, detail="Te veel probes - probeer het zo weer.")
+    return assistant.probe_tool_support(config.EUROUTER_API_KEY, config.EUROUTER_BASE_URL, model)
+
+
 @app.get("/api/organizations")
 def organizations(request: Request):
     """Organizations the user may view/switch to (admins: all; clients: own)."""
