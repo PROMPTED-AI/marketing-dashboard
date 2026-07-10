@@ -1,0 +1,94 @@
+# Strix — autonome AI-securityscan (https://github.com/usestrix/strix).
+#
+# Op elke pull request naar main scant Strix alleen de gewijzigde bestanden
+# (diff-scope: snel + goedkoop). Handmatig (workflow_dispatch) kan een volledige
+# scan gedraaid worden. Strix eindigt met een non-zero exitcode als er
+# kwetsbaarheden gevonden worden, zodat de check rood wordt.
+#
+# Strix wordt als vastgepind PyPI-pakket (strix-agent) geïnstalleerd i.p.v. via
+# een ongepinde shell-installer, zodat de toolchain reviewbaar en reproduceerbaar
+# is. Bump STRIX_VERSION bewust om te updaten. Docker is op de runner aanwezig;
+# Strix draait zijn tools in een sandbox-container die bij de eerste run wordt
+# opgehaald.
+#
+# Vereist twee repository-secrets (Settings -> Secrets and variables -> Actions):
+#   STRIX_LLM     - provider/model, bv. "openai/gpt-5.4" of "anthropic/claude-..."
+#   LLM_API_KEY   - de API-sleutel van die provider
+# Ontbreekt LLM_API_KEY (bv. op fork-PR's), dan wordt de scan netjes overgeslagen
+# met een waarschuwing i.p.v. een rode build.
+
+name: Strix security scan
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: "Scan-modus voor de volledige scan"
+        default: "quick"
+        type: choice
+        options: [quick, deep]
+
+# Alleen lezen; de scan schrijft niets terug naar de repo.
+permissions:
+  contents: read
+
+env:
+  # Vastgepinde Strix-versie (PyPI: strix-agent). Bewust bumpen om te updaten.
+  STRIX_VERSION: "1.0.4"
+
+# Nieuwe push op dezelfde PR annuleert een lopende scan (bespaart LLM-kosten).
+concurrency:
+  group: strix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  strix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Volledige historie zodat diff-scoping de basisbranch kan vinden.
+          fetch-depth: 0
+
+      # Secrets mogen niet in `if:`-condities; daarom hier via env checken en
+      # het resultaat als output doorgeven. Zo blijft de key ook uit de logs.
+      - name: Controleer configuratie
+        id: cfg
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          if [ -n "$LLM_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Secret LLM_API_KEY ontbreekt — Strix-scan overgeslagen. Stel STRIX_LLM + LLM_API_KEY in bij de repo-secrets."
+          fi
+
+      - name: Zet Python op
+        if: steps.cfg.outputs.enabled == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installeer Strix (vastgepind)
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          pipx install "strix-agent==${STRIX_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Strix — scan gewijzigde bestanden (PR)
+        if: steps.cfg.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: strix -n -t ./ --scan-mode quick --scope-mode diff --diff-base "origin/${{ github.base_ref }}"
+
+      - name: Strix — volledige scan (handmatig)
+        if: steps.cfg.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: strix -n -t ./ --scan-mode ${{ inputs.scan_mode }}
