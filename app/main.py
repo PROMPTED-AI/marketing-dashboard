@@ -491,8 +491,31 @@ def assistant_chat(request: Request, body: ChatBody):
             log.exception("assistant tool failed name=%s org=%s", name, target_org)
             return json.dumps({"error": "Kon deze gegevens niet ophalen."}, ensure_ascii=False)
 
+    def gather_context() -> str:
+        """Compacte data van alle gekoppelde kanalen, als context voor modellen
+        zonder tool-calling. Hergebruikt `execute` (org-scoped, gecachet); niet
+        gekoppelde kanalen leveren een fout en worden overgeslagen."""
+        blocks = []
+        for name, label in (
+            ("get_analytics_overview", "Google Analytics"),
+            ("get_search_console", "Search Console"),
+            ("get_google_ads", "Google Ads"),
+            ("get_meta_ads", "META Ads"),
+            ("get_meta_organic", "META Organisch"),
+            ("get_woocommerce", "WooCommerce"),
+        ):
+            out = execute(name, {})
+            try:
+                parsed = json.loads(out)
+            except (TypeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict) and parsed.get("error"):
+                continue
+            blocks.append(f"## {label}\n{out}")
+        return "\n\n".join(blocks) if blocks else "(geen gekoppelde kanalen met data voor deze periode)"
+
     stream = assistant.stream_chat(
-        safe_messages, execute,
+        safe_messages, execute, gather_context,
         api_key=config.EUROUTER_API_KEY, base_url=config.EUROUTER_BASE_URL,
         model=config.EUROUTER_MODEL, period=(body.start, body.end),
     )
