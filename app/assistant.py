@@ -10,6 +10,7 @@ import logging
 from datetime import date
 
 import openai
+import requests
 from openai import OpenAI
 
 log = logging.getLogger("dashboard")
@@ -333,10 +334,30 @@ def stream_chat(messages: list, execute, gather_context=None, *, api_key: str,
 _TOOL_SUPPORT: dict[str, bool] = {}  # model-slug -> ondersteunt tools
 
 
-def list_models(api_key: str, base_url: str) -> list[str]:
-    """Alle model-slugs die EuRouter voor deze sleutel aanbiedt (gesorteerd)."""
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    return sorted(m.id for m in client.models.list().data)
+def list_models(api_key: str, base_url: str) -> list[dict]:
+    """EuRouter-modellen met hun opgegeven tool-support (uit de catalogus).
+
+    De /models-catalogus geeft per model `supported_parameters` en `tags`; een
+    model dat tool-calling ondersteunt heeft "tools" in de parameters (of de tag
+    "function-calling"). Dat lezen we gratis uit de metadata — geen probe nodig.
+    """
+    resp = requests.get(
+        f"{base_url.rstrip('/')}/models",
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    out = []
+    for m in resp.json().get("data", []):
+        params = m.get("supported_parameters") or []
+        tags = m.get("tags") or []
+        declares = ("tools" in params) or ("function-calling" in tags)
+        out.append({
+            "id": m.get("id"),
+            "declares_tools": bool(declares),
+            "context": m.get("context_length"),
+        })
+    return sorted(out, key=lambda x: (not x["declares_tools"], x["id"] or ""))
 
 
 def cached_tool_support(model: str):

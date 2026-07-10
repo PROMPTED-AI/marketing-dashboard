@@ -318,13 +318,21 @@ def assistant_models(request: Request):
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
     try:
-        ids = assistant.list_models(config.EUROUTER_API_KEY, config.EUROUTER_BASE_URL)
+        models = assistant.list_models(config.EUROUTER_API_KEY, config.EUROUTER_BASE_URL)
     except Exception:
         log.exception("assistant: modellenlijst ophalen faalde")
         raise HTTPException(status_code=502, detail="Kan de modellenlijst niet ophalen bij EuRouter.")
     return {
         "current": config.EUROUTER_MODEL,
-        "models": [{"id": m, "supports_tools": assistant.cached_tool_support(m)} for m in ids],
+        "models": [
+            {
+                "id": m["id"],
+                "declares_tools": m["declares_tools"],  # uit de EuRouter-catalogus
+                "supports_tools": assistant.cached_tool_support(m["id"]),  # None tot geprobed
+                "context": m.get("context"),
+            }
+            for m in models
+        ],
     }
 
 

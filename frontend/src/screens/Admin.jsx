@@ -220,15 +220,19 @@ function ModelDiagnostics() {
       .finally(() => setBusy((b) => ({ ...b, [id]: false })));
   };
 
+  // Alleen de modellen proben die volgens de catalogus tools ondersteunen, ter
+  // bevestiging tegen het echte endpoint (scheelt calls op de rest).
   const probeAll = async () => {
-    const todo = (models || []).filter((m) => m.supports_tools == null).map((m) => m.id);
-    for (const id of todo) await probe(id); // serieel: elke probe kost een mini-call
+    const todo = (models || []).filter((m) => m.declares_tools && m.supports_tools == null).map((m) => m.id);
+    for (const id of todo) await probe(id);
   };
 
-  const badge = (v) => {
-    if (v === true) return <span className="pill pos" style={{ fontSize: 11 }}>tools ✓</span>;
-    if (v === false) return <span className="pill muted" style={{ fontSize: 11 }}>geen tools</span>;
-    return <span className="pill accent" style={{ fontSize: 11 }}>onbekend</span>;
+  // Live probe (indien uitgevoerd) wint; anders wat de catalogus opgeeft.
+  const badge = (m) => {
+    if (m.supports_tools === true) return <span className="pill pos" style={{ fontSize: 11 }}>tools ✓ (getest)</span>;
+    if (m.supports_tools === false) return <span className="pill neg" style={{ fontSize: 11 }}>geen tools (getest)</span>;
+    if (m.declares_tools) return <span className="pill pos" style={{ fontSize: 11, opacity: 0.7 }}>tools ✓</span>;
+    return <span className="pill muted" style={{ fontSize: 11 }}>geen tools</span>;
   };
 
   return (
@@ -258,7 +262,7 @@ function ModelDiagnostics() {
                 {m.id}{m.id === current && <span style={{ color: "var(--c-accent)", fontSize: 11, fontWeight: 700 }}> · huidig</span>}
               </span>
               {m.detail && m.supports_tools == null && <span title={m.detail} style={{ fontSize: 11, color: "var(--c-muted)" }}>{m.detail}</span>}
-              {badge(m.supports_tools)}
+              {badge(m)}
               <button className="btn-ghost" onClick={() => probe(m.id)} disabled={busy[m.id]} style={{ height: 30, padding: "0 10px", fontSize: 12 }}>
                 {busy[m.id] ? "…" : "probe"}
               </button>
