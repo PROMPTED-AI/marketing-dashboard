@@ -155,6 +155,25 @@ def _sse(event: str, **data) -> str:
     return "data: " + json.dumps({"type": event, **data}, ensure_ascii=False) + "\n\n"
 
 
+def _err_detail(exc) -> str:
+    """Korte, veilige weergave van de foutreden die de gateway teruggaf.
+
+    Haalt de leesbare boodschap uit de OpenAI-compatibele fout (body.error.message
+    of .message). Bevat geen sleutel; alleen de reden van afwijzing. Ingekort.
+    """
+    msg = ""
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error")
+        if isinstance(err, dict):
+            msg = err.get("message") or ""
+        msg = msg or body.get("message") or ""
+    if not msg:
+        msg = getattr(exc, "message", "") or ""
+    msg = str(msg).strip()
+    return f": {msg[:200]}" if msg else ""
+
+
 def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: str,
                 period: tuple[str, str] | None = None):
     """Yield Server-Sent-Events strings for one chat turn.
@@ -236,9 +255,19 @@ def stream_chat(messages: list, execute, *, api_key: str, base_url: str, model: 
     except openai.APIConnectionError:
         log.exception("assistant: EuRouter onbereikbaar (model=%s, base=%s)", model, base_url)
         yield _sse("error", message="Kan de taalmodel-service (EuRouter) niet bereiken. Controleer EUROUTER_BASE_URL of probeer het later opnieuw.")
+    except openai.BadRequestError as e:
+        # 400: verzoek geweigerd. Meestal ondersteunt het model geen tool-calling
+        # of is de model-slug ongeldig. Toon EuRouter's eigen reden (geen secret).
+        log.exception("assistant: EuRouter 400 (model=%s)", model)
+        yield _sse("error", message=(
+            f"De taalmodel-service weigerde het verzoek (400){_err_detail(e)}. "
+            f"Vaak ondersteunt het gekozen model '{model}' geen tool-calling of is de "
+            "model-slug ongeldig — kies een ander EUROUTER_MODEL dat functies ondersteunt."
+        ))
     except openai.APIStatusError as e:
-        log.exception("assistant: EuRouter fout %s (model=%s)", getattr(e, "status_code", "?"), model)
-        yield _sse("error", message=f"De taalmodel-service gaf een fout (status {getattr(e, 'status_code', '?')}). Probeer het later opnieuw.")
+        code = getattr(e, "status_code", "?")
+        log.exception("assistant: EuRouter fout %s (model=%s)", code, model)
+        yield _sse("error", message=f"De taalmodel-service gaf een fout (status {code}){_err_detail(e)}. Probeer het later opnieuw.")
     except Exception:  # onbekende fout; log server-side, generieke melding
         log.exception("assistant stream failed (model=%s)", model)
         yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
