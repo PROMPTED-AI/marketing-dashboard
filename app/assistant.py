@@ -10,6 +10,7 @@ import logging
 from datetime import date
 
 import openai
+import requests
 from openai import OpenAI
 
 log = logging.getLogger("dashboard")
@@ -321,3 +322,73 @@ def stream_chat(messages: list, execute, gather_context=None, *, api_key: str,
         log.exception("assistant stream failed (model=%s)", model)
         yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
     yield _sse("done")
+
+
+# ----------------------------------------------------------- model-diagnostiek
+#
+# Welke EuRouter-modellen ondersteunen tool-calling? Dat verschilt per gateway en
+# is niet betrouwbaar te raden, dus vragen we het EuRouter zelf: lijst de modellen
+# en probe tool-support met een mini-verzoek. Het resultaat wordt in-process
+# gecachet (per instance) zodat routing/diagnostiek het kan hergebruiken.
+
+_TOOL_SUPPORT: dict[str, bool] = {}  # model-slug -> ondersteunt tools
+
+
+def list_models(api_key: str, base_url: str) -> list[dict]:
+    """EuRouter-modellen met hun opgegeven tool-support (uit de catalogus).
+
+    De /models-catalogus geeft per model `supported_parameters` en `tags`; een
+    model dat tool-calling ondersteunt heeft "tools" in de parameters (of de tag
+    "function-calling"). Dat lezen we gratis uit de metadata — geen probe nodig.
+    """
+    resp = requests.get(
+        f"{base_url.rstrip('/')}/models",
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    out = []
+    for m in resp.json().get("data", []):
+        params = m.get("supported_parameters") or []
+        tags = m.get("tags") or []
+        declares = ("tools" in params) or ("function-calling" in tags)
+        out.append({
+            "id": m.get("id"),
+            "declares_tools": bool(declares),
+            "context": m.get("context_length"),
+        })
+    return sorted(out, key=lambda x: (not x["declares_tools"], x["id"] or ""))
+
+
+def cached_tool_support(model: str):
+    """True/False als eerder geprobed, anders None (nog onbekend)."""
+    return _TOOL_SUPPORT.get(model)
+
+
+def probe_tool_support(api_key: str, base_url: str, model: str) -> dict:
+    """Stuur een minimaal verzoek mét tool en kijk of de gateway het accepteert.
+
+    Cachet en retourneert {model, supports_tools: True/False/None, detail}. None =
+    onbekend (een andere fout dan 'geen tool-support', bv. auth/onbereikbaar).
+    """
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    try:
+        client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "ping"}],
+            tools=TOOLS[:1],
+            max_tokens=1,
+            stream=False,
+        )
+        _TOOL_SUPPORT[model] = True
+        return {"model": model, "supports_tools": True, "detail": ""}
+    except openai.BadRequestError as e:
+        if _tool_unsupported(e):
+            _TOOL_SUPPORT[model] = False
+            return {"model": model, "supports_tools": False, "detail": _err_detail(e).lstrip(": ").strip()}
+        return {"model": model, "supports_tools": None, "detail": ("400" + _err_detail(e)).strip()}
+    except openai.APIStatusError as e:
+        return {"model": model, "supports_tools": None, "detail": f"status {getattr(e, 'status_code', '?')}"}
+    except Exception as e:  # noqa: BLE001
+        log.warning("probe tool-support faalde (model=%s): %s", model, e)
+        return {"model": model, "supports_tools": None, "detail": type(e).__name__}
