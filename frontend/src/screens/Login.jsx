@@ -1,4 +1,7 @@
-import { LOGIN_URL } from "../lib/api.js";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { LOGIN_URL, passwordLogin } from "../lib/api.js";
+import { useMe } from "../lib/useMe.jsx";
 
 const Star = ({ s = 20 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -7,6 +10,28 @@ const Star = ({ s = 20 }) => (
 );
 
 export default function Login() {
+  const { reload } = useMe();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await passwordLogin(email, password);
+      reload();          // refresh /api/me so the router lets us into /app
+      navigate("/app", { replace: true });
+    } catch (err) {
+      setError(err?.message || "Inloggen mislukt. Probeer het opnieuw.");
+      setBusy(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", color: "var(--c-ink)", background: "var(--c-surface)" }}>
       {/* LEFT — form (fills the white half) */}
@@ -21,28 +46,38 @@ export default function Login() {
             log in om je marketingdata, koppelingen en rapporten te beheren.
           </div>
 
-          <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 7, display: "block" }}>E-mailadres</label>
-          <div style={field}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m3 7 9 6 9-6" /></svg>
-            <input placeholder="jij@bureau.nl" style={input} />
-          </div>
-          <label style={{ fontSize: 13, fontWeight: 600, margin: "18px 0 7px", display: "block" }}>Wachtwoord</label>
-          <div style={field}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
-            <input type="password" placeholder="••••••••••" style={input} />
-          </div>
+          <form onSubmit={submit}>
+            <label htmlFor="login-email" style={{ fontSize: 13, fontWeight: 600, marginBottom: 7, display: "block" }}>E-mailadres</label>
+            <div style={field}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m3 7 9 6 9-6" /></svg>
+              <input id="login-email" type="email" autoComplete="username" placeholder="jij@bureau.nl" style={input}
+                value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 600, margin: "18px 0 7px", display: "block" }}>Wachtwoord</label>
+            <div style={field}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+              <input id="login-password" type="password" autoComplete="current-password" placeholder="••••••••••" style={input}
+                value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 26px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--c-ink-soft)", fontWeight: 500 }}>
-              <input type="checkbox" /> onthoud mij
-            </label>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>wachtwoord vergeten?</span>
-          </div>
+            {error && (
+              <div role="alert" style={{ marginTop: 14, padding: "10px 14px", borderRadius: 12, background: "var(--c-neg-soft, #fdecea)", color: "var(--c-neg, #c0392b)", fontSize: 13, fontWeight: 600 }}>
+                {error}
+              </div>
+            )}
 
-          <button className="btn-primary" style={{ width: "100%", height: 52, fontSize: 15 }} title="Wachtwoord-login volgt later — gebruik voorlopig Google" disabled>
-            inloggen
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
-          </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 26px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--c-ink-soft)", fontWeight: 500 }}>
+                <input type="checkbox" /> onthoud mij
+              </label>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>wachtwoord vergeten?</span>
+            </div>
+
+            <button type="submit" className="btn-primary" style={{ width: "100%", height: 52, fontSize: 15, opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer" }} disabled={busy}>
+              {busy ? "bezig met inloggen…" : "inloggen"}
+              {!busy && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>}
+            </button>
+          </form>
 
           <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "22px 0" }}>
             <div style={{ flex: 1, height: 1, background: "var(--c-border)" }} />

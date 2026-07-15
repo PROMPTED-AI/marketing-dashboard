@@ -19,6 +19,29 @@ export async function api(path, opts = {}) {
 export const LOGIN_URL = "/api/auth/google/login";
 export const LOGOUT_URL = "/api/auth/logout";
 
+// Sign in with email + password. Resolves on success; on failure throws an
+// Error whose message is the server's detail (e.g. wrong combination). Uses a
+// raw fetch so the 401 body is read (the shared api() wrapper hides it).
+export async function passwordLogin(email, password) {
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    let detail = "Inloggen mislukt. Probeer het opnieuw.";
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch { /* non-JSON error body */ }
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
 // Disconnect a source (revokes the Google grant when it's the last one).
 export function disconnectProvider(provider, orgId) {
   const q = orgId ? "?org_id=" + encodeURIComponent(orgId) : "";

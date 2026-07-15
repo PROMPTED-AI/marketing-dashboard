@@ -78,9 +78,34 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain FROM organizations WHERE id = %s", (org_id,)
+            "SELECT id, name, domain, is_demo FROM organizations WHERE id = %s", (org_id,)
         ).fetchone()
-    return {"id": row[0], "name": row[1], "domain": row[2]} if row else None
+    return {"id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3]} if row else None
+
+
+def is_demo_org(org_id: str) -> bool:
+    org = get_organization(org_id)
+    return bool(org and org.get("is_demo"))
+
+
+def create_demo_organization(name: str, domain: str) -> dict:
+    """Create (or fetch) an org flagged as demo: it serves generated sample data."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM organizations WHERE domain = %s", (domain,)
+        ).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE organizations SET is_demo = true WHERE id = %s", (row[0],)
+            )
+            return {"id": row[0], "name": name, "domain": domain, "is_demo": True}
+        org_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO organizations (id, name, domain, is_demo) "
+            "VALUES (%s, %s, %s, true)",
+            (org_id, name, domain),
+        )
+        return {"id": org_id, "name": name, "domain": domain, "is_demo": True}
 
 
 def rename_organization(org_id: str, name: str) -> dict | None:
@@ -127,6 +152,33 @@ def get_user(user_id: str) -> dict | None:
     if not row:
         return None
     return {"id": row[0], "email": row[1], "organization_id": row[2], "role": row[3]}
+
+
+def get_user_by_email(email: str) -> dict | None:
+    """User lookup for password sign-in (includes the stored hash)."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, email, organization_id, role, password_hash "
+            "FROM users WHERE email = %s",
+            (email.lower(),),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "email": row[1],
+        "organization_id": row[2],
+        "role": row[3],
+        "password_hash": row[4],
+    }
+
+
+def set_user_password(email: str, password_hash: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = %s WHERE email = %s",
+            (password_hash, email.lower()),
+        )
 
 
 # ----------------------------------------------------------------- connections
