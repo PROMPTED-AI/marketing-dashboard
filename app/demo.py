@@ -8,10 +8,10 @@ Everything is derived from SHA-256 of the inputs (dates, labels), so the same
 date range always renders the same numbers — across restarts and instances —
 while different ranges still look naturally different.
 
-Google Analytics and Search Console are generated here. WooCommerce reuses the
-app's built-in demo store (``woocommerce.DEMO_STORE``): the demo org simply gets
-a real ``woocommerce`` connection row pointing at it, so that dashboard fills via
-the normal path.
+Google Analytics, Search Console, Google Ads and Meta (Ads + Organic) are all
+generated here. WooCommerce reuses the app's built-in demo store
+(``woocommerce.DEMO_STORE``): the demo org simply gets a real ``woocommerce``
+connection row pointing at it, so that dashboard fills via the normal path.
 """
 import hashlib
 import time
@@ -30,6 +30,21 @@ DEMO_PROPERTIES = [
 ]
 
 DEMO_SITES = [{"site_url": DEMO_SITE, "permission": "siteFullUser"}]
+
+# Google Ads: accounts the demo "connection" exposes.
+DEMO_ADS_ACCOUNTS = [{"customer_id": "demo-1234567890", "name": "Janssen — Google Ads"}]
+
+# Meta: ad accounts + pages (with linked Instagram) the demo exposes.
+DEMO_META_ASSETS = {
+    "ad_accounts": [{"id": "act_demo_janssen", "name": "Janssen — Adverteren", "currency": "EUR"}],
+    "pages": [
+        {
+            "id": "demo_page_janssen",
+            "name": "Janssen",
+            "instagram": {"id": "demo_ig_janssen", "username": "janssen.nl"},
+        }
+    ],
+}
 
 
 # --------------------------------------------------------------------- seeding
@@ -434,3 +449,220 @@ def gsc_report(start: str, end: str, compare: tuple[str, str] | None = None) -> 
         "devices": devices,
         "countries": countries,
     }
+
+
+# ---------------------------------------------------------------- google ads
+
+
+def _deltas(cur: dict, prev: dict, keys) -> dict:
+    return {k: ((cur[k] - prev[k]) / prev[k] * 100) if prev.get(k) else None for k in keys}
+
+
+def _ads_day(d: date) -> dict:
+    """One day of Google Ads metrics, derived from that day's impressions."""
+    weekday = [1.05, 1.10, 1.08, 1.03, 0.98, 0.80, 0.78][d.weekday()]
+    trend = 1 + (d.toordinal() - date(2026, 1, 1).toordinal()) * 0.0006
+    impressions = max(50, round(8200 * weekday * trend * _jitter("ads-impr", d, spread=0.3)))
+    clicks = max(1, round(impressions * 0.045 * _jitter("ads-ctr", d, spread=0.2)))
+    cost = round(clicks * 0.86 * _jitter("ads-cpc", d, spread=0.2), 2)
+    conversions = round(clicks * 0.062 * _jitter("ads-cvr", d, spread=0.25), 1)
+    return {
+        "date": d.strftime("%Y%m%d"),
+        "impressions": impressions,
+        "clicks": clicks,
+        "cost": cost,
+        "conversions": conversions,
+    }
+
+
+def ads_overview(start: str, end: str, compare: tuple[str, str] | None = None) -> dict:
+    """Same shape as google_ads.run_overview, but generated."""
+
+    def totals_for(s, e):
+        rows = [_ads_day(d) for d in _days(s, e)]
+        cost = round(sum(r["cost"] for r in rows), 2)
+        clicks = sum(r["clicks"] for r in rows)
+        impressions = sum(r["impressions"] for r in rows)
+        conversions = round(sum(r["conversions"] for r in rows), 1)
+        conv_value = round(conversions * 88.0 * _jitter("ads-aov", s, e, spread=0.1), 2)
+        return {
+            "cost": cost,
+            "clicks": clicks,
+            "impressions": impressions,
+            "conversions": conversions,
+            "conversionsValue": conv_value,
+            "ctr": (clicks / impressions * 100) if impressions else 0.0,
+            "cpc": (cost / clicks) if clicks else 0.0,
+            "roas": (conv_value / cost) if cost else 0.0,
+        }
+
+    kpis = totals_for(start, end)
+    deltas = None
+    if compare:
+        deltas = _deltas(kpis, totals_for(compare[0], compare[1]),
+                         ("cost", "clicks", "impressions", "conversions", "conversionsValue", "ctr", "cpc", "roas"))
+
+    by_date = [_ads_day(d) for d in _days(start, end)]
+
+    def campaign(name, share, ctr, roas):
+        cost = round(kpis["cost"] * share * _jitter("ads-camp", name), 2)
+        clicks = max(1, round(kpis["clicks"] * share * _jitter("ads-campc", name)))
+        impressions = max(1, round(kpis["impressions"] * share * _jitter("ads-campi", name)))
+        conversions = round(clicks * 0.062 * _jitter("ads-campv", name), 1)
+        return {
+            "name": name, "cost": cost, "clicks": clicks, "impressions": impressions,
+            "conversions": conversions, "ctr": ctr * _jitter("ads-campctr", name),
+            "roas": roas * _jitter("ads-camproas", name),
+        }
+
+    campaigns = [
+        campaign("Merk — Zoeken", 0.28, 6.8, 8.4),
+        campaign("Producten — Shopping", 0.24, 1.9, 5.1),
+        campaign("Diensten — Zoeken", 0.18, 4.2, 4.6),
+        campaign("Remarketing — Display", 0.12, 0.7, 3.2),
+        campaign("Concurrenten — Zoeken", 0.09, 3.1, 2.4),
+        campaign("Performance Max", 0.09, 2.6, 6.0),
+    ]
+
+    return {"kpis": kpis, "deltas": deltas, "by_date": by_date, "campaigns": campaigns}
+
+
+# ----------------------------------------------------------------- meta ads
+
+
+def _meta_ads_day(d: date) -> dict:
+    weekday = [1.04, 1.08, 1.06, 1.05, 1.02, 0.86, 0.83][d.weekday()]
+    trend = 1 + (d.toordinal() - date(2026, 1, 1).toordinal()) * 0.0007
+    impressions = max(80, round(12500 * weekday * trend * _jitter("mads-impr", d, spread=0.3)))
+    reach = round(impressions / (1.85 * _jitter("mads-freq", d, spread=0.1)))
+    clicks = max(1, round(impressions * 0.0125 * _jitter("mads-ctr", d, spread=0.25)))
+    spend = round(impressions / 1000 * 6.4 * _jitter("mads-cpm", d, spread=0.2), 2)
+    return {
+        "date": d.strftime("%Y%m%d"),
+        "impressions": impressions,
+        "reach": reach,
+        "clicks": clicks,
+        "spend": spend,
+    }
+
+
+def meta_ads_overview(start: str, end: str, compare: tuple[str, str] | None = None) -> dict:
+    """Same shape as meta.ads_overview, but generated."""
+
+    def totals_for(s, e):
+        rows = [_meta_ads_day(d) for d in _days(s, e)]
+        impressions = sum(r["impressions"] for r in rows)
+        reach = sum(r["reach"] for r in rows)
+        clicks = sum(r["clicks"] for r in rows)
+        spend = round(sum(r["spend"] for r in rows), 2)
+        link_clicks = round(clicks * 0.72)
+        return {
+            "spend": spend,
+            "reach": reach,
+            "impressions": impressions,
+            "clicks": clicks,
+            "linkClicks": link_clicks,
+            "ctr": (clicks / impressions * 100) if impressions else 0.0,
+            "cpc": (spend / clicks) if clicks else 0.0,
+            "cpm": (spend / impressions * 1000) if impressions else 0.0,
+            "frequency": (impressions / reach) if reach else 0.0,
+        }
+
+    kpis = totals_for(start, end)
+    deltas = None
+    if compare:
+        deltas = _deltas(kpis, totals_for(compare[0], compare[1]),
+                         ("spend", "reach", "impressions", "clicks", "linkClicks", "ctr", "cpc", "cpm", "frequency"))
+
+    by_date = [_meta_ads_day(d) for d in _days(start, end)]
+
+    def campaign(name, objective, status, share, ctr):
+        spend = round(kpis["spend"] * share * _jitter("mads-camp", name), 2)
+        clicks = max(1, round(kpis["clicks"] * share * _jitter("mads-campc", name)))
+        results = max(1, round(clicks * 0.09 * _jitter("mads-campr", name)))
+        return {
+            "name": name, "objective": objective, "status": status, "spend": spend,
+            "clicks": clicks, "ctr": ctr * _jitter("mads-campctr", name), "results": results,
+        }
+
+    campaigns = [
+        campaign("Aankopen — Voorjaar", "OUTCOME_SALES", "ACTIVE", 0.34, 1.5),
+        campaign("Leads — Offerteaanvraag", "OUTCOME_LEADS", "ACTIVE", 0.24, 1.1),
+        campaign("Verkeer — Blog", "OUTCOME_TRAFFIC", "ACTIVE", 0.16, 1.9),
+        campaign("Betrokkenheid — Merk", "OUTCOME_ENGAGEMENT", "PAUSED", 0.14, 0.9),
+        campaign("Retargeting — Websitebezoekers", "OUTCOME_SALES", "ACTIVE", 0.12, 2.3),
+    ]
+
+    def result(goal, share, roas):
+        count = max(1, round(kpis["clicks"] * share * _jitter("mads-res", goal)))
+        value = round(count * 82.0 * _jitter("mads-resv", goal), 2)
+        cpa = round((kpis["spend"] * share) / count, 2) if count else 0.0
+        return {"goal": goal, "count": count, "value": value, "roas": roas * _jitter("mads-resr", goal), "cpa": cpa}
+
+    results = [
+        result("Aankopen", 0.05, 4.6),
+        result("Leads", 0.07, 3.1),
+        result("Toevoegen aan winkelwagen", 0.11, 2.2),
+        result("Berichten", 0.04, 1.8),
+    ]
+
+    return {"kpis": kpis, "deltas": deltas, "by_date": by_date, "campaigns": campaigns, "results": results}
+
+
+# ------------------------------------------------------------- meta organic
+
+
+def _organic_day(d: date, seed: str, base_reach: int) -> dict:
+    weekday = [1.03, 1.07, 1.05, 1.06, 1.09, 0.90, 0.88][d.weekday()]
+    reach = max(20, round(base_reach * weekday * _jitter(seed + "reach", d, spread=0.35)))
+    impressions = round(reach * 1.35 * _jitter(seed + "impr", d, spread=0.1))
+    engagement = round(reach * 0.062 * _jitter(seed + "eng", d, spread=0.3))
+    return {"date": d.strftime("%Y%m%d"), "reach": reach, "impressions": impressions, "engagement": engagement}
+
+
+def meta_organic_overview(start: str, end: str) -> dict:
+    """Same shape as meta.organic_overview, but generated (Facebook + Instagram)."""
+    fb_days = [_organic_day(d, "fb", 1400) for d in _days(start, end)]
+    ig_days = [_organic_day(d, "ig", 1900) for d in _days(start, end)]
+
+    def posts(seed, texts):
+        out = []
+        for i, txt in enumerate(texts):
+            out.append({
+                "text": txt,
+                "date": _days(start, end)[min(i * 3, len(_days(start, end)) - 1)].isoformat(),
+                "engagement": max(5, round(320 * _jitter(seed, i, spread=0.6))),
+            })
+        return sorted(out, key=lambda p: p["engagement"], reverse=True)
+
+    facebook = {
+        "followers": round(8420 * _jitter("fb-fol", start, end, spread=0.02)),
+        "followers_growth": round(120 * _jitter("fb-folg", start, end, spread=0.4)),
+        "reach": sum(r["reach"] for r in fb_days),
+        "impressions": sum(r["impressions"] for r in fb_days),
+        "engagement": sum(r["engagement"] for r in fb_days),
+        "by_date": fb_days,
+        "top_posts": posts("fb-post", [
+            "Nieuwe voorjaarscollectie is binnen! 🌷",
+            "Achter de schermen bij Janssen",
+            "5 tips om het meeste uit je aankoop te halen",
+            "Klant in de spotlight: bedankt voor je review!",
+            "Dit weekend: 10% korting in de webshop",
+        ]),
+    }
+    instagram = {
+        "followers": round(11240 * _jitter("ig-fol", start, end, spread=0.02)),
+        "followers_growth": round(210 * _jitter("ig-folg", start, end, spread=0.4)),
+        "reach": sum(r["reach"] for r in ig_days),
+        "impressions": sum(r["impressions"] for r in ig_days),
+        "profile_views": round(sum(r["reach"] for r in ig_days) * 0.04 * _jitter("ig-pv", start, end)),
+        "by_date": ig_days,
+        "top_posts": posts("ig-post", [
+            "Reel: zo maak je het perfecte plekje ✨",
+            "Nieuwe kleuren, wie is er fan? 💚",
+            "Giveaway! Volg + tag 2 vrienden",
+            "Sfeerbeeld van vandaag 📸",
+            "Onze best verkochte producten deze maand",
+        ]),
+    }
+    return {"facebook": facebook, "instagram": instagram}
