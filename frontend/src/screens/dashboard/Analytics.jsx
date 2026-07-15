@@ -48,11 +48,11 @@ export default function Analytics() {
         ["Bouncepercentage %", (data.kpis.bounceRate * 100).toFixed(1)],
         ["Gem. sessieduur (s)", Math.round(data.kpis.avgSessionDuration)],
       ] },
-      { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: data.channels.map((c) => [c.label, c.sessions, c.pct]) },
-      { title: "Toppagina's", columns: ["Pagina", "Weergaven", "Bounce %"], rows: data.top_pages.map((p) => [p.path, p.views, (p.bounceRate * 100).toFixed(1)]) },
-      { title: "Apparaten", columns: ["Apparaat", "%"], rows: data.devices.map((d) => [d.label, d.pct]) },
-      { title: "Geografie", columns: ["Land", "%"], rows: data.geography.map((g) => [g.label, g.pct]) },
-      { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: data.sessions_by_date.map((d) => [d.date, d.sessions]) },
+      { title: "Verkeersbronnen", columns: ["Kanaal", "Sessies", "%"], rows: (data.channels ?? []).map((c) => [c.label, c.sessions, c.pct]) },
+      { title: "Toppagina's", columns: ["Pagina", "Weergaven", "Bounce %"], rows: (data.top_pages ?? []).map((p) => [p.path, p.views, (p.bounceRate * 100).toFixed(1)]) },
+      { title: "Apparaten", columns: ["Apparaat", "%"], rows: (data.devices ?? []).map((d) => [d.label, d.pct]) },
+      { title: "Geografie", columns: ["Land", "%"], rows: (data.geography ?? []).map((g) => [g.label, g.pct]) },
+      { title: "Sessies per dag", columns: ["Datum", "Sessies"], rows: (data.sessions_by_date ?? []).map((d) => [d.date, d.sessions]) },
     ];
     if (data.conversions?.length)
       out.push({ title: "Conversies", columns: ["Doel", "Aantal"], rows: data.conversions.map((c) => [c.name, c.count]) });
@@ -100,9 +100,9 @@ export default function Analytics() {
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
             <SectionCard title="sessies over tijd" style={{ flex: 2, minWidth: 320 }}>
               <AreaChart
-                values={data.sessions_by_date.map((d) => d.sessions)}
+                values={(data.sessions_by_date ?? []).map((d) => d.sessions)}
                 compareValues={data.compare_series}
-                labels={pickLabels(data.sessions_by_date.map((d) => shortDate(d.date)))}
+                labels={pickLabels((data.sessions_by_date ?? []).map((d) => shortDate(d.date)))}
                 height={210}
               />
             </SectionCard>
@@ -137,7 +137,7 @@ export default function Analytics() {
               <div style={{ ...tableHead, gridTemplateColumns: "2.4fr 1fr 1fr" }}>
                 <span>Pagina</span><span style={{ textAlign: "right" }}>Weergaven</span><span style={{ textAlign: "right" }}>Bounce</span>
               </div>
-              {data.top_pages.map((p, i) => (
+              {(data.top_pages ?? []).map((p, i) => (
                 <div key={i} style={{ ...tableRow, gridTemplateColumns: "2.4fr 1fr 1fr" }}>
                   <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.path}</span>
                   <span style={{ textAlign: "right", fontWeight: 600 }}>{num(p.views)}</span>
@@ -146,15 +146,15 @@ export default function Analytics() {
               ))}
             </SectionCard>
             <SectionCard title="verkeersbronnen" style={{ flex: 1, minWidth: 240 }}>
-              <Donut segments={data.channels} centerTop={data.channels.length} centerSub="kanalen" size={150} />
-              <div style={{ marginTop: 14 }}><Legend segments={data.channels} /></div>
+              <Donut segments={data.channels ?? []} centerTop={(data.channels ?? []).length} centerSub="kanalen" size={150} />
+              <div style={{ marginTop: 14 }}><Legend segments={data.channels ?? []} /></div>
             </SectionCard>
           </div>
 
           {/* CONVERSIES + DEVICES + GEO */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <SectionCard title="conversies &amp; doelen" style={{ flex: 1, minWidth: 240 }}>
-              {data.conversions.length ? (
+              {data.conversions?.length ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {data.conversions.slice(0, 4).map((c, i) => {
                     const max = data.conversions[0].count || 1;
@@ -165,12 +165,12 @@ export default function Analytics() {
             </SectionCard>
             <SectionCard title="apparaten" style={{ flex: 1, minWidth: 240 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {data.devices.map((d, i) => <ProgressRow key={i} label={cap(d.label)} value={`${d.pct}%`} pct={d.pct} color={palette[i % palette.length]} />)}
+                {(data.devices ?? []).map((d, i) => <ProgressRow key={i} label={cap(d.label)} value={`${d.pct}%`} pct={d.pct} color={palette[i % palette.length]} />)}
               </div>
             </SectionCard>
             <SectionCard title="geografie" style={{ flex: 1, minWidth: 240 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-                {data.geography.map((g, i) => <ProgressRow key={i} label={g.label} value={`${g.pct}%`} pct={g.pct} color={palette[i % palette.length]} labelWidth={78} />)}
+                {(data.geography ?? []).map((g, i) => <ProgressRow key={i} label={g.label} value={`${g.pct}%`} pct={g.pct} color={palette[i % palette.length]} labelWidth={78} />)}
               </div>
             </SectionCard>
           </div>

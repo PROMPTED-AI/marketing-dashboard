@@ -543,7 +543,11 @@ def spa(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     if SPA_INDEX.exists():
-        return FileResponse(SPA_INDEX)
+        # index.html must never be cached: a stale copy keeps referencing old
+        # hashed asset files after a deploy, which renders as a blank page.
+        return FileResponse(
+            SPA_INDEX, headers={"Cache-Control": "no-cache, must-revalidate"}
+        )
     return JSONResponse(
         {"detail": "Frontend not built. Run `npm run build` in frontend/."},
         status_code=503,
