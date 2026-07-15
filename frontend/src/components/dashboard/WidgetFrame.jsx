@@ -2,6 +2,7 @@
 // sleephandvat (volgorde), titel, type, optioneel filter, grootte, verwijderen.
 import { useEffect, useRef, useState } from "react";
 import WidgetRenderer from "../WidgetRenderer.jsx";
+import WidgetErrorBoundary from "../WidgetErrorBoundary.jsx";
 import { KINDS, SIZES } from "../../lib/widgets/kit.js";
 
 const ctrlStyle = {
@@ -143,7 +144,9 @@ export default function WidgetFrame({
           outlineOffset: 4,
         }}
       >
-        <WidgetRenderer widget={widget} data={data} catalog={catalog} ctx={ctx} />
+        <WidgetErrorBoundary title={widget.title} resetKey={`${widget.kind}|${widget.source}`}>
+          <WidgetRenderer widget={widget} data={data} catalog={catalog} ctx={ctx} />
+        </WidgetErrorBoundary>
       </div>
     </div>
   );
