@@ -711,9 +711,9 @@ def _connections_payload(target_org: str) -> dict:
     items = []
     for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
         conn = models.get_connection(target_org, provider=provider)
-        # The demo org has no real Google grant, but GA + Search Console serve
-        # generated data, so present them as connected.
-        if demo_org and provider in ("google_analytics", "search_console"):
+        # The demo org has no real grants, but GA, Search Console, Google Ads and
+        # Meta all serve generated sample data, so present them as connected.
+        if demo_org and provider in ("google_analytics", "search_console", "google_ads", "meta_ads"):
             items.append({"provider": provider, "status": "connected", "google_email": demo.DEMO_EMAIL})
             continue
         items.append(
@@ -852,6 +852,8 @@ def meta_callback(request: Request):
 def meta_accounts(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"org_id": target_org, **demo.DEMO_META_ASSETS}
     key = f"{target_org}|metaassets"
     cached = cache.get(key)
     if cached is not None:
@@ -875,12 +877,15 @@ def meta_ads_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    if models.is_demo_org(target_org):
+        data = demo.meta_ads_overview(start, end, compare)
+        return {"org_id": target_org, "ad_account_id": ad_account_id, **data}
     key = f"{target_org}|metaads|{ad_account_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
         return cached
     token = _meta_token(target_org)
-    compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = meta.ads_overview(token, ad_account_id, start, end, compare)
     payload = {"org_id": target_org, "ad_account_id": ad_account_id, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
@@ -899,6 +904,9 @@ def meta_organic_report(
     user = auth.current_user(request)
     _require_period(start, end)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        data = demo.meta_organic_overview(start, end)
+        return {"org_id": target_org, "page_id": page_id, **data}
     key = f"{target_org}|metaorg|{page_id}|{ig_id}|{start}|{end}"
     cached = cache.get(key)
     if cached is not None:
@@ -917,6 +925,8 @@ def meta_organic_report(
 def ads_accounts(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"org_id": target_org, "accounts": demo.DEMO_ADS_ACCOUNTS}
     key = f"{target_org}|adsaccounts"
     cached = cache.get(key)
     if cached is not None:
@@ -944,12 +954,15 @@ def ads_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    if models.is_demo_org(target_org):
+        data = demo.ads_overview(start, end, compare)
+        return {"org_id": target_org, "customer_id": customer_id, **data}
     key = f"{target_org}|ads|{customer_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
         return cached
     creds = _org_credentials(target_org, provider="google_ads")
-    compare = (compare_start, compare_end) if compare_start and compare_end else None
     try:
         data = google_ads.run_overview(creds, customer_id, start, end, compare)
     except google_ads.AdsNotConfigured:
