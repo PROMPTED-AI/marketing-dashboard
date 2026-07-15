@@ -99,7 +99,20 @@ export default function WidgetRenderer({ widget, data, catalog, ctx }) {
   }
 
   if (widget.kind === "table") {
-    const { columns, rows } = src.table(data, widget.config, ctx);
+    // Sommige bronnen (verdelingen via `dist`) staan "table" wél toe als kind,
+    // maar leveren alleen een `breakdown`-accessor. Val daar netjes op terug i.p.v.
+    // te crashen op een ontbrekende `table`-functie (blank scherm).
+    let columns, rows;
+    if (typeof src.table === "function") {
+      ({ columns, rows } = src.table(data, widget.config, ctx));
+    } else if (typeof src.breakdown === "function") {
+      const segs = src.breakdown(data, widget.config, ctx);
+      columns = [src.label ?? "Categorie", src.unit ? src.unit : "Aantal"];
+      rows = segs.map((s) => [s.label, num(s.value ?? s.sessions ?? 0)]);
+    } else {
+      columns = [];
+      rows = [];
+    }
     return (
       <SectionCard title={widget.title} style={{ height: "100%" }}>
         {rows.length === 0 ? (

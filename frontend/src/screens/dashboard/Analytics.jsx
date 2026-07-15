@@ -9,6 +9,7 @@ import { num } from "../../lib/format.js";
 import { SectionCard, TabState } from "../../components/ui.jsx";
 import { RealtimeBars } from "../../components/charts.jsx";
 import WidgetRenderer from "../../components/WidgetRenderer.jsx";
+import WidgetErrorBoundary from "../../components/WidgetErrorBoundary.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
 import { analyticsCatalog } from "../../lib/widgets/index.js";
@@ -152,7 +153,9 @@ export default function Analytics() {
             <div className="widget-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
               {widgets.map((w) => (
                 <div key={w.id} className="widget-cell" style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
-                  <WidgetRenderer widget={w} data={data} catalog={analyticsCatalog} />
+                  <WidgetErrorBoundary title={w.title} resetKey={`${view}|${selected}|${start}|${end}`}>
+                    <WidgetRenderer widget={w} data={data} catalog={analyticsCatalog} />
+                  </WidgetErrorBoundary>
                 </div>
               ))}
             </div>

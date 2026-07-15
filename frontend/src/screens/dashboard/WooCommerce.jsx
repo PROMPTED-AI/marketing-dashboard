@@ -5,6 +5,7 @@ import { useCachedApi } from "../../lib/swr.js";
 import { wcReportUrl } from "../../lib/urls.js";
 import { TabState } from "../../components/ui.jsx";
 import WidgetRenderer from "../../components/WidgetRenderer.jsx";
+import WidgetErrorBoundary from "../../components/WidgetErrorBoundary.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { WooGlyph } from "../../components/icons.jsx";
 import { woocommerceCatalog } from "../../lib/widgets/index.js";
@@ -84,7 +85,9 @@ export default function WooCommerce() {
         <div className="widget-grid" style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 16 }}>
           {widgets.map((w) => (
             <div key={w.id} className="widget-cell" style={{ gridColumn: `span ${w.size}`, minWidth: 0 }}>
-              <WidgetRenderer widget={w} data={data} catalog={woocommerceCatalog} />
+              <WidgetErrorBoundary title={w.title} resetKey={w.kind + "|" + w.source}>
+                <WidgetRenderer widget={w} data={data} catalog={woocommerceCatalog} />
+              </WidgetErrorBoundary>
             </div>
           ))}
         </div>
