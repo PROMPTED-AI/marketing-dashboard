@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { useCachedApi } from "../../lib/swr.js";
@@ -17,17 +17,24 @@ const statusLabel = (s) => {
   return map[s] || s.toLowerCase();
 };
 
+// Views getagd met een profiel; 'conversions' (ROAS) is ecommerce-gericht, de
+// rest is voor beide relevant. Profiel-passende views komen eerst (soft).
 const VIEWS = [
-  { id: "overview", name: "Betaald-overzicht" },
-  { id: "campaigns", name: "Campagnes" },
-  { id: "conversions", name: "Conversie & ROAS" },
-  { id: "vs", name: "Betaald vs. organisch" },
+  { id: "overview", name: "Betaald-overzicht", profile: "both" },
+  { id: "campaigns", name: "Campagnes", profile: "both" },
+  { id: "conversions", name: "Conversie & ROAS", profile: "ecommerce" },
+  { id: "vs", name: "Betaald vs. organisch", profile: "both" },
 ];
+const orderViews = (businessType) => {
+  const ok = (v) => v.profile === "both" || v.profile === businessType;
+  return [...VIEWS.filter(ok), ...VIEWS.filter((v) => !ok(v))];
+};
 
 export default function MetaAds() {
-  const { orgId } = useActiveOrg();
+  const { orgId, businessType } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const [view, setView] = useState(() => localStorage.getItem("kompas-meta-ads-view") || "overview");
+  const views = useMemo(() => orderViews(businessType), [businessType]);
   const pickView = (id) => { setView(id); localStorage.setItem("kompas-meta-ads-view", id); };
 
   const { data: assets, loading, error: assetsErr } = useCachedApi(metaAccountsUrl(orgId));
@@ -102,7 +109,7 @@ export default function MetaAds() {
 
       {/* view-switcher */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {VIEWS.map((v) => {
+        {views.map((v) => {
           const on = v.id === view;
           return (
             <button key={v.id} onClick={() => pickView(v.id)} style={{

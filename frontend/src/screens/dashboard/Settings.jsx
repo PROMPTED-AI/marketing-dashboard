@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../../lib/api.js";
+import { api, setBusinessType } from "../../lib/api.js";
 import { useMe } from "../../lib/useMe.jsx";
 import { useTheme } from "../../lib/ThemeProvider.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
@@ -78,27 +78,44 @@ export default function Settings() {
   );
 }
 
+const BIZ_TYPES = [
+  { value: "leadgen", label: "Leadgeneratie" },
+  { value: "ecommerce", label: "E-commerce" },
+];
+
 function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
   const [name, setName] = useState(org?.name || "");
+  const [bizType, setBizType] = useState(org?.business_type || "leadgen");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [done, setDone] = useState(false);
 
-  // keep the input in sync when the active org changes
+  // keep the inputs in sync when the active org changes
   const orgKey = org?.id;
   const [seenKey, setSeenKey] = useState(orgKey);
-  if (orgKey !== seenKey) { setSeenKey(orgKey); setName(org?.name || ""); setDone(false); setErr(null); }
+  if (orgKey !== seenKey) {
+    setSeenKey(orgKey); setName(org?.name || ""); setBizType(org?.business_type || "leadgen");
+    setDone(false); setErr(null);
+  }
 
-  const dirty = name.trim() && name.trim() !== (org?.name || "");
+  const nameDirty = isAdmin && name.trim() && name.trim() !== (org?.name || "");
+  const bizDirty = bizType !== (org?.business_type || "leadgen");
+  const dirty = nameDirty || bizDirty;
 
   const save = async () => {
     setBusy(true); setErr(null); setDone(false);
     try {
-      await api(`/api/organizations/${orgId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+      if (isAdmin) {
+        // Admins may edit any client org: name + type via the admin endpoint.
+        await api(`/api/organizations/${orgId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim() || org?.name, business_type: bizType }),
+        });
+      } else if (bizDirty) {
+        // A client may set its own organization's profile (least-privilege).
+        await setBusinessType(bizType);
+      }
       setDone(true);
       onSaved();
     } catch (e) {
@@ -119,16 +136,25 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
       />
       <label style={lbl}>E-maildomein</label>
       <input value={org?.domain || ""} disabled style={{ ...inp, opacity: 0.7 }} />
+      <label style={lbl}>Bedrijfstype</label>
+      <select
+        value={bizType}
+        onChange={(e) => { setBizType(e.target.value); setDone(false); }}
+        style={{ ...inp, cursor: "pointer" }}
+      >
+        {BIZ_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+      </select>
+      <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8 }}>
+        Bepaalt welke dashboards en KPI's standaard vooraan staan (leadgeneratie of e-commerce).
+      </div>
       {!isAdmin && <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8 }}>Alleen een bureau-admin kan de organisatienaam wijzigen.</div>}
       {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 10 }}>{String(err.message || err)}</div>}
-      {isAdmin && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
-          <button className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: dirty && !busy ? 1 : 0.6 }} disabled={!dirty || busy} onClick={save}>
-            {busy ? "opslaan…" : "opslaan"}
-          </button>
-          {done && !dirty && <span style={{ fontSize: 13, color: "var(--c-pos)", fontWeight: 700 }}>opgeslagen ✓</span>}
-        </div>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+        <button className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: dirty && !busy ? 1 : 0.6 }} disabled={!dirty || busy} onClick={save}>
+          {busy ? "opslaan…" : "opslaan"}
+        </button>
+        {done && !dirty && <span style={{ fontSize: 13, color: "var(--c-pos)", fontWeight: 700 }}>opgeslagen ✓</span>}
+      </div>
     </SectionCard>
   );
 }

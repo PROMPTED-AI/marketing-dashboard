@@ -12,7 +12,7 @@ import WidgetFrame from "./WidgetFrame.jsx";
 import WidgetPicker from "./WidgetPicker.jsx";
 import TemplatePicker from "./TemplatePicker.jsx";
 import NameDialog from "./NameDialog.jsx";
-import { instantiateTemplate, sanitizeLayout, newWidget } from "../../lib/widgets/kit.js";
+import { instantiateTemplate, sanitizeLayout, newWidget, defaultTemplateFor } from "../../lib/widgets/kit.js";
 
 const serialize = (l) => JSON.stringify(l?.widgets ?? []);
 
@@ -20,7 +20,7 @@ export default function DashboardEditor({
   catalog, page, data, loading, error, ctx,
   title, subtitle, assetControls, exportFilename, exportSections,
 }) {
-  const { orgId } = useActiveOrg();
+  const { orgId, businessType } = useActiveOrg();
   const dash = useDashboards(orgId, page);
 
   const [activeId, setActiveId] = useState(null);
@@ -60,7 +60,7 @@ export default function DashboardEditor({
     const list = dash.list;
     if (!list.length) {
       setActiveId(null);
-      setWorking(instantiateTemplate(catalog, catalog.TEMPLATES[0]));
+      setWorking(instantiateTemplate(catalog, defaultTemplateFor(catalog, businessType)));
       setBaseline(null);
       setEditing(false);
       return;
@@ -241,7 +241,7 @@ export default function DashboardEditor({
       )}
 
       {modal === "template" && (
-        <TemplatePicker catalog={catalog} onPick={createFromTemplate} onClose={() => setModal(null)} />
+        <TemplatePicker catalog={catalog} businessType={businessType} onPick={createFromTemplate} onClose={() => setModal(null)} />
       )}
       {modal === "widget" && (
         <WidgetPicker catalog={catalog} onPick={addWidget} onClose={() => setModal(null)} />

@@ -327,11 +327,12 @@ def admin_add_organization(request: Request, payload: OrgIn):
 
 class OrgRename(BaseModel):
     name: str
+    business_type: str | None = None
 
 
 @app.patch("/api/organizations/{org_id}")
 def rename_organization(request: Request, org_id: str, payload: OrgRename):
-    """Rename an organization (agency admins only)."""
+    """Rename an organization and/or set its business type (agency admins only)."""
     auth.require_admin(request)
     name = payload.name.strip()
     if not name:
@@ -339,7 +340,32 @@ def rename_organization(request: Request, org_id: str, payload: OrgRename):
     org = models.rename_organization(org_id, name)
     if not org:
         raise HTTPException(status_code=404, detail="Organisatie niet gevonden")
+    if payload.business_type is not None:
+        if payload.business_type not in models.BUSINESS_TYPES:
+            raise HTTPException(status_code=400, detail="Ongeldig bedrijfstype")
+        org = models.set_business_type(org_id, payload.business_type)
     cache.invalidate_org(org_id)
+    return {"organization": org}
+
+
+class BusinessTypeIn(BaseModel):
+    business_type: str
+
+
+@app.patch("/api/organizations/me/business-type")
+def set_own_business_type(request: Request, payload: BusinessTypeIn):
+    """Set the signed-in user's own organization profile (leadgen | ecommerce).
+
+    Least-privilege: any signed-in user may set it, but only for their own org —
+    the org id comes from the session, never from the request body.
+    """
+    user = auth.current_user(request)
+    if payload.business_type not in models.BUSINESS_TYPES:
+        raise HTTPException(status_code=400, detail="Ongeldig bedrijfstype")
+    org = models.set_business_type(user["organization_id"], payload.business_type)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden")
+    cache.invalidate_org(user["organization_id"])
     return {"organization": org}
 
 
@@ -396,9 +422,9 @@ def organizations(request: Request):
     user = auth.current_user(request)
     if user["role"] == "agency_admin":
         orgs = models.list_organizations_with_connections()
-        return {"organizations": [{"id": o["id"], "name": o["name"], "domain": o["domain"]} for o in orgs]}
+        return {"organizations": [{"id": o["id"], "name": o["name"], "domain": o["domain"], "business_type": o.get("business_type")} for o in orgs]}
     org = models.get_organization(user["organization_id"])
-    return {"organizations": [{"id": org["id"], "name": org["name"], "domain": org["domain"]}] if org else []}
+    return {"organizations": [{"id": org["id"], "name": org["name"], "domain": org["domain"], "business_type": org.get("business_type")}] if org else []}
 
 
 @app.get("/api/analytics/properties")

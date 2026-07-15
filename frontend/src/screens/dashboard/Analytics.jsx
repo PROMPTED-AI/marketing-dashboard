@@ -13,24 +13,32 @@ import WidgetErrorBoundary from "../../components/WidgetErrorBoundary.jsx";
 import ExportButton from "../../components/ExportButton.jsx";
 import { GaGlyph } from "../../components/icons.jsx";
 import { analyticsCatalog } from "../../lib/widgets/index.js";
-import { instantiateTemplate } from "../../lib/widgets/kit.js";
+import { instantiateTemplate, templateMatchesProfile } from "../../lib/widgets/kit.js";
 
-// De preset-views op het Analytics-tabblad = de doelgroepgerichte templates
-// (renderen tegen de overview-payload) + een aparte Realtime-view.
-const VIEW_IDS = ["executive", "acquisition", "behavior", "conversion"];
-const VIEWS = [
-  ...analyticsCatalog.TEMPLATES.filter((t) => VIEW_IDS.includes(t.id)).map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
-  { id: "realtime", name: "Realtime", audience: "Live", tpl: null },
-];
+// De preset-views op het Analytics-tabblad = een curated set doelgroepgerichte
+// templates (renderen tegen de overview-payload) + een aparte Realtime-view. De
+// volgorde is profiel-afhankelijk: passende templates eerst, de andere onderaan
+// (niets verdwijnt — soft), realtime altijd als laatste.
+const CANDIDATE_VIEW_IDS = ["executive", "acquisition", "behavior", "conversion", "leadgen"];
+function buildViews(businessType) {
+  const tpls = analyticsCatalog.TEMPLATES.filter((t) => CANDIDATE_VIEW_IDS.includes(t.id));
+  const match = tpls.filter((t) => templateMatchesProfile(t, businessType));
+  const rest = tpls.filter((t) => !templateMatchesProfile(t, businessType));
+  return [
+    ...[...match, ...rest].map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
+    { id: "realtime", name: "Realtime", audience: "Live", tpl: null },
+  ];
+}
 
 export default function Analytics() {
   const { props, selected, choose, loading: pLoading, error: pError } = useProperties();
-  const { orgId } = useActiveOrg();
+  const { orgId, businessType } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
   const [rt, setRt] = useState(null);
   const [view, setView] = useState(() => localStorage.getItem("kompas-analytics-view") || "executive");
 
+  const VIEWS = useMemo(() => buildViews(businessType), [businessType]);
   const pickView = (id) => { setView(id); localStorage.setItem("kompas-analytics-view", id); };
 
   // realtime: refresh on load and then poll every 30s (never cached)

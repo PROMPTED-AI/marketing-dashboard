@@ -38,6 +38,30 @@ export function seriesDatesFrom(rows, key = "date") {
   return (rows ?? []).map((r) => shortDate(String(r?.[key] ?? "").replaceAll("-", "")));
 }
 
+// --- bedrijfstype-profiel (leadgen | ecommerce) ---------------------------
+// Een template hoort bij het profiel als het geen profiel declareert (legacy),
+// "both" is, of exact matcht. Zo blijft alles backward-compatible.
+export function templateMatchesProfile(tpl, businessType) {
+  const p = tpl?.profile ?? "both";
+  return p === "both" || p === businessType;
+}
+
+// Templates gesorteerd voor een profiel: passende eerst (in oorspronkelijke
+// volgorde), de andere-profiel-templates daarna. Niets wordt verwijderd (soft).
+export function templatesForProfile(catalog, businessType) {
+  const all = catalog?.TEMPLATES ?? [];
+  const match = all.filter((t) => templateMatchesProfile(t, businessType));
+  const rest = all.filter((t) => !templateMatchesProfile(t, businessType));
+  return { match, rest, ordered: [...match, ...rest] };
+}
+
+// De default-template voor een profiel: de eerste passende, met de allereerste
+// template als laatste vangnet.
+export function defaultTemplateFor(catalog, businessType) {
+  const all = catalog?.TEMPLATES ?? [];
+  return all.find((t) => templateMatchesProfile(t, businessType)) || all[0];
+}
+
 let _seq = 0;
 export function newId() {
   return "w" + Date.now().toString(36) + (_seq++).toString(36);

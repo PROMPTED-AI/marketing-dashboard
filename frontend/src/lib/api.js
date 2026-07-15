@@ -42,6 +42,15 @@ export async function passwordLogin(email, password) {
   return res.json();
 }
 
+// Set the signed-in user's own organization profile (leadgen | ecommerce).
+export function setBusinessType(businessType) {
+  return api("/api/organizations/me/business-type", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ business_type: businessType }),
+  });
+}
+
 // Disconnect a source (revokes the Google grant when it's the last one).
 export function disconnectProvider(provider, orgId) {
   const q = orgId ? "?org_id=" + encodeURIComponent(orgId) : "";

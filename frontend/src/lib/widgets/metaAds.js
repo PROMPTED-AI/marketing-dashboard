@@ -115,7 +115,7 @@ export const GROUPS = [
 
 export const TEMPLATES = [
   {
-    id: "meta-ads-overview", name: "Betaald-overzicht", audience: "Directie",
+    id: "meta-ads-overview", name: "Betaald-overzicht", audience: "Directie", profile: "both",
     description: "Uitgaven, bereik, klikken en CTR met de uitgaventrend en resultaten per doel.",
     widgets: [
       { source: "spend", kind: "kpi", size: 3 },
@@ -128,7 +128,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "meta-ads-campaigns", name: "Campagnes", audience: "Marketeer",
+    id: "meta-ads-campaigns", name: "Campagnes", audience: "Marketeer", profile: "both",
     description: "Alle campagnes met uitgaven, klikken, CTR en resultaten, plus het uitgaven-aandeel.",
     widgets: [
       { source: "spend", kind: "kpi", size: 3 },
@@ -140,12 +140,25 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "meta-ads-conversion", name: "Conversie & ROAS", audience: "Marketeer",
+    id: "meta-ads-conversion", name: "Conversie & ROAS", audience: "Marketeer", profile: "ecommerce",
     description: "Rendement per conversiedoel met ROAS en CPA.",
     widgets: [
       { source: "spend", kind: "kpi", size: 4 },
       { source: "reach", kind: "kpi", size: 4 },
       { source: "ctr", kind: "kpi", size: 4 },
+      { source: "results", kind: "table", size: 8 },
+      { source: "results_by_goal", kind: "donut", size: 4 },
+    ],
+  },
+  {
+    id: "meta-ads-leadgen", name: "Leads", audience: "Marketeer", profile: "leadgen",
+    description: "Aanvragen uit betaalde social: uitgaven, kosten per lead en resultaten per doel.",
+    widgets: [
+      { source: "spend", kind: "kpi", size: 3 },
+      { source: "clicks", kind: "kpi", size: 3 },
+      { source: "cpc", kind: "kpi", size: 3 },
+      { source: "frequency", kind: "kpi", size: 3 },
+      { source: "spend_by_date", kind: "area", size: 12 },
       { source: "results", kind: "table", size: 8 },
       { source: "results_by_goal", kind: "donut", size: 4 },
     ],
