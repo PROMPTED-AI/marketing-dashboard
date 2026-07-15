@@ -60,6 +60,12 @@ def init_schema() -> None:
             "ALTER TABLE organizations "
             "ADD COLUMN IF NOT EXISTS is_personal BOOLEAN NOT NULL DEFAULT false"
         )
+        # Demo orgs get generated sample data instead of live Google data, so
+        # the product can be shown without connecting a real account.
+        conn.execute(
+            "ALTER TABLE organizations "
+            "ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -70,6 +76,10 @@ def init_schema() -> None:
                 created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
             )
             """
+        )
+        # Password sign-in (next to Google). NULL = user can only use Google.
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
         )
         conn.execute(
             """

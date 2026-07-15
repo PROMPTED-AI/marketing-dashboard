@@ -32,7 +32,7 @@ from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import analytics, auth, cache, config, db, models, oauth, search_console
+from . import analytics, auth, cache, config, db, demo, models, oauth, search_console
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
@@ -43,6 +43,7 @@ SPA_INDEX = SPA_DIR / "index.html"
 async def lifespan(app: FastAPI):
     db.init_schema()
     cache.init_schema()
+    demo.seed()
     yield
 
 
@@ -87,6 +88,13 @@ def healthz():
 def me(request: Request):
     user = auth.current_user(request)
     org = models.get_organization(user["organization_id"])
+    if org and org.get("is_demo"):
+        return {
+            "email": user["email"],
+            "role": user["role"],
+            "organization": org,
+            "connection_status": "connected",
+        }
     conn = models.get_connection(user["organization_id"])
     return {
         "email": user["email"],
@@ -94,6 +102,29 @@ def me(request: Request):
         "organization": org,
         "connection_status": conn["status"] if conn else "not_connected",
     }
+
+
+class PasswordLoginIn(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/login")
+def password_login(request: Request, payload: PasswordLoginIn):
+    """Sign in with email + password (next to the Google flow)."""
+    email = payload.email.strip().lower()
+    user = models.get_user_by_email(email) if email else None
+    if (
+        not user
+        or not user.get("password_hash")
+        or not auth.verify_password(payload.password, user["password_hash"])
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Onjuiste combinatie van e-mailadres en wachtwoord",
+        )
+    request.session["user_id"] = user["id"]
+    return {"email": user["email"], "role": user["role"]}
 
 
 @app.get("/api/auth/google/login")
@@ -235,6 +266,8 @@ def organizations(request: Request):
 def properties(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"org_id": target_org, "properties": demo.DEMO_PROPERTIES}
     key = f"{target_org}|props"
     cached = cache.get(key)
     if cached is not None:
@@ -249,6 +282,8 @@ def properties(request: Request, org_id: str | None = None):
 def report(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"org_id": target_org, "property_id": property_id, "rows": demo.basic_report()}
     creds = _org_credentials(target_org)
     rows = analytics.run_basic_report(creds, property_id)
     return {"org_id": target_org, "property_id": property_id, "rows": rows}
@@ -266,12 +301,15 @@ def analytics_overview(
 ):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    if models.is_demo_org(target_org):
+        data = demo.overview(start, end, compare)
+        return {"org_id": target_org, "property_id": property_id, **data}
     key = f"{target_org}|overview|{property_id}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
         return cached
     creds = _org_credentials(target_org)
-    compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = analytics.run_ga_overview(creds, property_id, start, end, compare)
     payload = {"org_id": target_org, "property_id": property_id, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
@@ -282,11 +320,23 @@ def analytics_overview(
 def analytics_realtime(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"property_id": property_id, **demo.realtime()}
     creds = _org_credentials(target_org)
     return {"property_id": property_id, **analytics.run_realtime(creds, property_id)}
 
 
 def _connections_payload(target_org: str) -> dict:
+    if models.is_demo_org(target_org):
+        items = [
+            {"provider": p, "status": "connected", "google_email": demo.DEMO_EMAIL}
+            for p in config.GOOGLE_PROVIDERS
+        ] + [
+            {"provider": p, "status": "coming_soon", "google_email": None}
+            for p in config.PLACEHOLDER_PROVIDERS
+        ]
+        connected = sum(1 for i in items if i["status"] == "connected")
+        return {"org_id": target_org, "connected": connected, "total": len(items), "connections": items}
     items = []
     for provider in config.GOOGLE_PROVIDERS:
         conn = models.get_connection(target_org, provider=provider)
@@ -317,6 +367,11 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
     target_org = _resolve_org_id(user, org_id)
     if provider not in config.GOOGLE_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unknown provider")
+    if models.is_demo_org(target_org):
+        raise HTTPException(
+            status_code=400,
+            detail="Demo-omgeving: koppelingen kunnen niet worden gewijzigd",
+        )
 
     conn = models.get_connection(target_org, provider=provider)
     models.delete_connection(target_org, provider)
@@ -334,6 +389,8 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
 def gsc_sites(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    if models.is_demo_org(target_org):
+        return {"org_id": target_org, "sites": demo.DEMO_SITES}
     key = f"{target_org}|gscsites"
     cached = cache.get(key)
     if cached is not None:
@@ -356,12 +413,15 @@ def gsc_report(
 ):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    if models.is_demo_org(target_org):
+        data = demo.gsc_report(start, end, compare)
+        return {"org_id": target_org, "site": site, **data}
     key = f"{target_org}|gsc|{site}|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
         return cached
     creds = _org_credentials(target_org, provider="search_console")
-    compare = (compare_start, compare_end) if compare_start and compare_end else None
     data = search_console.run_search_analytics(creds, site, start, end, compare)
     payload = {"org_id": target_org, "site": site, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
