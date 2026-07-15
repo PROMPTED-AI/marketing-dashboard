@@ -44,6 +44,20 @@ Then in the browser:
 3. Open `http://localhost:8000/api/analytics/report?property_id=YOUR_GA4_PROPERTY_ID`
    (find the numeric Property ID under GA4 **Admin → Property Settings**).
 
+## Demo account
+
+On startup the app seeds a demo organization ("Janssen", flagged `is_demo`)
+with a password login and generated sample data, so the product can be shown
+without connecting a real Google account:
+
+- **Email:** `info@janssen.nl`
+- **Password:** `janssen123`
+
+Demo organizations never call the Google APIs: `app/demo.py` generates
+deterministic GA4 + Search Console sample data (same date range → same
+numbers). Password sign-in (`POST /api/auth/login`) works for any user with a
+`password_hash` set; everyone else keeps using the Google flow.
+
 ## Project layout
 
 | File | Purpose |
