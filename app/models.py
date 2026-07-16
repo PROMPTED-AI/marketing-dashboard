@@ -78,9 +78,14 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain, is_demo FROM organizations WHERE id = %s", (org_id,)
+            "SELECT id, name, domain, is_demo, business_type FROM organizations WHERE id = %s",
+            (org_id,),
         ).fetchone()
-    return {"id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3]} if row else None
+    return (
+        {"id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3], "business_type": row[4]}
+        if row
+        else None
+    )
 
 
 def is_demo_org(org_id: str) -> bool:
@@ -88,7 +93,20 @@ def is_demo_org(org_id: str) -> bool:
     return bool(org and org.get("is_demo"))
 
 
-def create_demo_organization(name: str, domain: str) -> dict:
+BUSINESS_TYPES = ("leadgen", "ecommerce")
+
+
+def set_business_type(org_id: str, business_type: str) -> dict | None:
+    """Set an organization's company profile (leadgen | ecommerce)."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE organizations SET business_type = %s WHERE id = %s",
+            (business_type, org_id),
+        )
+    return get_organization(org_id)
+
+
+def create_demo_organization(name: str, domain: str, business_type: str = "ecommerce") -> dict:
     """Create (or fetch) an org flagged as demo: it serves generated sample data."""
     with db.get_conn() as conn:
         row = conn.execute(
@@ -96,16 +114,17 @@ def create_demo_organization(name: str, domain: str) -> dict:
         ).fetchone()
         if row:
             conn.execute(
-                "UPDATE organizations SET is_demo = true WHERE id = %s", (row[0],)
+                "UPDATE organizations SET is_demo = true, business_type = %s WHERE id = %s",
+                (business_type, row[0]),
             )
-            return {"id": row[0], "name": name, "domain": domain, "is_demo": True}
+            return {"id": row[0], "name": name, "domain": domain, "is_demo": True, "business_type": business_type}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain, is_demo) "
-            "VALUES (%s, %s, %s, true)",
-            (org_id, name, domain),
+            "INSERT INTO organizations (id, name, domain, is_demo, business_type) "
+            "VALUES (%s, %s, %s, true, %s)",
+            (org_id, name, domain, business_type),
         )
-        return {"id": org_id, "name": name, "domain": domain, "is_demo": True}
+        return {"id": org_id, "name": name, "domain": domain, "is_demo": True, "business_type": business_type}
 
 
 def rename_organization(org_id: str, name: str) -> dict | None:
@@ -287,7 +306,7 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain FROM organizations "
+            "SELECT id, name, domain, business_type FROM organizations "
             "WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
@@ -303,7 +322,7 @@ def list_organizations_with_connections() -> list[dict]:
         }
 
     out = []
-    for org_id, name, domain in orgs:
+    for org_id, name, domain, business_type in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -314,6 +333,7 @@ def list_organizations_with_connections() -> list[dict]:
                 "id": org_id,
                 "name": name,
                 "domain": domain,
+                "business_type": business_type,
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { useCachedApi } from "../../lib/swr.js";
@@ -14,18 +14,26 @@ const roas = (v) => (v || 0).toFixed(2).replace(".", ",") + "×";
 const cpm = (k) => (k?.impressions ? k.cost / k.impressions * 1000 : 0);
 const cpa = (cost, conv) => (conv ? cost / conv : 0);
 
+// Views zijn getagd met een profiel; 'both' = altijd relevant, 'ecommerce' =
+// ROAS-gericht. De volgorde is profiel-afhankelijk (passende eerst), niets wordt
+// verborgen. Voor leadgen valt de nadruk op efficiëntie/CPA.
 const VIEWS = [
-  { id: "overview", name: "Ads-overzicht", audience: "Directie" },
-  { id: "campaigns", name: "Campagnes", audience: "Marketeer" },
-  { id: "efficiency", name: "Efficiëntie & budget", audience: "Marketeer" },
-  { id: "conversion", name: "Conversie & ROAS", audience: "Marketeer" },
+  { id: "overview", name: "Ads-overzicht", audience: "Directie", profile: "both" },
+  { id: "campaigns", name: "Campagnes", audience: "Marketeer", profile: "both" },
+  { id: "efficiency", name: "Efficiëntie & CPA", audience: "Marketeer", profile: "both" },
+  { id: "conversion", name: "Conversie & ROAS", audience: "Marketeer", profile: "ecommerce" },
 ];
+const orderViews = (businessType) => {
+  const ok = (v) => v.profile === "both" || v.profile === businessType;
+  return [...VIEWS.filter(ok), ...VIEWS.filter((v) => !ok(v))];
+};
 
 export default function GoogleAds() {
   const [account, setAccount] = useState(() => localStorage.getItem("kompas-ads-account") || "");
   const [view, setView] = useState(() => localStorage.getItem("kompas-ads-view") || "overview");
-  const { orgId } = useActiveOrg();
+  const { orgId, businessType } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
+  const views = useMemo(() => orderViews(businessType), [businessType]);
 
   const { data: accResp, loading, error: accErr } = useCachedApi(adsAccountsUrl(orgId));
   const accounts = accResp?.accounts || null;
@@ -97,7 +105,7 @@ export default function GoogleAds() {
 
       {/* view-switcher */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {VIEWS.map((v) => {
+        {views.map((v) => {
           const on = v.id === view;
           return (
             <button key={v.id} onClick={() => pickView(v.id)} style={{

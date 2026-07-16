@@ -66,6 +66,13 @@ def init_schema() -> None:
             "ALTER TABLE organizations "
             "ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false"
         )
+        # Company profile: 'leadgen' (service businesses — forms, quotes, calls)
+        # or 'ecommerce' (revenue, orders, ROAS). Drives which dashboard views and
+        # KPIs are shown by default, per organization.
+        conn.execute(
+            "ALTER TABLE organizations "
+            "ADD COLUMN IF NOT EXISTS business_type TEXT NOT NULL DEFAULT 'leadgen'"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (

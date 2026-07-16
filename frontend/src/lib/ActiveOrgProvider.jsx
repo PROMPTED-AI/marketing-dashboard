@@ -37,8 +37,12 @@ export function ActiveOrgProvider({ children }) {
     localStorage.removeItem("kompas-gsc-site");
   };
 
-  const orgName = orgs.find((o) => o.id === orgId)?.name || me?.organization?.name || "—";
-  return <Ctx.Provider value={{ orgId, orgName, orgs, setOrg, reload }}>{children}</Ctx.Provider>;
+  const activeOrg = orgs.find((o) => o.id === orgId);
+  const orgName = activeOrg?.name || me?.organization?.name || "—";
+  // Company profile of the active org, drives which dashboard views/KPIs default.
+  const businessType =
+    activeOrg?.business_type || me?.organization?.business_type || "leadgen";
+  return <Ctx.Provider value={{ orgId, orgName, orgs, setOrg, reload, businessType }}>{children}</Ctx.Provider>;
 }
 
 export const useActiveOrg = () => useContext(Ctx);

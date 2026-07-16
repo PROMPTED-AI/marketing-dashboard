@@ -108,7 +108,7 @@ export const GROUPS = [
 
 export const TEMPLATES = [
   {
-    id: "ads-overview", name: "Ads-overzicht", audience: "Directie",
+    id: "ads-overview", name: "Ads-overzicht", audience: "Directie", profile: "both",
     description: "Kosten, klikken, conversies en ROAS met de kostentrend en campagnes.",
     widgets: [
       { source: "cost", kind: "kpi", size: 3 },
@@ -121,7 +121,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "ads-efficiency", name: "Efficiëntie & budget", audience: "Marketeer",
+    id: "ads-efficiency", name: "Efficiëntie & budget", audience: "Marketeer", profile: "both",
     description: "Waar het budget naartoe gaat: CTR, CPC, CPM, CPA en campagne-efficiëntie.",
     widgets: [
       { source: "ctr", kind: "kpi", size: 3 },
@@ -133,7 +133,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "ads-conversion", name: "Conversie & ROAS", audience: "Marketeer",
+    id: "ads-conversion", name: "Conversie & ROAS", audience: "Marketeer", profile: "ecommerce",
     description: "Sturen op rendement: conversies, conversiewaarde en ROAS per campagne.",
     widgets: [
       { source: "conversions", kind: "kpi", size: 4 },
@@ -141,6 +141,18 @@ export const TEMPLATES = [
       { source: "roas", kind: "kpi", size: 4 },
       { source: "conversions_by_date", kind: "area", size: 12 },
       { source: "campaigns", kind: "table", size: 12 },
+    ],
+  },
+  {
+    id: "ads-leadgen", name: "Leads & CPA", audience: "Marketeer", profile: "leadgen",
+    description: "Aanvragen uit betaald zoeken: conversies, kosten per lead (CPA) en campagne-efficiëntie.",
+    widgets: [
+      { source: "conversions", kind: "kpi", size: 3 },
+      { source: "cpa", kind: "kpi", size: 3 },
+      { source: "cpc", kind: "kpi", size: 3 },
+      { source: "ctr", kind: "kpi", size: 3 },
+      { source: "conversions_by_date", kind: "area", size: 12 },
+      { source: "campaigns_efficiency", kind: "table", size: 12 },
     ],
   },
 ];

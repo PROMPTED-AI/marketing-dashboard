@@ -223,7 +223,7 @@ export const GROUPS = [
 
 export const TEMPLATES = [
   {
-    id: "executive", name: "Directie-overzicht", audience: "Directie",
+    id: "executive", name: "Directie-overzicht", audience: "Directie", profile: "both",
     description: "De headline-cijfers, trend en herkomst in één compleet directiebeeld.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },
@@ -241,7 +241,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "acquisition", name: "Acquisitie & verkeer", audience: "Marketeer",
+    id: "acquisition", name: "Acquisitie & verkeer", audience: "Marketeer", profile: "both",
     description: "Waar bezoekers vandaan komen: sessie- én eerste-gebruiker-kanalen, bron/medium, campagnes en landen.",
     widgets: [
       { source: "sessions", kind: "kpi", size: 3 },
@@ -258,7 +258,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "behavior", name: "Gedrag & content", audience: "Marketeer",
+    id: "behavior", name: "Gedrag & content", audience: "Marketeer", profile: "both",
     description: "Welke content werkt en waar bezoekers afhaken: toppagina's, titels, instappagina's en gebeurtenissen.",
     widgets: [
       { source: "pageViews", kind: "kpi", size: 3 },
@@ -273,7 +273,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "conversion", name: "Conversie & doelen", audience: "Marketeer",
+    id: "conversion", name: "Conversie & doelen", audience: "Marketeer", profile: "ecommerce",
     description: "Sturen op resultaat: conversies, ratio, opbrengst, de doelen en de bronnen die ze opleveren.",
     widgets: [
       { source: "conversions_total", kind: "kpi", size: 3 },
@@ -288,7 +288,22 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "audience", name: "Publiek & techniek", audience: "Specialist",
+    id: "leadgen", name: "Leadgeneratie", audience: "Marketeer", profile: "leadgen",
+    description: "Aanvragen sturen: conversies (formulieren, offertes, telefoon), ratio, herkomst en de pagina's die leads opleveren.",
+    widgets: [
+      { source: "conversions_total", kind: "kpi", size: 3 },
+      { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "sessions", kind: "kpi", size: 3 },
+      { source: "users", kind: "kpi", size: 3 },
+      { source: "conversions_by_date", kind: "area", size: 12 },
+      { source: "conversions", kind: "table", size: 6 },
+      { source: "channels", kind: "donut", size: 6 },
+      { source: "source_medium", kind: "bars", size: 6 },
+      { source: "landing_pages", kind: "table", size: 6 },
+    ],
+  },
+  {
+    id: "audience", name: "Publiek & techniek", audience: "Specialist", profile: "both",
     description: "Wie de bezoekers zijn en waarmee ze komen: apparaten, browsers, OS, platform, landen, steden, taal, leeftijd en geslacht.",
     widgets: [
       { source: "activeUsers", kind: "kpi", size: 3 },
@@ -306,7 +321,7 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "full", name: "Alles (volledig)", audience: "Specialist",
+    id: "full", name: "Alles (volledig)", audience: "Specialist", profile: "both",
     description: "Het complete overzicht met alle beschikbare blokken.",
     widgets: [
       { source: "users", kind: "kpi", size: 3 },

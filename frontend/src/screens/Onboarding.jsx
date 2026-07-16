@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { connectUrl, metaLoginUrl } from "../lib/api.js";
+import { connectUrl, metaLoginUrl, setBusinessType } from "../lib/api.js";
+import { useMe } from "../lib/useMe.jsx";
 import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
 const TOOLS = [
@@ -10,8 +11,19 @@ const TOOLS = [
   { key: "meta", name: "META / social", desc: "Facebook & Instagram — campagnes, bereik & betrokkenheid.", note: "Facebook Login · veilig & alleen-lezen", Glyph: MetaGlyph, bg: "#E7F0FF", live: true },
 ];
 
+// De twee bedrijfsprofielen. Het gekozen profiel richt de dashboards standaard in
+// (welke views/KPI's vooraan staan) en wordt org-breed opgeslagen.
+const PROFILES = [
+  { key: "leadgen", name: "Leadgeneratie", desc: "Je stuurt op aanvragen: formulieren, offertes en telefoongesprekken. Dashboards tonen conversies, kosten per lead (CPA) en de pagina's die leads opleveren." },
+  { key: "ecommerce", name: "E-commerce", desc: "Je verkoopt online. Dashboards tonen omzet, bestellingen, ROAS en je best verkochte producten." },
+];
+
 export default function Onboarding() {
   const nav = useNavigate();
+  const { reload } = useMe();
+  const [step, setStep] = useState("profile"); // 'profile' | 'tools'
+  const [profile, setProfile] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [sel, setSel] = useState({ ga: true, gsc: true, ads: false, meta: false });
   const count = Object.values(sel).filter(Boolean).length;
   const allSel = TOOLS.every((t) => sel[t.key]);
@@ -20,6 +32,21 @@ export default function Onboarding() {
   const toggleAll = () => {
     const v = !allSel;
     setSel({ ga: v, gsc: v, ads: v, meta: v });
+  };
+
+  // Save the chosen profile org-wide, then move on to connecting tools.
+  const confirmProfile = async () => {
+    if (!profile || savingProfile) return;
+    setSavingProfile(true);
+    try {
+      await setBusinessType(profile);
+      reload(); // refresh me.organization.business_type so dashboards default correctly
+    } catch {
+      /* niet-blokkerend: type is later in Instellingen te wijzigen */
+    } finally {
+      setSavingProfile(false);
+      setStep("tools");
+    }
   };
 
   // Connect only the selected Google tools (incremental authorization).
@@ -37,6 +64,12 @@ export default function Onboarding() {
     nav("/app/analytics");
   };
 
+  const stepPill = (active, done, txt) => (
+    <span style={{ color: done ? "var(--c-pos)" : active ? "var(--c-accent)" : "var(--c-muted)" }}>
+      {done ? "✓ " : ""}{txt}
+    </span>
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--c-page)", display: "flex", justifyContent: "center", padding: 24 }}>
       <div className="card" style={{ width: "min(1100px, 100%)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "var(--sh-md)" }}>
@@ -46,58 +79,88 @@ export default function Onboarding() {
           <div className="display" style={{ fontSize: 20 }}>kompas</div>
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--c-muted)", fontWeight: 600 }}>
-            <span style={{ color: "var(--c-pos)" }}>✓ account</span><span style={{ opacity: 0.4 }}>———</span>
-            <span style={{ color: "var(--c-accent)" }}>koppelen</span><span style={{ opacity: 0.4 }}>———</span>
-            <span>klaar</span>
+            {stepPill(false, true, "account")}<span style={{ opacity: 0.4 }}>———</span>
+            {stepPill(step === "profile", step === "tools", "profiel")}<span style={{ opacity: 0.4 }}>———</span>
+            {stepPill(step === "tools", false, "koppelen")}
           </div>
           <div onClick={skip} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>overslaan</div>
         </div>
 
         {/* body */}
-        <div style={{ padding: "36px 48px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 2 van 3</div>
-          <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>koppel je marketingtools.</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
-            <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>
-              kies welke bronnen je wilt verbinden. je kunt er één kiezen of alles tegelijk — later koppelen kan altijd via Integraties.
+        {step === "profile" ? (
+          <div style={{ padding: "36px 48px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 1 van 2</div>
+            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>wat voor bedrijf ben je?</div>
+            <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 620, marginBottom: 24 }}>
+              hiermee richten we je dashboards meteen goed in. je kunt dit later altijd wijzigen in Instellingen.
             </div>
-            <div onClick={toggleAll} style={selectAll}>
-              <div style={{ ...box, ...(allSel ? boxOn : {}) }}>{allSel && <IcCheck />}</div>
-              selecteer alles
-            </div>
-          </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-            {TOOLS.map((t) => (
-              <div key={t.key} onClick={() => toggle(t.key)} style={{ ...toolCard, ...(sel[t.key] ? toolCardOn : {}) }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 13, background: t.bg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><t.Glyph /></div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 17, fontWeight: 700 }}>{t.name}</span>
-                      {!t.live && <span className="pill accent" style={{ fontSize: 10, padding: "2px 8px" }}>binnenkort</span>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              {PROFILES.map((p) => (
+                <div key={p.key} onClick={() => setProfile(p.key)} style={{ ...toolCard, ...(profile === p.key ? toolCardOn : {}) }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 18, fontWeight: 700 }}>{p.name}</span>
+                      <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.55, marginTop: 6 }}>{p.desc}</div>
                     </div>
-                    <div style={{ fontSize: 13, color: "var(--c-muted)", lineHeight: 1.5, marginTop: 3 }}>{t.desc}</div>
+                    <div style={{ ...check, ...(profile === p.key ? checkOn : {}) }}>{profile === p.key && <IcCheck s={14} />}</div>
                   </div>
-                  <div style={{ ...check, ...(sel[t.key] ? checkOn : {}) }}>{sel[t.key] && <IcCheck s={14} />}</div>
                 </div>
-                <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--c-muted)" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.live ? "var(--c-pos)" : "var(--c-muted)" }} />{t.note}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 28 }}>
-            <div style={{ fontSize: 14, color: "var(--c-muted)", fontWeight: 600 }}>{count} van 4 tools geselecteerd</div>
-            <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: count ? 1 : 0.5, cursor: count ? "pointer" : "not-allowed" }} disabled={!count} onClick={cont}>
-              {count ? `verbind ${count} tool${count === 1 ? "" : "s"}` : "kies minstens één tool"} <IcArrow />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 28 }}>
+              <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: profile && !savingProfile ? 1 : 0.5, cursor: profile ? "pointer" : "not-allowed" }} disabled={!profile || savingProfile} onClick={confirmProfile}>
+                {savingProfile ? "bezig…" : "verder"} <IcArrow />
+              </button>
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 14 }}>
-            Google Analytics, Search Console en Google Ads worden samen in één Google-toestemming gekoppeld. META loopt via een aparte Facebook-toestemming (koppel je daarna eventueel via Integraties).
+        ) : (
+          <div style={{ padding: "36px 48px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 2 van 2</div>
+            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>koppel je marketingtools.</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
+              <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>
+                kies welke bronnen je wilt verbinden. je kunt er één kiezen of alles tegelijk — later koppelen kan altijd via Integraties.
+              </div>
+              <div onClick={toggleAll} style={selectAll}>
+                <div style={{ ...box, ...(allSel ? boxOn : {}) }}>{allSel && <IcCheck />}</div>
+                selecteer alles
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              {TOOLS.map((t) => (
+                <div key={t.key} onClick={() => toggle(t.key)} style={{ ...toolCard, ...(sel[t.key] ? toolCardOn : {}) }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 13, background: t.bg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><t.Glyph /></div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 17, fontWeight: 700 }}>{t.name}</span>
+                        {!t.live && <span className="pill accent" style={{ fontSize: 10, padding: "2px 8px" }}>binnenkort</span>}
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--c-muted)", lineHeight: 1.5, marginTop: 3 }}>{t.desc}</div>
+                    </div>
+                    <div style={{ ...check, ...(sel[t.key] ? checkOn : {}) }}>{sel[t.key] && <IcCheck s={14} />}</div>
+                  </div>
+                  <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--c-muted)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.live ? "var(--c-pos)" : "var(--c-muted)" }} />{t.note}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 28 }}>
+              <div onClick={() => setStep("profile")} style={{ fontSize: 14, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>← terug</div>
+              <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: count ? 1 : 0.5, cursor: count ? "pointer" : "not-allowed" }} disabled={!count} onClick={cont}>
+                {count ? `verbind ${count} tool${count === 1 ? "" : "s"}` : "kies minstens één tool"} <IcArrow />
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 14 }}>
+              Google Analytics, Search Console en Google Ads worden samen in één Google-toestemming gekoppeld. META loopt via een aparte Facebook-toestemming (koppel je daarna eventueel via Integraties).
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
