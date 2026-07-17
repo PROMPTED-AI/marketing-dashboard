@@ -544,64 +544,194 @@ def assistant_chat(request: Request, body: ChatBody):
             pass
         return body.start, body.end
 
+    # --- per-channel fetchers (raise HTTPException 409 when not connected) ---
+    # Reused by both the single-channel tools and the cross-channel overview, so
+    # the org-scoping and property/site/account selection live in one place. Demo
+    # orgs serve generated sample data, mirroring the dashboard endpoints.
+    demo_org = models.is_demo_org(target_org)
+
+    def _fetch_analytics(start, end, compare):
+        if demo_org:
+            return demo.overview(start, end, compare)
+        creds = _org_credentials(target_org)
+        prop = body.property_id
+        if not prop:
+            props = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
+            if not props:
+                raise HTTPException(status_code=409, detail="Geen Analytics-property gekoppeld.")
+            prop = props[0]["property_id"]
+        return _google_data(target_org, "google_analytics",
+                            lambda: analytics.run_ga_overview(creds, prop, start, end, compare))
+
+    def _fetch_gsc(start, end, compare):
+        if demo_org:
+            return demo.gsc_report(start, end, compare)
+        creds = _org_credentials(target_org, provider="search_console")
+        site = body.site
+        if not site:
+            sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
+            if not sites:
+                raise HTTPException(status_code=409, detail="Geen Search Console-site gekoppeld.")
+            site = sites[0]["site_url"]
+        return _google_data(target_org, "search_console",
+                            lambda: search_console.run_search_analytics(creds, site, start, end, compare))
+
+    def _fetch_google_ads(start, end, compare):
+        if demo_org:
+            return demo.ads_overview(start, end, compare)
+        creds = _org_credentials(target_org, provider="google_ads")
+        accounts = google_ads.list_accounts(creds)
+        if not accounts:
+            raise HTTPException(status_code=409, detail="Geen Google Ads-account gekoppeld.")
+        return google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, compare)
+
+    def _fetch_meta_ads(start, end, compare):
+        if demo_org:
+            return demo.meta_ads_overview(start, end, compare)
+        token = _meta_token(target_org)
+        accounts = (meta.list_assets(token).get("ad_accounts") or [])
+        if not accounts:
+            raise HTTPException(status_code=409, detail="Geen Meta-advertentieaccount gekoppeld.")
+        return meta.ads_overview(token, accounts[0]["id"], start, end, compare)
+
+    def _fetch_meta_organic(start, end):
+        if demo_org:
+            return demo.meta_organic_overview(start, end)
+        token = _meta_token(target_org)
+        pages = (meta.list_assets(token).get("pages") or [])
+        if not pages:
+            raise HTTPException(status_code=409, detail="Geen Facebook-pagina gekoppeld.")
+        page = pages[0]
+        ig_id = (page.get("instagram") or {}).get("id")
+        return meta.organic_overview(token, page["id"], ig_id, start, end)
+
+    def _fetch_woo(start, end, compare):
+        store, ck, cs = _wc_creds(target_org)
+        return woocommerce.run_overview(store, ck, cs, start, end, compare)
+
+    def _marketing_overview(start, end, compare) -> dict:
+        """Cross-channel figures with the relationships computed server-side, so the
+        assistant states facts (blended ROAS, total spend, paid vs organic) instead
+        of deriving them from separate blocks. Missing channels are simply skipped."""
+        def safe(fn):
+            try:
+                return fn()
+            except Exception:  # not connected / no data / API error -> skip channel
+                return None
+
+        ga = safe(lambda: _fetch_analytics(start, end, compare))
+        gsc = safe(lambda: _fetch_gsc(start, end, compare))
+        ads = safe(lambda: _fetch_google_ads(start, end, compare))
+        mads = safe(lambda: _fetch_meta_ads(start, end, compare))
+        woo = safe(lambda: _fetch_woo(start, end, compare))
+
+        connected = []
+        if ga: connected.append("google_analytics")
+        if gsc: connected.append("search_console")
+        if ads: connected.append("google_ads")
+        if mads: connected.append("meta_ads")
+        if woo: connected.append("woocommerce")
+
+        def r2(v):
+            return round(v, 2) if isinstance(v, (int, float)) else v
+
+        ads_cost = (ads or {}).get("kpis", {}).get("cost")
+        meta_spend = (mads or {}).get("kpis", {}).get("spend")
+        spend_parts = {k: v for k, v in (("google_ads", ads_cost), ("meta_ads", meta_spend)) if v}
+        ad_spend_total = round(sum(spend_parts.values()), 2) if spend_parts else None
+
+        woo_revenue = (woo or {}).get("kpis", {}).get("revenue")
+        ga_revenue = (ga or {}).get("kpis", {}).get("revenue")
+        if woo_revenue:
+            revenue_total, revenue_source = round(woo_revenue, 2), "woocommerce"
+        elif ga_revenue:
+            revenue_total, revenue_source = round(ga_revenue, 2), "google_analytics"
+        else:
+            revenue_total, revenue_source = None, None
+
+        blended_roas = (
+            round(revenue_total / ad_spend_total, 2)
+            if revenue_total and ad_spend_total else None
+        )
+        ads_conv = (ads or {}).get("kpis", {}).get("conversions") or 0
+        meta_results = sum((r.get("count") or 0) for r in (mads or {}).get("results", []) or [])
+        paid_conversions = round(ads_conv + meta_results, 1) or None
+        blended_cpa = (
+            round(ad_spend_total / paid_conversions, 2)
+            if ad_spend_total and paid_conversions else None
+        )
+
+        # Traffic mix from GA channel groups (share of sessions).
+        traffic_mix = None
+        if ga and ga.get("channels"):
+            buckets = {"organisch": 0, "betaald": 0, "direct": 0, "social": 0, "overig": 0}
+            for c in ga["channels"]:
+                label = (c.get("label") or "").lower()
+                v = c.get("value") or c.get("sessions") or 0
+                if "paid" in label or "cpc" in label:
+                    buckets["betaald"] += v
+                elif "organic search" in label:
+                    buckets["organisch"] += v
+                elif "social" in label:
+                    buckets["social"] += v
+                elif "direct" in label:
+                    buckets["direct"] += v
+                else:
+                    buckets["overig"] += v
+            tot = sum(buckets.values()) or 1
+            traffic_mix = {k: round(v * 100 / tot) for k, v in buckets.items() if v}
+
+        combined = {
+            "advertentie_uitgaven_totaal": ad_spend_total,
+            "advertentie_uitgaven_per_kanaal": {k: r2(v) for k, v in spend_parts.items()} or None,
+            "omzet_totaal": revenue_total,
+            "omzet_bron": revenue_source,
+            "blended_roas": blended_roas,  # omzet / advertentie-uitgaven
+            "betaalde_conversies": paid_conversions,
+            "kosten_per_conversie": blended_cpa,
+            "verkeersverdeling_pct": traffic_mix,
+            "organische_zoekklikken": (gsc or {}).get("totals", {}).get("clicks"),
+        }
+        per_channel = {}
+        if ga: per_channel["google_analytics"] = {"kpis": ga.get("kpis"), "deltas": ga.get("deltas"), "channels": _compact(ga.get("channels", []), 6)}
+        if gsc: per_channel["search_console"] = {"totals": gsc.get("totals"), "deltas": gsc.get("deltas")}
+        if ads: per_channel["google_ads"] = {"kpis": ads.get("kpis"), "deltas": ads.get("deltas")}
+        if mads: per_channel["meta_ads"] = {"kpis": mads.get("kpis"), "deltas": mads.get("deltas"), "results": _compact(mads.get("results", []), 6)}
+        if woo: per_channel["woocommerce"] = {"kpis": woo.get("kpis")}
+
+        return {
+            "periode": {"start": start, "end": end, "vergelijking": {"start": compare[0], "end": compare[1]} if compare else None},
+            "gekoppelde_kanalen": connected,
+            "combinatie": combined,
+            "per_kanaal": per_channel,
+            "let_op": "De combinatiecijfers zijn server-side berekend en kloppend; gebruik ze zoals ze zijn.",
+        }
+
     def execute(name: str, tool_input: dict) -> str:
         """Run one tool, org-scoped. Returns a JSON string; never raises."""
         start, end = _tool_period(tool_input or {})
+        compare = _previous_period(start, end)  # deltas so the model states real trends
         try:
             if name == "list_connections":
                 return json.dumps(_connections_payload(target_org), ensure_ascii=False, default=str)
+            if name == "get_marketing_overview":
+                return json.dumps(_marketing_overview(start, end, compare), ensure_ascii=False, default=str)
             if name == "get_analytics_overview":
-                creds = _org_credentials(target_org)
-                prop = body.property_id
-                if not prop:
-                    props = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
-                    if not props:
-                        return json.dumps({"error": "Geen Analytics-property gekoppeld."})
-                    prop = props[0]["property_id"]
-                data = _google_data(target_org, "google_analytics",
-                                    lambda: analytics.run_ga_overview(creds, prop, start, end, None))
-                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+                return json.dumps(_compact(_fetch_analytics(start, end, compare)), ensure_ascii=False, default=str)
             if name == "get_search_console":
-                creds = _org_credentials(target_org, provider="search_console")
-                site = body.site
-                if not site:
-                    sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
-                    if not sites:
-                        return json.dumps({"error": "Geen Search Console-site gekoppeld."})
-                    site = sites[0]["site_url"]
-                data = _google_data(target_org, "search_console",
-                                    lambda: search_console.run_search_analytics(creds, site, start, end, None))
-                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+                return json.dumps(_compact(_fetch_gsc(start, end, compare)), ensure_ascii=False, default=str)
             if name == "get_google_ads":
-                creds = _org_credentials(target_org, provider="google_ads")
                 try:
-                    accounts = google_ads.list_accounts(creds)
-                    if not accounts:
-                        return json.dumps({"error": "Geen Google Ads-account gekoppeld."})
-                    data = google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, None)
+                    data = _fetch_google_ads(start, end, compare)
                 except google_ads.AdsNotConfigured:
                     return json.dumps({"error": "Google Ads is nog niet geconfigureerd op de server."})
                 return json.dumps(_compact(data), ensure_ascii=False, default=str)
             if name == "get_meta_ads":
-                token = _meta_token(target_org)
-                accounts = (meta.list_assets(token).get("ad_accounts") or [])
-                if not accounts:
-                    return json.dumps({"error": "Geen Meta-advertentieaccount gekoppeld."})
-                data = meta.ads_overview(token, accounts[0]["id"], start, end, None)
-                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+                return json.dumps(_compact(_fetch_meta_ads(start, end, compare)), ensure_ascii=False, default=str)
             if name == "get_meta_organic":
-                token = _meta_token(target_org)
-                pages = (meta.list_assets(token).get("pages") or [])
-                if not pages:
-                    return json.dumps({"error": "Geen Facebook-pagina gekoppeld."})
-                page = pages[0]
-                ig_id = (page.get("instagram") or {}).get("id")
-                data = meta.organic_overview(token, page["id"], ig_id, start, end)
-                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+                return json.dumps(_compact(_fetch_meta_organic(start, end)), ensure_ascii=False, default=str)
             if name == "get_woocommerce":
-                store, ck, cs = _wc_creds(target_org)
-                data = woocommerce.run_overview(store, ck, cs, start, end, None)
-                return json.dumps(_compact(data), ensure_ascii=False, default=str)
+                return json.dumps(_compact(_fetch_woo(start, end, compare)), ensure_ascii=False, default=str)
             return json.dumps({"error": f"Onbekende tool: {name}"})
         except HTTPException as e:
             return json.dumps({"error": str(e.detail)}, ensure_ascii=False)
@@ -610,10 +740,10 @@ def assistant_chat(request: Request, body: ChatBody):
             return json.dumps({"error": "Kon deze gegevens niet ophalen."}, ensure_ascii=False)
 
     def gather_context() -> str:
-        """Compacte data van alle gekoppelde kanalen, als context voor modellen
-        zonder tool-calling. Hergebruikt `execute` (org-scoped, gecachet); niet
-        gekoppelde kanalen leveren een fout en worden overgeslagen."""
-        blocks = []
+        """Data van alle gekoppelde kanalen als context voor modellen zonder
+        tool-calling. Begint met het cross-kanaal overzicht (berekende verbanden),
+        gevolgd door de losse kanalen; niet gekoppelde kanalen worden overgeslagen."""
+        blocks = [f"## Cross-kanaal overzicht (verbanden)\n{execute('get_marketing_overview', {})}"]
         for name, label in (
             ("get_analytics_overview", "Google Analytics"),
             ("get_search_console", "Search Console"),
@@ -630,7 +760,7 @@ def assistant_chat(request: Request, body: ChatBody):
             if isinstance(parsed, dict) and parsed.get("error"):
                 continue
             blocks.append(f"## {label}\n{out}")
-        return "\n\n".join(blocks) if blocks else "(geen gekoppelde kanalen met data voor deze periode)"
+        return "\n\n".join(blocks)
 
     stream = assistant.stream_chat(
         safe_messages, execute, gather_context,

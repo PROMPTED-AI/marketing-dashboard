@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
@@ -6,12 +8,24 @@ import { IcChat } from "../../components/icons.jsx";
 
 const TOOL_LABELS = {
   list_connections: "je koppelingen",
+  get_marketing_overview: "Alle kanalen",
   get_analytics_overview: "Analytics",
   get_search_console: "Search Console",
   get_google_ads: "Google Ads",
   get_meta_ads: "Meta Ads",
   get_meta_organic: "Meta organisch",
+  get_woocommerce: "WooCommerce",
 };
+
+// Renders an assistant answer as Markdown (GFM tables/lists) with compact,
+// theme-aware styling. User messages stay plain text.
+function Answer({ text }) {
+  return (
+    <div className="assistant-md">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+    </div>
+  );
+}
 
 const SEV_COLOR = { positive: "var(--c-pos)", negative: "var(--c-neg)", neutral: "var(--c-accent)" };
 
@@ -50,10 +64,11 @@ export default function Assistant() {
     return () => { alive = false; };
   }, [orgId, start, end]);
 
-  const setLast = (txt) =>
+  // Merge a patch into the last (assistant) message.
+  const updateLast = (patch) =>
     setMessages((ms) => {
       const c = [...ms];
-      c[c.length - 1] = { role: "assistant", content: txt };
+      c[c.length - 1] = { ...(c[c.length - 1] || {}), role: "assistant", ...patch };
       return c;
     });
 
@@ -61,12 +76,13 @@ export default function Assistant() {
     const question = (text ?? input).trim();
     if (!question || streaming) return;
     const history = [...messages, { role: "user", content: question }];
-    setMessages([...history, { role: "assistant", content: "" }]);
+    setMessages([...history, { role: "assistant", content: "", sources: [] }]);
     setInput("");
     setStreaming(true);
     setTool(null);
 
     let answer = "";
+    const sources = []; // ordered, unique tool labels used for this answer
     try {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
@@ -96,13 +112,17 @@ export default function Assistant() {
           buf = buf.slice(i + 2);
           if (!line.startsWith("data:")) continue;
           const ev = JSON.parse(line.slice(5).trim());
-          if (ev.type === "text") { answer += ev.text; setTool(null); setLast(answer); }
-          else if (ev.type === "tool") setTool(TOOL_LABELS[ev.name] || ev.name);
-          else if (ev.type === "error") { answer += (answer ? "\n\n" : "") + ev.message; setLast(answer); }
+          if (ev.type === "text") { answer += ev.text; setTool(null); updateLast({ content: answer }); }
+          else if (ev.type === "tool") {
+            const lbl = TOOL_LABELS[ev.name] || ev.name;
+            setTool(lbl);
+            if (lbl !== "je koppelingen" && !sources.includes(lbl)) { sources.push(lbl); updateLast({ sources: [...sources] }); }
+          }
+          else if (ev.type === "error") { answer += (answer ? "\n\n" : "") + ev.message; updateLast({ content: answer }); }
         }
       }
     } catch (e) {
-      setLast(answer || `Er ging iets mis: ${e.message}`);
+      updateLast({ content: answer || `Er ging iets mis: ${e.message}` });
     } finally {
       setStreaming(false);
       setTool(null);
@@ -141,12 +161,22 @@ export default function Assistant() {
         )}
 
         {messages.map((m, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
             <div style={m.role === "user" ? userBubble : botBubble}>
               {m.content
-                ? <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                ? (m.role === "user"
+                    ? <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                    : <Answer text={m.content} />)
                 : <span style={{ color: "var(--c-muted)" }}>{tool ? `analyseert ${tool}…` : "denkt na…"}</span>}
             </div>
+            {m.role !== "user" && m.sources?.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "6px 2px 0" }}>
+                <span style={{ fontSize: 10.5, color: "var(--c-muted)", fontWeight: 600 }}>Bronnen:</span>
+                {m.sources.map((s) => (
+                  <span key={s} style={sourceChip}>{s}</span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         <div ref={endRef} />
@@ -218,6 +248,7 @@ export default function Assistant() {
 }
 
 const chip = { padding: "8px 13px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 600, cursor: "pointer" };
+const sourceChip = { padding: "2px 8px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-muted)", fontSize: 10.5, fontWeight: 700 };
 const signalRow = { display: "flex", gap: 9, alignItems: "flex-start", padding: "9px 10px", textAlign: "left", cursor: "pointer", width: "100%", borderRadius: 10, border: "1px solid var(--c-border-soft)", background: "var(--c-surface-2)", color: "var(--c-ink)" };
 const userBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "var(--c-accent)", color: "#fff", fontSize: 13.5, lineHeight: 1.5 };
 const botBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-ink)", fontSize: 13.5, lineHeight: 1.55 };

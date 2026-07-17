@@ -25,7 +25,19 @@ SYSTEM_PROMPT = (
     "technische termen.\n"
     "- Gebruik ALTIJD eerst de tools om de echte cijfers op te halen voordat je "
     "iets beweert. Verzin nooit getallen of trends.\n"
-    "- Noem concrete cijfers en de periode waarover je het hebt.\n"
+    "- Bij vragen die kanalen combineren of naar samenhang/rendement over kanalen "
+    "vragen (bijv. 'wat leveren mijn advertenties op', 'ROAS', 'betaald vs "
+    "organisch', 'waar komt mijn omzet vandaan'), roep je `get_marketing_overview` "
+    "aan. Die levert vooraf berekende, kloppende cross-kanaal-cijfers (o.a. totale "
+    "advertentie-uitgaven, blended ROAS, betaald vs organisch verkeer, kosten per "
+    "conversie). Bereken zulke verbanden NIET zelf uit losse cijfers; gebruik de "
+    "waarden uit dat overzicht.\n"
+    "- Noem concrete cijfers en de periode waarover je het hebt. De data bevat waar "
+    "mogelijk een vergelijking met de vorige periode (deltas); gebruik die voor "
+    "trends in plaats van ze te schatten.\n"
+    "- Leg waar zinvol een verband tussen kanalen dat relevant is voor marketing "
+    "(bijv. advertentie-uitgaven versus omzet, verkeersbron versus conversie, SEO "
+    "versus betaald verkeer).\n"
     "- Sluit af met 1 tot 3 concrete, uitvoerbare acties.\n"
     "- Je ziet uitsluitend de gegevens van de huidige klant.\n"
     "- Als een kanaal niet gekoppeld is, leg dat rustig uit in plaats van te "
@@ -34,7 +46,9 @@ SYSTEM_PROMPT = (
     "periode (bijv. 'vorige maand', 'maart', 'afgelopen 7 dagen'), reken die dan om "
     "naar ISO-datums en geef die als start/end mee aan de tool. Noem in je antwoord "
     "altijd welke periode je hebt gebruikt.\n"
-    "- Hou antwoorden bondig en to-the-point."
+    "- Opmaak: gebruik korte Markdown waar dat de leesbaarheid helpt — koppen, "
+    "**vet** voor kerncijfers, opsommingen, en een Markdown-tabel bij een "
+    "vergelijking van meerdere kanalen of campagnes. Hou het bondig en to-the-point."
 )
 
 # Optionele periode-override per tool: alleen invullen als de gebruiker expliciet
@@ -66,6 +80,24 @@ TOOLS = [
                 "als de gebruiker vraagt wat er gekoppeld is."
             ),
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_marketing_overview",
+            "description": (
+                "Cross-kanaal marketingoverzicht van de klant voor de huidige periode: "
+                "haalt alle gekoppelde kanalen op en berekent de VERBANDEN ertussen die "
+                "je zelf niet mag uitrekenen — totale advertentie-uitgaven (Google Ads + "
+                "Meta), totale omzet, blended ROAS (omzet / advertentie-uitgaven), kosten "
+                "per conversie, en de verdeling betaald vs. organisch vs. direct verkeer. "
+                "Geeft ook per kanaal de kerncijfers. Gebruik dit ALTIJD bij vragen over "
+                "rendement/ROAS over kanalen heen, 'wat leveren advertenties op', betaald "
+                "vs. organisch, of waar de omzet vandaan komt. Voor detailvragen over één "
+                "kanaal gebruik je de kanaal-specifieke tool."
+            ),
+            "parameters": _PERIOD_PARAMS,
         },
     },
     {
