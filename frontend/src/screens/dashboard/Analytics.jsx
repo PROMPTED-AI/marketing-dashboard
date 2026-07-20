@@ -16,16 +16,17 @@ import { analyticsCatalog } from "../../lib/widgets/index.js";
 import { instantiateTemplate, templateMatchesProfile } from "../../lib/widgets/kit.js";
 
 // De preset-views op het Analytics-tabblad = een curated set doelgroepgerichte
-// templates (renderen tegen de overview-payload) + een aparte Realtime-view. De
-// volgorde is profiel-afhankelijk: passende templates eerst, de andere onderaan
-// (niets verdwijnt — soft), realtime altijd als laatste.
+// templates (renderen tegen de overview-payload) + een aparte Realtime-view.
+// Harde profielscheiding: alleen views die bij het bedrijfstype passen (of
+// neutraal zijn) verschijnen. Een e-commerce-organisatie ziet dus geen
+// leadgen-views en andersom. Realtime is neutraal en staat altijd als laatste.
 const CANDIDATE_VIEW_IDS = ["executive", "acquisition", "behavior", "conversion", "leadgen"];
 function buildViews(businessType) {
-  const tpls = analyticsCatalog.TEMPLATES.filter((t) => CANDIDATE_VIEW_IDS.includes(t.id));
-  const match = tpls.filter((t) => templateMatchesProfile(t, businessType));
-  const rest = tpls.filter((t) => !templateMatchesProfile(t, businessType));
+  const tpls = analyticsCatalog.TEMPLATES.filter(
+    (t) => CANDIDATE_VIEW_IDS.includes(t.id) && templateMatchesProfile(t, businessType)
+  );
   return [
-    ...[...match, ...rest].map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
+    ...tpls.map((t) => ({ id: t.id, name: t.name, audience: t.audience, tpl: t })),
     { id: "realtime", name: "Realtime", audience: "Live", tpl: null },
   ];
 }
