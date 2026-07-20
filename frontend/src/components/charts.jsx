@@ -93,11 +93,16 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
   );
 }
 
-// Donut from [{label, pct}] (+ center label). Colors come from the palette.
+// Donut from [{label, pct, value?}] (+ center label). Colors come from the palette.
 // Hovering a segment highlights it and shows its label + share in the centre.
+// De bogen worden getekend op de RUWE waarden (value/sessions), niet op de
+// afgeronde percentages: afgerond telt de som vaak op tot 99% of 101%, wat een
+// kier of een overlappend hapje bij 12 uur geeft. Alleen labels tonen `pct`.
 export function Donut({ segments = [], centerTop, centerSub, size = 160 }) {
   const [active, setActive] = useState(null);
   const r = 70, C = 2 * Math.PI * r;
+  const weight = (s) => Math.max(0, s.value ?? s.sessions ?? s.pct ?? 0);
+  const total = segments.reduce((a, s) => a + weight(s), 0) || 1;
   let offset = 0;
   const seg = active != null ? segments[active] : null;
   return (
@@ -105,11 +110,11 @@ export function Donut({ segments = [], centerTop, centerSub, size = 160 }) {
       <svg width={size} height={size} viewBox="0 0 180 180">
         <g transform="rotate(-90 90 90)">
           {segments.map((s, i) => {
-            const dash = (s.pct / 100) * C;
+            const dash = (weight(s) / total) * C;
             const el = (
               <circle key={i} cx="90" cy="90" r={r} fill="none"
                 style={{ stroke: PALETTE[i % PALETTE.length], cursor: "pointer", opacity: active == null || active === i ? 1 : 0.35, transition: "opacity .12s" }}
-                strokeWidth={active === i ? 26 : 22} strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={-offset}
+                strokeWidth={active === i ? 26 : 22} strokeDasharray={`${dash} ${Math.max(0, C - dash)}`} strokeDashoffset={-offset}
                 onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)} />
             );
             offset += dash;
