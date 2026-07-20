@@ -162,18 +162,25 @@ export default function Assistant() {
 
         {messages.map((m, i) => (
           <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
-            <div style={m.role === "user" ? userBubble : botBubble}>
+            <div className="bubble-in" style={m.role === "user" ? userBubble : botBubble}>
               {m.content
                 ? (m.role === "user"
                     ? <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
                     : <Answer text={m.content} />)
-                : <span style={{ color: "var(--c-muted)" }}>{tool ? `analyseert ${tool}…` : "denkt na…"}</span>}
+                : (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 9, color: "var(--c-muted)" }}>
+                    <span className="typing-dots" aria-hidden="true">
+                      <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+                    </span>
+                    <span className="thinking-label">{tool ? `analyseert ${tool}…` : "denkt na…"}</span>
+                  </span>
+                )}
             </div>
             {m.role !== "user" && m.sources?.length > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "6px 2px 0" }}>
                 <span style={{ fontSize: 10.5, color: "var(--c-muted)", fontWeight: 600 }}>Bronnen:</span>
                 {m.sources.map((s) => (
-                  <span key={s} style={sourceChip}>{s}</span>
+                  <span key={s} className="chip-in" style={sourceChip}>{s}</span>
                 ))}
               </div>
             )}
