@@ -38,11 +38,11 @@ export default function MetaOrganic() {
   const sections = () => {
     const out = [];
     if (fb)
-      out.push({ title: "Facebook (organisch) — " + label, columns: ["Metric", "Waarde"], rows: [
+      out.push({ title: "Facebook (organisch) · " + label, columns: ["Metric", "Waarde"], rows: [
         ["Volgers", fb.followers], ["Volgersgroei", fb.followers_growth],
         ["Bereik", fb.reach], ["Vertoningen", fb.impressions], ["Betrokkenheid", fb.engagement]] });
     if (insta)
-      out.push({ title: "Instagram (organisch) — " + label, columns: ["Metric", "Waarde"], rows: [
+      out.push({ title: "Instagram (organisch) · " + label, columns: ["Metric", "Waarde"], rows: [
         ["Volgers", insta.followers], ["Volgersgroei", insta.followers_growth],
         ["Bereik", insta.reach], ["Vertoningen", insta.impressions], ["Profielbezoeken", insta.profile_views]] });
     return out;
@@ -105,7 +105,7 @@ export default function MetaOrganic() {
                 ["Bereik", num(fb.reach)],
                 ["Betrokkenheid", num(fb.engagement)],
               ]} />
-            ) : <Empty>geen Facebook-paginadata.</Empty>}
+            ) : <Empty>Geen Facebook-paginadata.</Empty>}
           </SectionCard>
           <SectionCard title={"Instagram" + (insta?.username ? " · @" + insta.username : "")} style={{ flex: 1, minWidth: 280 }}>
             {insta ? (
@@ -115,7 +115,7 @@ export default function MetaOrganic() {
                 ["Bereik", num(insta.reach)],
                 ["Profielbezoeken", num(insta.profile_views)],
               ]} />
-            ) : <Empty>geen gekoppeld Instagram-account.</Empty>}
+            ) : <Empty>Geen gekoppeld Instagram-account.</Empty>}
           </SectionCard>
         </div>
       )}
@@ -134,14 +134,14 @@ export default function MetaOrganic() {
               ]} />
               <PostList posts={fb.top_posts} />
             </>
-          ) : <Empty>geen Facebook-paginadata.</Empty>}
+          ) : <Empty>Geen Facebook-paginadata.</Empty>}
         </SectionCard>
       )}
 
       {/* ---- Instagram ---- */}
       {view === "instagram" && (
         <SectionCard title={"Instagram" + (insta?.username ? " · @" + insta.username : "")}>
-          {ig == null ? <Empty>geen gekoppeld Instagram-account.</Empty> : insta ? (
+          {ig == null ? <Empty>Geen gekoppeld Instagram-account.</Empty> : insta ? (
             <>
               <KpiRow items={[
                 ["Volgers", num(insta.followers)],
@@ -152,7 +152,7 @@ export default function MetaOrganic() {
               ]} />
               <PostList posts={insta.top_posts} />
             </>
-          ) : <Empty>geen Instagram-data.</Empty>}
+          ) : <Empty>Geen Instagram-data.</Empty>}
         </SectionCard>
       )}
     </div>
@@ -164,7 +164,7 @@ function Header({ right, label }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "#E7F0FF", display: "flex", alignItems: "center", justifyContent: "center" }}><MetaGlyph s={20} /></div>
-        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>META Organisch</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Facebook & Instagram — organische resultaten</div></div>
+        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>META Organisch</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Facebook en Instagram: organische resultaten</div></div>
         <div style={{ flex: 1 }} />
         {right}
       </div>
@@ -188,7 +188,7 @@ function KpiRow({ items }) {
 }
 
 function PostList({ posts }) {
-  if (!posts?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen posts in deze periode.</div>;
+  if (!posts?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>Geen posts in deze periode.</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)" }}>top-posts</div>

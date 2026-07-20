@@ -27,7 +27,7 @@ export default function WooCommerce() {
   const widgets = useMemo(() => instantiateTemplate(woocommerceCatalog, activeView.tpl).widgets, [activeView.id]);
 
   const sections = () => data?.kpis ? [
-    { title: "WooCommerce — " + label },
+    { title: "WooCommerce · " + label },
     { columns: ["Metric", "Waarde"], rows: [
       ["Omzet", (data.kpis.revenue || 0).toFixed(2)],
       ["Bestellingen", data.kpis.orders],
@@ -46,7 +46,7 @@ export default function WooCommerce() {
           <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F3EDFA", display: "flex", alignItems: "center", justifyContent: "center" }}><WooGlyph s={20} /></div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>WooCommerce</div>
-            <div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>webshop — omzet, bestellingen & producten</div>
+            <div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Webshop: omzet, bestellingen en producten</div>
           </div>
         </div>
         <div style={{ flex: 1 }} />

@@ -175,7 +175,7 @@ export default function WidgetRenderer({ widget, data, catalog, ctx }) {
 function Empty() {
   return (
     <div style={{ padding: "24px 0", display: "grid", placeItems: "center", color: "var(--c-muted)", fontSize: 13 }}>
-      geen data in deze periode
+      Geen data in deze periode
     </div>
   );
 }

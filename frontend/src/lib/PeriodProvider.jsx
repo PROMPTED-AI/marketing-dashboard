@@ -79,7 +79,7 @@ export function DateRangeProvider({ children }) {
     };
     const presetLabel = PRESETS.find((p) => p.id === state.preset)?.label;
     const fmt = (d) => parse(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
-    const label = presetLabel || `${fmt(state.start)} – ${fmt(state.end)}`;
+    const label = presetLabel || `${fmt(state.start)} t/m ${fmt(state.end)}`;
     const compare = computeCompare(state.compareMode, state.start, state.end, state.compareStart, state.compareEnd);
     const compareLabel = COMPARE_OPTIONS.find((c) => c.id === state.compareMode)?.label || "Geen vergelijking";
     return { ...state, label, compare, compareLabel, apply, isoToday: iso(new Date()) };

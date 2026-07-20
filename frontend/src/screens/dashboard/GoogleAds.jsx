@@ -71,7 +71,7 @@ export default function GoogleAds() {
   const sections = () => {
     if (!data || !k) return [];
     return [
-      { title: "Google Ads — " + label },
+      { title: "Google Ads · " + label },
       { columns: ["Metric", "Waarde"], rows: [
         ["Kosten", (k.cost || 0).toFixed(2)],
         ["Klikken", k.clicks],
@@ -164,7 +164,7 @@ export default function GoogleAds() {
             <KpiCard label="CPM" value={eur(cpm(k))} {...(data.deltas ? deltaProps(data.deltas.cpm, false) : {})} />
             <KpiCard label="CPA" value={eur(cpa(k.cost, k.conversions))} />
           </div>
-          <SectionCard title="efficiëntie per campagne — hoge uitgaven, weinig conversie bovenaan">
+          <SectionCard title="Efficiëntie per campagne: hoge uitgaven, weinig conversie bovenaan">
             <CampaignTable rows={[...campaigns].sort((a, b) => (b.cost || 0) - (a.cost || 0))}
               cols={["Campagne", "Kosten", "Conversies", "CPA", "CTR"]}
               render={(c) => [c.name, eur(c.cost), num(c.conversions), eur(cpa(c.cost, c.conversions)), pct1(c.ctr)]} />
@@ -195,18 +195,18 @@ function Header({ right, label }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}><AdsGlyph s={20} /></div>
-        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Google Ads</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>campagnes, kosten & conversies</div></div>
+        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Google Ads</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Campagnes, kosten en conversies</div></div>
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>google ads — campagnes</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>google ads · campagnes</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Google Ads-koppeling</div>
     </div>
   );
 }
 
 function CampaignTable({ rows, cols, render }) {
-  if (!rows?.length) return <Empty>geen campagnedata in deze periode.</Empty>;
+  if (!rows?.length) return <Empty>Geen campagnedata in deze periode.</Empty>;
   const grid = "2fr " + cols.slice(1).map(() => "1fr").join(" ");
   return (
     <div style={{ overflowX: "auto" }}>

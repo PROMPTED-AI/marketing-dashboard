@@ -140,7 +140,7 @@ export default function Assistant() {
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--c-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-accent)" }}><IcChat s={19} /></div>
         <div>
           <div className="display" style={{ fontSize: 24, lineHeight: 1 }}>assistent</div>
-          <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{label} · vraag alles over je cijfers</div>
+          <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{label} · Vraag alles over je cijfers</div>
         </div>
       </div>
 

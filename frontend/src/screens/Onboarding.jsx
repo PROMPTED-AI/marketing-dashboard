@@ -5,10 +5,10 @@ import { useMe } from "../lib/useMe.jsx";
 import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
 const TOOLS = [
-  { key: "ga", name: "Google Analytics", desc: "bezoekers, sessies, conversies & gedrag (GA4).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
-  { key: "gsc", name: "Search Console", desc: "organisch verkeer, posities & zoekwoorden (SEO).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GscGlyph, bg: "#E8F0FE", live: true },
-  { key: "ads", name: "Google Ads", desc: "campagnes, kosten, klikken & ROAS.", note: "OAuth via Google · veilig & alleen-lezen", Glyph: AdsGlyph, bg: "#E8F0FE", live: true },
-  { key: "meta", name: "META / social", desc: "Facebook & Instagram — campagnes, bereik & betrokkenheid.", note: "Facebook Login · veilig & alleen-lezen", Glyph: MetaGlyph, bg: "#E7F0FF", live: true },
+  { key: "ga", name: "Google Analytics", desc: "Bezoekers, sessies, conversies en gedrag (GA4).", note: "OAuth via Google · veilig en alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
+  { key: "gsc", name: "Search Console", desc: "Organisch verkeer, posities en zoekwoorden (SEO).", note: "OAuth via Google · veilig en alleen-lezen", Glyph: GscGlyph, bg: "#E8F0FE", live: true },
+  { key: "ads", name: "Google Ads", desc: "Campagnes, kosten, klikken en ROAS.", note: "OAuth via Google · veilig en alleen-lezen", Glyph: AdsGlyph, bg: "#E8F0FE", live: true },
+  { key: "meta", name: "META / social", desc: "Campagnes, bereik en betrokkenheid op Facebook en Instagram.", note: "Facebook Login · veilig en alleen-lezen", Glyph: MetaGlyph, bg: "#E7F0FF", live: true },
 ];
 
 // De twee bedrijfsprofielen. Het gekozen profiel richt de dashboards standaard in
@@ -64,11 +64,13 @@ export default function Onboarding() {
     nav("/app/analytics");
   };
 
-  const stepPill = (active, done, txt) => (
-    <span style={{ color: done ? "var(--c-pos)" : active ? "var(--c-accent)" : "var(--c-muted)" }}>
-      {done ? "✓ " : ""}{txt}
-    </span>
-  );
+  // Visuele stepper: genummerde cirkels met vinkje voor afgeronde stappen en
+  // een lijn die meekleurt met de voortgang.
+  const steps = [
+    { label: "Account", done: true, active: false },
+    { label: "Profiel", done: step === "tools", active: step === "profile" },
+    { label: "Koppelen", done: false, active: step === "tools" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--c-page)", display: "flex", justifyContent: "center", padding: 24 }}>
@@ -78,12 +80,22 @@ export default function Onboarding() {
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
           <div className="display" style={{ fontSize: 20 }}>kompas</div>
           <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--c-muted)", fontWeight: 600 }}>
-            {stepPill(false, true, "account")}<span style={{ opacity: 0.4 }}>———</span>
-            {stepPill(step === "profile", step === "tools", "profiel")}<span style={{ opacity: 0.4 }}>———</span>
-            {stepPill(step === "tools", false, "koppelen")}
+          <div className="hide-mobile" style={{ display: "flex", alignItems: "center" }}>
+            {steps.map((s, i) => (
+              <div key={s.label} style={{ display: "flex", alignItems: "center" }}>
+                {i > 0 && <div style={{ ...stepLine, background: s.done || s.active ? "var(--c-accent)" : "var(--c-track)" }} />}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ ...stepDot, ...(s.done ? stepDotDone : s.active ? stepDotActive : {}) }}>
+                    {s.done ? <IcCheck s={13} /> : i + 1}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: s.done ? "var(--c-pos)" : s.active ? "var(--c-ink)" : "var(--c-muted)" }}>
+                    {s.label}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
-          <div onClick={skip} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>overslaan</div>
+          <div onClick={skip} style={{ marginLeft: 18, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Overslaan</div>
         </div>
 
         {/* body */}
@@ -92,7 +104,7 @@ export default function Onboarding() {
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 1 van 2</div>
             <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>wat voor bedrijf ben je?</div>
             <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 620, marginBottom: 24 }}>
-              hiermee richten we je dashboards meteen goed in. je kunt dit later altijd wijzigen in Instellingen.
+              Hiermee richten we je dashboards meteen goed in. Je kunt dit later altijd wijzigen in Instellingen.
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
@@ -121,11 +133,11 @@ export default function Onboarding() {
             <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>koppel je marketingtools.</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
               <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>
-                kies welke bronnen je wilt verbinden. je kunt er één kiezen of alles tegelijk — later koppelen kan altijd via Integraties.
+                Kies welke bronnen je wilt verbinden. Je kunt er één kiezen of alles tegelijk. Later koppelen kan altijd via Integraties.
               </div>
               <div onClick={toggleAll} style={selectAll}>
                 <div style={{ ...box, ...(allSel ? boxOn : {}) }}>{allSel && <IcCheck />}</div>
-                selecteer alles
+                Selecteer alles
               </div>
             </div>
 
@@ -166,6 +178,10 @@ export default function Onboarding() {
   );
 }
 
+const stepDot = { width: 26, height: 26, borderRadius: "50%", border: "2px solid var(--c-border-strong)", color: "var(--c-muted)", background: "var(--c-surface)", fontSize: 12.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
+const stepDotActive = { border: "2px solid var(--c-accent)", background: "var(--c-accent)", color: "var(--c-accent-ink)" };
+const stepDotDone = { border: "2px solid var(--c-pos)", background: "var(--c-pos)", color: "#fff" };
+const stepLine = { width: 34, height: 2, borderRadius: 1, margin: "0 10px" };
 const selectAll = { display: "inline-flex", alignItems: "center", gap: 9, padding: "9px 15px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
 const box = { width: 18, height: 18, borderRadius: 6, border: "2px solid var(--c-muted)", display: "flex", alignItems: "center", justifyContent: "center" };
 const boxOn = { background: "var(--c-accent)", border: "2px solid var(--c-accent)" };

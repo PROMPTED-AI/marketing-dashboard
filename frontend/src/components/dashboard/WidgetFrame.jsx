@@ -64,7 +64,7 @@ function MultiSelect({ label, allLabel = "Alles", options, value, onChange }) {
             </label>
           ))}
           {options.length === 0 && (
-            <div style={{ padding: 8, fontSize: 12, color: "var(--c-muted)" }}>geen opties in deze periode</div>
+            <div style={{ padding: 8, fontSize: 12, color: "var(--c-muted)" }}>Geen opties in deze periode</div>
           )}
         </div>
       )}
