@@ -70,7 +70,7 @@ export default function Login() {
               <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--c-ink-soft)", fontWeight: 500 }}>
                 <input type="checkbox" /> onthoud mij
               </label>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>wachtwoord vergeten?</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>Wachtwoord vergeten?</span>
             </div>
 
             <button type="submit" className="btn-primary" style={{ width: "100%", height: 52, fontSize: 15, opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer" }} disabled={busy}>
@@ -103,7 +103,7 @@ export default function Login() {
         <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.7)", position: "relative" }}>partner in groei</div>
         <div style={{ position: "relative" }}>
           <div className="display" style={{ fontSize: "clamp(38px, 4vw, 54px)", lineHeight: 0.98, color: "#fff", marginBottom: 20 }}>al je marketing<br />op één plek.</div>
-          <div style={{ fontSize: 16, lineHeight: 1.6, color: "rgba(255,255,255,.82)", maxWidth: 360 }}>analytics, ads en seo gebundeld in heldere dashboards. minder schakelen, meer overzicht.</div>
+          <div style={{ fontSize: 16, lineHeight: 1.6, color: "rgba(255,255,255,.82)", maxWidth: 360 }}>Analytics, ads en SEO gebundeld in heldere dashboards. Minder schakelen, meer overzicht.</div>
         </div>
         <div style={{ position: "relative", display: "flex", gap: 10 }}>
           <div style={{ width: 34, height: 6, borderRadius: 3, background: "#fff" }} />

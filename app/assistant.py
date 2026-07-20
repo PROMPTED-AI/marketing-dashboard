@@ -46,9 +46,12 @@ SYSTEM_PROMPT = (
     "periode (bijv. 'vorige maand', 'maart', 'afgelopen 7 dagen'), reken die dan om "
     "naar ISO-datums en geef die als start/end mee aan de tool. Noem in je antwoord "
     "altijd welke periode je hebt gebruikt.\n"
-    "- Opmaak: gebruik korte Markdown waar dat de leesbaarheid helpt — koppen, "
+    "- Opmaak: gebruik korte Markdown waar dat de leesbaarheid helpt: koppen, "
     "**vet** voor kerncijfers, opsommingen, en een Markdown-tabel bij een "
-    "vergelijking van meerdere kanalen of campagnes. Hou het bondig en to-the-point."
+    "vergelijking van meerdere kanalen of campagnes. Hou het bondig en to-the-point.\n"
+    "- Schrijfstijl: schrijf volledige zinnen die met een hoofdletter beginnen. "
+    "Gebruik NOOIT een gedachtestreepje (em dash of los streepje als leesteken); "
+    "gebruik in plaats daarvan een komma, dubbele punt of een nieuwe zin."
 )
 
 # Optionele periode-override per tool: alleen invullen als de gebruiker expliciet
@@ -89,7 +92,7 @@ TOOLS = [
             "description": (
                 "Cross-kanaal marketingoverzicht van de klant voor de huidige periode: "
                 "haalt alle gekoppelde kanalen op en berekent de VERBANDEN ertussen die "
-                "je zelf niet mag uitrekenen — totale advertentie-uitgaven (Google Ads + "
+                "je zelf niet mag uitrekenen: totale advertentie-uitgaven (Google Ads + "
                 "Meta), totale omzet, blended ROAS (omzet / advertentie-uitgaven), kosten "
                 "per conversie, en de verdeling betaald vs. organisch vs. direct verkeer. "
                 "Geeft ook per kanaal de kerncijfers. Gebruik dit ALTIJD bij vragen over "

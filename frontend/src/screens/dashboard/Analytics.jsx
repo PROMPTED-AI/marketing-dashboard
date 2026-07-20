@@ -66,7 +66,7 @@ export default function Analytics() {
   const sections = () => {
     if (!data) return [];
     const out = [
-      { title: "Analytics — " + label },
+      { title: "Analytics · " + label },
       { columns: ["Metric", "Waarde"], rows: [
         ["Gebruikers", data.kpis.users],
         ["Sessies", data.kpis.sessions],
@@ -106,7 +106,7 @@ export default function Analytics() {
       </div>
 
       <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>automatisch ingeladen via je GA4-koppeling · {label}</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>Automatisch ingeladen via je GA4-koppeling · {label}</div>
 
       {/* view-switcher */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
@@ -137,8 +137,8 @@ export default function Analytics() {
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> realtime
             </div>
             <div className="display" style={{ fontSize: 44, lineHeight: 1, margin: "8px 0 2px" }}>{rt ? num(rt.active_users) : "—"}</div>
-            <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 16 }}>actieve gebruikers nu</div>
-            <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>per minuut (laatste 30 min)</div>
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 16 }}>Actieve gebruikers nu</div>
+            <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>Per minuut (laatste 30 min)</div>
             <RealtimeBars values={rt?.by_minute || []} />
           </SectionCard>
           <SectionCard title="actieve pagina's" style={{ flex: 1, minWidth: 280 }}>
@@ -151,7 +151,7 @@ export default function Analytics() {
                   </div>
                 ))}
               </div>
-            ) : <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen actieve pagina's nu.</div>}
+            ) : <div style={{ color: "var(--c-muted)", fontSize: 13 }}>Geen actieve pagina's nu.</div>}
           </SectionCard>
         </div>
       ) : (

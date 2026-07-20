@@ -2,33 +2,49 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { LOGOUT_URL } from "../lib/api.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
+import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
   IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcGrid,
   IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
 } from "./icons.jsx";
 
 // De sidebar is gegroepeerd: losse items + uitklapbare groepen (Marketing met
-// alle marketingkanalen, Verkoop met de webshop).
+// alle marketingkanalen, Verkoop met de webshop). Kanaal-items dragen een
+// `provider`-key: alleen kanalen met een actieve koppeling verschijnen in het
+// menu (extra kanalen koppel je via Integraties; META Organisch deelt de
+// META-koppeling). Items zonder `provider` zijn altijd zichtbaar.
 const NAV = [
   { to: "/app/assistant", label: "Assistent", Icon: IcChat },
   {
     group: "Marketing", Icon: IcMegaphone, children: [
-      { to: "/app/analytics", label: "Analytics", Icon: IcBars },
-      { to: "/app/search-console", label: "Search Console", Icon: IcSearch },
-      { to: "/app/google-ads", label: "Google Ads", Icon: IcAds },
-      { to: "/app/meta-ads", label: "META Ads", Icon: IcShare },
-      { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare },
+      { to: "/app/analytics", label: "Analytics", Icon: IcBars, provider: "google_analytics" },
+      { to: "/app/search-console", label: "Search Console", Icon: IcSearch, provider: "search_console" },
+      { to: "/app/google-ads", label: "Google Ads", Icon: IcAds, provider: "google_ads" },
+      { to: "/app/meta-ads", label: "META Ads", Icon: IcShare, provider: "meta_ads" },
+      { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare, provider: "meta_ads" },
     ],
   },
   {
     group: "Verkoop", Icon: IcCart, children: [
-      { to: "/app/woocommerce", label: "WooCommerce", Icon: IcCart },
+      { to: "/app/woocommerce", label: "WooCommerce", Icon: IcCart, provider: "woocommerce" },
     ],
   },
   { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },
   { to: "/app/integrations", label: "Integraties", Icon: IcPlug },
   { to: "/app/settings", label: "Instellingen", Icon: IcCog },
 ];
+
+// Filter de navigatie op actieve koppelingen. Zolang de status onbekend is
+// (eerste load, geen cache) tonen we alles — daarna klapt het menu netjes
+// terug naar alleen de gekoppelde kanalen. Groepen zonder kanalen verdwijnen.
+function navForConnections(active) {
+  if (!active) return NAV;
+  return NAV.map((item) => {
+    if (!item.group) return item;
+    const children = item.children.filter((c) => !c.provider || active.has(c.provider));
+    return children.length ? { ...item, children } : null;
+  }).filter(Boolean);
+}
 
 function initials(name = "") {
   const parts = name.replace(/^https?:\/\//, "").split(/[ .@]/).filter(Boolean);
@@ -37,6 +53,8 @@ function initials(name = "") {
 
 export default function Sidebar({ user, connected = 0, total = 4, open = false, onNavigate }) {
   const { orgs, orgId, orgName, setOrg } = useActiveOrg();
+  const { data: connData } = useConnections();
+  const nav = navForConnections(connectedProviders(connData));
   const pct = Math.round((connected / total) * 100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
@@ -72,7 +90,7 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
 
       <div style={menuLabel}>Menu</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
-        {NAV.map((item) => (
+        {nav.map((item) => (
           item.group ? (
             <NavGroup key={item.group} item={item} onNavigate={onNavigate} />
           ) : (

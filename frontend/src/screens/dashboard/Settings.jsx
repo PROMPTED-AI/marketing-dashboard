@@ -26,7 +26,7 @@ export default function Settings() {
   return (
     <div>
       <div className="display" style={{ fontSize: 30 }}>instellingen</div>
-      <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 22px" }}>beheer je profiel, voorkeuren en organisatie</div>
+      <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 22px" }}>Beheer je profiel, voorkeuren en organisatie</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
         {/* PROFIEL */}
@@ -50,7 +50,7 @@ export default function Settings() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0" }}>
             <div>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Standaard periode</div>
-              <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>wordt overal in het dashboard gebruikt</div>
+              <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Wordt overal in het dashboard gebruikt</div>
             </div>
             <select
               value={PRESETS.some((p) => p.id === preset) ? preset : ""}

@@ -26,17 +26,17 @@ DEMO_PASSWORD = "janssen123"
 DEMO_SITE = "https://www.janssen.nl/"
 
 DEMO_PROPERTIES = [
-    {"property_id": "demo-janssen", "display_name": "janssen.nl — website", "account": "Janssen"},
+    {"property_id": "demo-janssen", "display_name": "janssen.nl · website", "account": "Janssen"},
 ]
 
 DEMO_SITES = [{"site_url": DEMO_SITE, "permission": "siteFullUser"}]
 
 # Google Ads: accounts the demo "connection" exposes.
-DEMO_ADS_ACCOUNTS = [{"customer_id": "demo-1234567890", "name": "Janssen — Google Ads"}]
+DEMO_ADS_ACCOUNTS = [{"customer_id": "demo-1234567890", "name": "Janssen · Google Ads"}]
 
 # Meta: ad accounts + pages (with linked Instagram) the demo exposes.
 DEMO_META_ASSETS = {
-    "ad_accounts": [{"id": "act_demo_janssen", "name": "Janssen — Adverteren", "currency": "EUR"}],
+    "ad_accounts": [{"id": "act_demo_janssen", "name": "Janssen · Adverteren", "currency": "EUR"}],
     "pages": [
         {
             "id": "demo_page_janssen",
@@ -516,11 +516,11 @@ def ads_overview(start: str, end: str, compare: tuple[str, str] | None = None) -
         }
 
     campaigns = [
-        campaign("Merk — Zoeken", 0.28, 6.8, 8.4),
-        campaign("Producten — Shopping", 0.24, 1.9, 5.1),
-        campaign("Diensten — Zoeken", 0.18, 4.2, 4.6),
-        campaign("Remarketing — Display", 0.12, 0.7, 3.2),
-        campaign("Concurrenten — Zoeken", 0.09, 3.1, 2.4),
+        campaign("Merk · Zoeken", 0.28, 6.8, 8.4),
+        campaign("Producten · Shopping", 0.24, 1.9, 5.1),
+        campaign("Diensten · Zoeken", 0.18, 4.2, 4.6),
+        campaign("Remarketing · Display", 0.12, 0.7, 3.2),
+        campaign("Concurrenten · Zoeken", 0.09, 3.1, 2.4),
         campaign("Performance Max", 0.09, 2.6, 6.0),
     ]
 
@@ -586,11 +586,11 @@ def meta_ads_overview(start: str, end: str, compare: tuple[str, str] | None = No
         }
 
     campaigns = [
-        campaign("Aankopen — Voorjaar", "OUTCOME_SALES", "ACTIVE", 0.34, 1.5),
-        campaign("Leads — Offerteaanvraag", "OUTCOME_LEADS", "ACTIVE", 0.24, 1.1),
-        campaign("Verkeer — Blog", "OUTCOME_TRAFFIC", "ACTIVE", 0.16, 1.9),
-        campaign("Betrokkenheid — Merk", "OUTCOME_ENGAGEMENT", "PAUSED", 0.14, 0.9),
-        campaign("Retargeting — Websitebezoekers", "OUTCOME_SALES", "ACTIVE", 0.12, 2.3),
+        campaign("Aankopen · Voorjaar", "OUTCOME_SALES", "ACTIVE", 0.34, 1.5),
+        campaign("Leads · Offerteaanvraag", "OUTCOME_LEADS", "ACTIVE", 0.24, 1.1),
+        campaign("Verkeer · Blog", "OUTCOME_TRAFFIC", "ACTIVE", 0.16, 1.9),
+        campaign("Betrokkenheid · Merk", "OUTCOME_ENGAGEMENT", "PAUSED", 0.14, 0.9),
+        campaign("Retargeting · Websitebezoekers", "OUTCOME_SALES", "ACTIVE", 0.12, 2.3),
     ]
 
     def result(goal, share, roas):

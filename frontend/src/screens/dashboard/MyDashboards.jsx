@@ -39,7 +39,7 @@ export default function MyDashboards() {
       <div style={{ marginBottom: 14 }}>
         <div className="display" style={{ fontSize: 30 }}>mijn dashboards</div>
         <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
-          Stel per kanaal je eigen indeling samen — kies de cijfers, grafieken en tabellen die jij wilt zien.
+          Stel per kanaal je eigen indeling samen. Kies de cijfers, grafieken en tabellen die jij wilt zien.
         </div>
       </div>
 
@@ -87,7 +87,7 @@ function AnalyticsData({ catalog }) {
     </select>
   );
   const sections = () => data ? [
-    { title: "Analytics — " + label },
+    { title: "Analytics · " + label },
     { columns: ["Metric", "Waarde"], rows: [["Bezoekers", data.kpis.users], ["Sessies", data.kpis.sessions], ["Conversies", (data.conversions || []).reduce((a, c) => a + c.count, 0)]] },
   ] : [];
 
@@ -120,7 +120,7 @@ function SearchConsoleData({ catalog }) {
     </select>
   );
   const sections = () => data?.totals ? [
-    { title: "Search Console — " + label + " · " + activeSite },
+    { title: "Search Console · " + label + " · " + activeSite },
     { columns: ["Metric", "Waarde"], rows: [["Klikken", data.totals.clicks], ["Vertoningen", data.totals.impressions]] },
   ] : [];
 
@@ -153,7 +153,7 @@ function GoogleAdsData({ catalog }) {
     </select>
   );
   const sections = () => data?.kpis ? [
-    { title: "Google Ads — " + label },
+    { title: "Google Ads · " + label },
     { columns: ["Metric", "Waarde"], rows: [["Kosten", (data.kpis.cost || 0).toFixed(2)], ["Klikken", data.kpis.clicks], ["Conversies", (data.kpis.conversions || 0).toFixed(1)]] },
   ] : [];
 
@@ -186,7 +186,7 @@ function MetaAdsData({ catalog }) {
     </select>
   );
   const sections = () => data?.kpis ? [
-    { title: "META Ads — " + label },
+    { title: "META Ads · " + label },
     { columns: ["Metric", "Waarde"], rows: [["Uitgaven", (data.kpis.spend || 0).toFixed(2)], ["Bereik", data.kpis.reach], ["Klikken", data.kpis.clicks]] },
   ] : [];
 
@@ -222,8 +222,8 @@ function MetaOrganicData({ catalog }) {
   const sections = () => {
     const fb = data?.facebook, insta = data?.instagram;
     const out = [];
-    if (fb) out.push({ title: "Facebook — " + label, columns: ["Metric", "Waarde"], rows: [["Volgers", fb.followers], ["Bereik", fb.reach]] });
-    if (insta) out.push({ title: "Instagram — " + label, columns: ["Metric", "Waarde"], rows: [["Volgers", insta.followers], ["Bereik", insta.reach]] });
+    if (fb) out.push({ title: "Facebook · " + label, columns: ["Metric", "Waarde"], rows: [["Volgers", fb.followers], ["Bereik", fb.reach]] });
+    if (insta) out.push({ title: "Instagram · " + label, columns: ["Metric", "Waarde"], rows: [["Volgers", insta.followers], ["Bereik", insta.reach]] });
     return out;
   };
 
@@ -242,7 +242,7 @@ function WooCommerceData({ catalog }) {
   const { data, loading, error } = useCachedApi(wcReportUrl(start, end, compare, orgId));
 
   const sections = () => data?.kpis ? [
-    { title: "WooCommerce — " + label },
+    { title: "WooCommerce · " + label },
     { columns: ["Metric", "Waarde"], rows: [["Omzet", (data.kpis.revenue || 0).toFixed(2)], ["Bestellingen", data.kpis.orders], ["Gem. orderwaarde", (data.kpis.avgOrderValue || 0).toFixed(2)]] },
     { title: "Topproducten", columns: ["Product", "Aantal", "Omzet"], rows: (data.top_products || []).map((p) => [p.name, p.qty, (p.revenue || 0).toFixed(2)]) },
   ] : [];

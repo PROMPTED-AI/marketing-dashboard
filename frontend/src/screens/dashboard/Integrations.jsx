@@ -8,11 +8,11 @@ import { TabState } from "../../components/ui.jsx";
 import Modal from "../../components/dashboard/Modal.jsx";
 
 const META = {
-  google_analytics: { name: "Google Analytics", desc: "GA4 — bezoekers, sessies, conversies", Glyph: GaGlyph, bg: "#FFF3E0" },
-  search_console: { name: "Search Console", desc: "organisch verkeer, posities & zoekwoorden", Glyph: GscGlyph, bg: "#E8F0FE" },
-  google_ads: { name: "Google Ads", desc: "campagnes, kosten, klikken & ROAS", Glyph: AdsGlyph, bg: "#E8F0FE" },
-  meta_ads: { name: "META Ads", desc: "Facebook & Instagram campagnes", Glyph: MetaGlyph, bg: "#E7F0FF" },
-  woocommerce: { name: "WooCommerce", desc: "webshop — omzet, bestellingen & producten", Glyph: WooGlyph, bg: "#F3EDFA" },
+  google_analytics: { name: "Google Analytics", desc: "GA4: bezoekers, sessies en conversies", Glyph: GaGlyph, bg: "#FFF3E0" },
+  search_console: { name: "Search Console", desc: "Organisch verkeer, posities en zoekwoorden", Glyph: GscGlyph, bg: "#E8F0FE" },
+  google_ads: { name: "Google Ads", desc: "Campagnes, kosten, klikken en ROAS", Glyph: AdsGlyph, bg: "#E8F0FE" },
+  meta_ads: { name: "META Ads", desc: "Campagnes op Facebook en Instagram", Glyph: MetaGlyph, bg: "#E7F0FF" },
+  woocommerce: { name: "WooCommerce", desc: "Webshop: omzet, bestellingen en producten", Glyph: WooGlyph, bg: "#F3EDFA" },
 };
 
 function StatusPill({ status }) {
@@ -147,17 +147,17 @@ export default function Integrations() {
               </div>
               <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                 {canConnect && (c.provider === "woocommerce" ? (
-                  <button className="btn-primary" onClick={() => setWooOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>koppelen</button>
+                  <button className="btn-primary" onClick={() => setWooOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>Koppelen</button>
                 ) : (
-                  <a className="btn-primary" href={c.provider === "meta_ads" ? metaLoginUrl(orgId) : connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>koppelen</a>
+                  <a className="btn-primary" href={c.provider === "meta_ads" ? metaLoginUrl(orgId) : connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>Koppelen</a>
                 ))}
                 {c.status === "connected" && (
                   <>
                     <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>
-                    <button className="btn-ghost" style={{ height: 38, padding: "0 16px", fontSize: 13 }} onClick={() => onDisconnect(c.provider, m.name)}>ontkoppelen</button>
+                    <button className="btn-ghost" style={{ height: 38, padding: "0 16px", fontSize: 13 }} onClick={() => onDisconnect(c.provider, m.name)}>Ontkoppelen</button>
                   </>
                 )}
-                {c.status === "coming_soon" && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>nog niet beschikbaar</span>}
+                {c.status === "coming_soon" && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Nog niet beschikbaar</span>}
               </div>
             </div>
           );

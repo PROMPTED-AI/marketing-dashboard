@@ -80,7 +80,7 @@ export default function SearchConsole() {
   const sections = () => {
     if (!data) return [];
     const out = [
-      { title: "Search Console — " + label + " · " + site },
+      { title: "Search Console · " + label + " · " + site },
       { columns: ["Metric", "Waarde"], rows: [
         ["Klikken", t.clicks],
         ["Vertoningen", t.impressions],
@@ -179,7 +179,7 @@ export default function SearchConsole() {
       {/* ---- Zoekopdrachten ---- */}
       {data && view === "queries" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SectionCard title="top zoekopdrachten — klikken">
+          <SectionCard title="Top zoekopdrachten: klikken">
             <BarList rows={data.top_queries} keyCol="query" />
           </SectionCard>
           <SectionCard title="alle zoekopdrachten"><Table rows={data.top_queries} keyCol="query" /></SectionCard>
@@ -189,7 +189,7 @@ export default function SearchConsole() {
       {/* ---- Pagina's ---- */}
       {data && view === "pages" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SectionCard title="top pagina's — klikken">
+          <SectionCard title="Top pagina's: klikken">
             <BarList rows={data.top_pages} keyCol="page" />
           </SectionCard>
           <SectionCard title="alle pagina's"><Table rows={data.top_pages} keyCol="page" /></SectionCard>
@@ -199,7 +199,7 @@ export default function SearchConsole() {
       {/* ---- Kansen ---- */}
       {data && view === "opportunities" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SectionCard title="bijna pagina 1 — positie 11–20">
+          <SectionCard title="Bijna pagina 1: positie 11 t/m 20">
             <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 12 }}>
               Zoekopdrachten die net geen pagina 1 halen maar veel worden vertoond. Een kleine positieverbetering levert hier direct extra klikken op.
             </div>
@@ -253,11 +253,11 @@ function Header({ right, label }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}><GscGlyph s={20} /></div>
-        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Search Console</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>organisch verkeer & posities</div></div>
+        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Search Console</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Organisch verkeer en posities</div></div>
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>search console — seo</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>search console · seo</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Search Console-koppeling</div>
     </div>
   );
@@ -326,7 +326,7 @@ function SegTable({ rows, keyCol, labelFn }) {
 }
 
 function OppTable({ rows }) {
-  if (!rows?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen directe kansen in deze periode.</div>;
+  if (!rows?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>Geen directe kansen in deze periode.</div>;
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ ...head, gridTemplateColumns: "2.4fr 1fr 1fr 1fr" }}>

@@ -84,7 +84,7 @@ export default function Admin() {
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div className="display" style={{ fontSize: 30 }}>klanten</div>
-              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>alle organisaties op het platform — koppelingen, status &amp; activiteit</div>
+              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>Alle organisaties op het platform: koppelingen, status en activiteit</div>
             </div>
             <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setAdding(true)}>
               <IcPlus s={16} /> klant toevoegen
@@ -163,7 +163,7 @@ function AddClientModal({ onClose, onDone }) {
             <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>klant aangemaakt</div>
             <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
               <strong style={{ color: "var(--c-ink)" }}>{org.name}</strong> ({org.domain}) staat klaar. Nodig de klant uit door iemand met een
-              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard — ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
+              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard. Ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button className="btn-primary" style={{ height: 42, padding: "0 20px" }} onClick={onDone}>klaar</button>
@@ -172,7 +172,7 @@ function AddClientModal({ onClose, onDone }) {
         ) : (
           <form onSubmit={submit}>
             <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>klant toevoegen</div>
-            <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>maak een organisatie aan en nodig de klant uit via hun e-maildomein.</div>
+            <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Maak een organisatie aan en nodig de klant uit via hun e-maildomein.</div>
             <label style={lbl}>Naam organisatie</label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
             <label style={lbl}>E-maildomein</label>

@@ -56,7 +56,7 @@ export default function MetaAds() {
   const sections = () => {
     const out = [];
     if (ads?.kpis) {
-      out.push({ title: "META Ads — " + label });
+      out.push({ title: "META Ads · " + label });
       out.push({ columns: ["Metric", "Waarde"], rows: [
         ["Uitgaven", (ads.kpis.spend || 0).toFixed(2)], ["Vertoningen", ads.kpis.impressions],
         ["Bereik", ads.kpis.reach], ["Frequentie", (ads.kpis.frequency || 0).toFixed(2)],
@@ -144,7 +144,7 @@ export default function MetaAds() {
                 {results.length ? (
                   <Table head={["Doel", "Aantal", "Waarde", "ROAS", "CPA"]} cols="2fr 1fr 1fr 0.8fr 1fr"
                     rows={results.map((r) => [r.goal, num(r.count), money(r.value, currency), roas(r.roas), money(r.cpa, currency)])} />
-                ) : <Empty>geen conversieresultaten in deze periode.</Empty>}
+                ) : <Empty>Geen conversieresultaten in deze periode.</Empty>}
               </SectionCard>
             </>
           )}
@@ -156,7 +156,7 @@ export default function MetaAds() {
                 <Table head={["Campagne", "Doelstelling", "Status", "Uitgaven", "Klikken", "CTR", "Resultaten"]}
                   cols="1.8fr 1.1fr 0.9fr 1fr 0.8fr 0.7fr 0.9fr"
                   rows={ads.campaigns.map((c) => [c.name, c.objective || "—", statusLabel(c.status), money(c.spend, currency), num(c.clicks), pct1(c.ctr), num(c.results)])} />
-              ) : <Empty>geen campagnedata in deze periode.</Empty>}
+              ) : <Empty>Geen campagnedata in deze periode.</Empty>}
             </SectionCard>
           )}
 
@@ -173,7 +173,7 @@ export default function MetaAds() {
                 {results.length ? (
                   <Table head={["Doel", "Aantal", "Waarde", "ROAS", "CPA"]} cols="2fr 1fr 1fr 0.8fr 1fr"
                     rows={results.map((r) => [r.goal, num(r.count), money(r.value, currency), roas(r.roas), money(r.cpa, currency)])} />
-                ) : <Empty>geen conversieresultaten in deze periode.</Empty>}
+                ) : <Empty>Geen conversieresultaten in deze periode.</Empty>}
               </SectionCard>
             </>
           )}
@@ -182,7 +182,7 @@ export default function MetaAds() {
           {view === "vs" && (
             <SectionCard title="betaald vs. organisch">
               <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>
-                Wat advertenties toevoegen bovenop je organische bereik en betrokkenheid{firstPage ? " — " + firstPage.name : ""}.
+                Wat advertenties toevoegen bovenop je organische bereik en betrokkenheid{firstPage ? ", voor " + firstPage.name : ""}.
               </div>
               <KpiRow items={[
                 ["Betaald bereik", num(k?.reach)],
@@ -204,7 +204,7 @@ function Header({ right, label }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "#E7F0FF", display: "flex", alignItems: "center", justifyContent: "center" }}><MetaGlyph s={20} /></div>
-        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>META Ads</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Facebook & Instagram — betaalde advertenties</div></div>
+        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>META Ads</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Facebook en Instagram: betaalde advertenties</div></div>
         <div style={{ flex: 1 }} />
         {right}
       </div>
