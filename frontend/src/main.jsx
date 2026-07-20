@@ -5,6 +5,7 @@ import App from "./App.jsx";
 import { ThemeProvider } from "./lib/ThemeProvider.jsx";
 import { MeProvider } from "./lib/useMe.jsx";
 import { ActiveOrgProvider } from "./lib/ActiveOrgProvider.jsx";
+import { ConnectionsProvider } from "./lib/useConnections.jsx";
 import { DateRangeProvider } from "./lib/PeriodProvider.jsx";
 import "./theme.css";
 
@@ -13,11 +14,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ThemeProvider>
       <MeProvider>
         <ActiveOrgProvider>
-          <DateRangeProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </DateRangeProvider>
+          <ConnectionsProvider>
+            <DateRangeProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </DateRangeProvider>
+          </ConnectionsProvider>
         </ActiveOrgProvider>
       </MeProvider>
     </ThemeProvider>

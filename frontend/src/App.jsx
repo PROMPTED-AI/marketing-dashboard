@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useMe } from "./lib/useMe.jsx";
-import { useConnections } from "./lib/useConnections.jsx";
+import { useConnections, connectedProviders } from "./lib/useConnections.jsx";
 import Login from "./screens/Login.jsx";
 import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
@@ -32,13 +32,27 @@ function RequireAuth({ children }) {
   return children;
 }
 
-// First stop inside /app: send brand-new orgs (nothing connected) to onboarding.
+// First stop inside /app: send brand-new orgs (nothing connected) to onboarding,
+// and land existing users on their first *connected* channel (the sidebar only
+// shows connected channels, so never redirect into a hidden one).
+const CHANNEL_ROUTES = [
+  ["google_analytics", "/app/analytics"],
+  ["search_console", "/app/search-console"],
+  ["google_ads", "/app/google-ads"],
+  ["meta_ads", "/app/meta-ads"],
+  ["woocommerce", "/app/woocommerce"],
+];
+
 function DashIndex() {
   const { data, loading } = useConnections();
   if (loading) return <FullLoader />;
   const skipped = localStorage.getItem("kompas-onboarded");
   if (data && data.connected === 0 && !skipped) return <Navigate to="/onboarding" replace />;
-  return <Navigate to="/app/analytics" replace />;
+  const active = connectedProviders(data);
+  const first = active && CHANNEL_ROUTES.find(([p]) => active.has(p));
+  if (first) return <Navigate to={first[1]} replace />;
+  // Niets gekoppeld (of status onbekend): naar Integraties om te koppelen.
+  return <Navigate to={active ? "/app/integrations" : "/app/analytics"} replace />;
 }
 
 export default function App() {
