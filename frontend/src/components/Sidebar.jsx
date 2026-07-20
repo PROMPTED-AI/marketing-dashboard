@@ -4,8 +4,9 @@ import { LOGOUT_URL } from "../lib/api.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
-  IcStar, IcBars, IcSearch, IcAds, IcShare, IcPlug, IcCog, IcUsers, IcChat, IcGrid,
+  IcStar, IcPlug, IcCog, IcUsers, IcChat, IcGrid,
   IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
+  GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph,
 } from "./icons.jsx";
 
 // De sidebar is gegroepeerd: losse items + uitklapbare groepen (Marketing met
@@ -17,16 +18,16 @@ const NAV = [
   { to: "/app/assistant", label: "Assistent", Icon: IcChat },
   {
     group: "Marketing", Icon: IcMegaphone, children: [
-      { to: "/app/analytics", label: "Analytics", Icon: IcBars, provider: "google_analytics" },
-      { to: "/app/search-console", label: "Search Console", Icon: IcSearch, provider: "search_console" },
-      { to: "/app/google-ads", label: "Google Ads", Icon: IcAds, provider: "google_ads" },
-      { to: "/app/meta-ads", label: "META Ads", Icon: IcShare, provider: "meta_ads" },
-      { to: "/app/meta-organic", label: "META Organisch", Icon: IcShare, provider: "meta_ads" },
+      { to: "/app/analytics", label: "Analytics", Icon: GaGlyph, provider: "google_analytics" },
+      { to: "/app/search-console", label: "Search Console", Icon: GscGlyph, provider: "search_console" },
+      { to: "/app/google-ads", label: "Google Ads", Icon: AdsGlyph, provider: "google_ads" },
+      { to: "/app/meta-ads", label: "META Ads", Icon: MetaGlyph, provider: "meta_ads" },
+      { to: "/app/meta-organic", label: "META Organisch", Icon: MetaGlyph, provider: "meta_ads" },
     ],
   },
   {
     group: "Verkoop", Icon: IcCart, children: [
-      { to: "/app/woocommerce", label: "WooCommerce", Icon: IcCart, provider: "woocommerce" },
+      { to: "/app/woocommerce", label: "WooCommerce", Icon: WooGlyph, provider: "woocommerce" },
     ],
   },
   { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },

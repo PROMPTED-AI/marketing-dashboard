@@ -29,8 +29,14 @@ export const IcMegaphone = (p) => (<svg {...S(p)}><path d="M3 11v2a1 1 0 0 0 1 1
 export const IcCart = (p) => (<svg {...S(p)}><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2 3h2.2l2.2 12.2a1.5 1.5 0 0 0 1.5 1.3h9.1a1.5 1.5 0 0 0 1.5-1.2L20.5 7H5.2" /></svg>);
 
 // Brand/tool glyphs (colored)
-export const GaGlyph = ({ s = 30 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><rect x="3" y="11" width="4.5" height="10" rx="2.2" fill="#F9AB00" /><rect x="9.7" y="6" width="4.5" height="15" rx="2.2" fill="#E37400" /><rect x="16.4" y="3" width="4.5" height="18" rx="2.2" fill="#F9AB00" /></svg>);
-export const GscGlyph = ({ s = 28 }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6" stroke="#4285F4" strokeWidth="2.4" /><path d="m15 15 5 5" stroke="#34A853" strokeWidth="2.6" strokeLinecap="round" /><circle cx="10.5" cy="10.5" r="2.4" fill="#EA4335" /></svg>);
+// Getekend naar de officiële productlogo's (aangeleverd door de klant).
+// Google Analytics: oranje punt, oranje middelbalk, gele hoge balk.
+export const GaGlyph = ({ s = 30 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><circle cx="5" cy="18.4" r="2.6" fill="#E37400" /><rect x="9.4" y="9" width="5.2" height="12" rx="2.6" fill="#E37400" /><rect x="16.4" y="3" width="5.2" height="18" rx="2.6" fill="#F9AB00" /></svg>);
+// Search Console: blauwe en groene balk met geel vergrootglas (rode overlap).
+export const GscGlyph = ({ s = 28 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><rect x="15.2" y="2.5" width="6.8" height="19" rx="3.4" fill="#4285F4" /><rect x="8.6" y="6.5" width="6.8" height="15" rx="3.4" fill="#34A853" /><path d="M2.2 21.8 4.9 19.1" stroke="#FBBC04" strokeWidth="2.6" strokeLinecap="round" /><circle cx="8" cy="16" r="4.1" fill="#FBBC04" /><path d="M8.6 11.95a4.1 4.1 0 0 1 0 8.1z" fill="#EA4335" /></svg>);
+// Google Ads: gele en blauwe schuine balk met groene punt.
 export const AdsGlyph = ({ s = 28 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="17" rx="3" transform="rotate(-30 6.5 12)" fill="#FBBC04" /><rect x="14.5" y="3.5" width="6" height="17" rx="3" transform="rotate(30 17.5 12)" fill="#4285F4" /><circle cx="6.4" cy="18" r="3" fill="#34A853" /></svg>);
-export const MetaGlyph = ({ s = 30 }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#0866FF" strokeWidth="2.4"><path d="M3 15c0-4 1.6-7 4-7 3 0 4 9 7 9 2 0 3.5-2.4 3.5-5.5S20 6 18 6c-3 0-4.5 4-6.5 7" /></svg>);
-export const WooGlyph = ({ s = 28 }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#7F54B3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 7h12l1.5 13.5h-15z" /><path d="M9 10V6a3 3 0 0 1 6 0v4" /></svg>);
+// Meta: het blauwe oneindigheidsteken.
+export const MetaGlyph = ({ s = 30 }) => (<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#0866FF" strokeWidth="2.8" strokeLinecap="round"><path d="M12 12c-1.9-2.9-3.6-4.7-5.7-4.7C3.9 7.3 2.4 9.4 2.4 12s1.5 4.7 3.9 4.7c2.1 0 3.8-1.8 5.7-4.7 1.9-2.9 3.6-4.7 5.7-4.7 2.4 0 3.9 2.1 3.9 4.7s-1.5 4.7-3.9 4.7c-2.1 0-3.8-1.8-5.7-4.7Z" /></svg>);
+// WooCommerce: paarse tekstballon met "Woo".
+export const WooGlyph = ({ s = 28 }) => (<svg width={s} height={s} viewBox="0 0 24 24"><path d="M3.5 4.5h17A2.5 2.5 0 0 1 23 7v7.5a2.5 2.5 0 0 1-2.5 2.5h-6.1l1.7 3.5-4.6-3.5H3.5A2.5 2.5 0 0 1 1 14.5V7a2.5 2.5 0 0 1 2.5-2.5Z" fill="#7F54B3" /><text x="12" y="13.4" textAnchor="middle" fontSize="7" fontWeight="800" fill="#fff" fontFamily="Montserrat, sans-serif">Woo</text></svg>);
