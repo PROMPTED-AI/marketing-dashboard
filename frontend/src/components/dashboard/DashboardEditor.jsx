@@ -244,7 +244,7 @@ export default function DashboardEditor({
         <TemplatePicker catalog={catalog} businessType={businessType} onPick={createFromTemplate} onClose={() => setModal(null)} />
       )}
       {modal === "widget" && (
-        <WidgetPicker catalog={catalog} onPick={addWidget} onClose={() => setModal(null)} />
+        <WidgetPicker catalog={catalog} data={data} ctx={ctx} onPick={addWidget} onClose={() => setModal(null)} />
       )}
       {modal === "saveas" && (
         <NameDialog title="Dashboard opslaan" label="Naam van het dashboard" initial="" confirmLabel="Opslaan" onConfirm={saveAs} onClose={() => setModal(null)} />
