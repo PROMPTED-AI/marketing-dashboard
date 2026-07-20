@@ -81,7 +81,9 @@ a { color: inherit; }
   display: flex; flex-direction: column; flex: none;
 }
 .app-scrim { display: none; }
-.hamburger { display: none; }
+/* Verborgen op desktop; de mobiele media-query zet 'm op inline-flex.
+   (De knop zelf heeft géén inline display, anders wint die van deze regel.) */
+.hamburger { display: none; align-items: center; justify-content: center; }
 
 @media (max-width: 820px) {
   /* Off-canvas drawer, slides in when .open is added. */
