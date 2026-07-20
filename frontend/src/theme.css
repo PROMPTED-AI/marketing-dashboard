@@ -81,7 +81,9 @@ a { color: inherit; }
   display: flex; flex-direction: column; flex: none;
 }
 .app-scrim { display: none; }
-.hamburger { display: none; }
+/* Verborgen op desktop; de mobiele media-query zet 'm op inline-flex.
+   (De knop zelf heeft géén inline display, anders wint die van deze regel.) */
+.hamburger { display: none; align-items: center; justify-content: center; }
 
 @media (max-width: 820px) {
   /* Off-canvas drawer, slides in when .open is added. */
@@ -138,6 +140,31 @@ a { color: inherit; }
 .assistant-md th, .assistant-md td { border: 1px solid var(--c-border); padding: 6px 9px; text-align: left; white-space: nowrap; }
 .assistant-md th { background: var(--c-surface-2); font-weight: 700; }
 .assistant-md blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--c-border); color: var(--c-muted); }
+
+/* ---- Assistant: micro-animaties voor denken/streamen ---- */
+/* Drie zacht opverende puntjes zolang de assistent nadenkt of data ophaalt. */
+.typing-dots { display: inline-flex; align-items: center; gap: 4px; }
+.typing-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent);
+  display: inline-block; animation: dot-bounce 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot-bounce {
+  0%, 70%, 100% { transform: translateY(0); opacity: 0.35; }
+  35% { transform: translateY(-3px); opacity: 1; }
+}
+/* Het statuslabel ("analyseert Google Ads") ademt zachtjes mee. */
+.thinking-label { animation: soft-pulse 1.6s infinite ease-in-out; }
+@keyframes soft-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+/* Nieuwe bron-chips en antwoordbubbels poppen subtiel in. */
+.chip-in { animation: chip-in 0.25s ease; }
+@keyframes chip-in { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+.bubble-in { animation: bubble-in 0.22s ease; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot, .thinking-label, .chip-in, .bubble-in { animation: none; }
+}
 
 /* Print / Save-as-PDF: drop app chrome, force light, let content flow. */
 @media print {
