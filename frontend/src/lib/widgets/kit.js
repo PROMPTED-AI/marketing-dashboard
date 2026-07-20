@@ -46,8 +46,9 @@ export function templateMatchesProfile(tpl, businessType) {
   return p === "both" || p === businessType;
 }
 
-// Templates gesorteerd voor een profiel: passende eerst (in oorspronkelijke
-// volgorde), de andere-profiel-templates daarna. Niets wordt verwijderd (soft).
+// Templates gesplitst voor een profiel: `match` = passend bij het bedrijfstype
+// (of profielneutraal), `rest` = de andere. De UI toont uitsluitend `match`
+// (harde scheiding): e-commerce ziet geen leadgen-views en andersom.
 export function templatesForProfile(catalog, businessType) {
   const all = catalog?.TEMPLATES ?? [];
   const match = all.filter((t) => templateMatchesProfile(t, businessType));

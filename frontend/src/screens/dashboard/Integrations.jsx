@@ -126,7 +126,7 @@ export default function Integrations() {
     <div>
       <div className="display" style={{ fontSize: 30, marginBottom: 6 }}>integraties</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginBottom: 22 }}>
-        beheer je gekoppelde marketingbronnen · {data?.connected ?? 0} van {data?.total ?? 5} actief
+        Beheer je gekoppelde marketingbronnen · {data?.connected ?? 0} van {data?.total ?? 5} actief
       </div>
       <div className="split-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         {items.map((c) => {

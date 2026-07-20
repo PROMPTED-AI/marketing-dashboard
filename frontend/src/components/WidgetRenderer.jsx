@@ -17,7 +17,9 @@ export default function WidgetRenderer({ widget, data, catalog, ctx }) {
   const src = catalog?.SOURCES?.[widget.source];
   if (!src) return <SectionCard title={widget.title}>Onbekende bron.</SectionCard>;
 
-  const seriesDates = catalog.seriesDates ? catalog.seriesDates(data) : [];
+  // Bron-specifieke datums gaan voor (cross-kanaal catalogus: elke bron leest
+  // zijn eigen kanaalpayload); anders de catalogus-brede datums.
+  const seriesDates = src.seriesDates ? src.seriesDates(data) : (catalog.seriesDates ? catalog.seriesDates(data) : []);
 
   if (widget.kind === "kpi") {
     const s = src.scalar(data, widget.config, ctx);

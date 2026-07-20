@@ -1,15 +1,17 @@
 // "Mijn dashboards": per kanaal stelt de gebruiker zelf een indeling samen
 // (KPI's, grafieken, tabellen) met drag-and-drop, opgeslagen als privé of
-// gedeeld dashboard. Eén dashboard hoort bij één kanaal (= één payload).
+// gedeeld dashboard. Naast de kanaaltabs is er een "Overzicht"-tab die
+// widgets uit verschillende kanalen in één dashboard combineert.
 //
 // Omdat React-hooks niet voorwaardelijk aangeroepen mogen worden, heeft elk
 // kanaal een eigen wrapper-component die zijn data-hooks onvoorwaardelijk
 // aanroept en vervolgens de generieke DashboardEditor rendert.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useProperties } from "../../lib/useProperties.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { useConnections, connectedProviders } from "../../lib/useConnections.jsx";
 import { useCachedApi } from "../../lib/swr.js";
 import {
   overviewUrl, gscReportUrl, sitesUrl, adsAccountsUrl, adsReportUrl,
@@ -18,6 +20,10 @@ import {
 import { TabState } from "../../components/ui.jsx";
 import DashboardEditor from "../../components/dashboard/DashboardEditor.jsx";
 import { CHANNELS, CATALOGS } from "../../lib/widgets/index.js";
+import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
+
+// De tabs: het cross-kanaal Overzicht eerst, daarna de losse kanalen.
+const TABS = [{ key: "overview", label: "Overzicht", catalog: null }, ...CHANNELS];
 
 const selectStyle = {
   height: 40, padding: "0 12px", fontSize: 13, borderRadius: 999, border: "1px solid var(--c-border)",
@@ -29,9 +35,9 @@ function Empty({ children }) {
 }
 
 export default function MyDashboards() {
-  const [channel, setChannel] = useState(() => localStorage.getItem("kompas-mydash-channel") || "analytics");
+  const [channel, setChannel] = useState(() => localStorage.getItem("kompas-mydash-channel") || "overview");
   const pick = (k) => { setChannel(k); localStorage.setItem("kompas-mydash-channel", k); };
-  const active = CHANNELS.find((c) => c.key === channel) || CHANNELS[0];
+  const active = TABS.find((c) => c.key === channel) || TABS[0];
   const Wrapper = WRAPPERS[active.key];
 
   return (
@@ -45,7 +51,7 @@ export default function MyDashboards() {
 
       {/* kanaalkeuze */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {CHANNELS.map((c) => {
+        {TABS.map((c) => {
           const on = c.key === active.key;
           return (
             <button
@@ -70,6 +76,69 @@ export default function MyDashboards() {
 }
 
 // ------------------------------------------------------------- kanaalwrappers
+
+// Cross-kanaal "Overzicht": haalt de payloads van alle gekoppelde kanalen op
+// en voedt de gecombineerde catalogus, zodat één dashboard widgets uit
+// verschillende kanalen mixt. Kanalen zonder koppeling doen niet mee (hun
+// widgets en groepen verschijnen ook niet in de widget-kiezer).
+function OverviewData() {
+  const { orgId } = useActiveOrg();
+  const { start, end, compare, label } = useDateRange();
+  const { data: connData } = useConnections();
+  const active = connectedProviders(connData);
+  const has = (p) => !active || active.has(p);
+
+  // Analytics (property-keuze zoals op het Analytics-tabblad).
+  const { selected } = useProperties();
+  const ga = useCachedApi(has("google_analytics") && selected ? overviewUrl(selected, start, end, compare, orgId) : null);
+
+  // Search Console (opgeslagen site of de eerste geverifieerde).
+  const sitesQ = useCachedApi(has("search_console") ? sitesUrl(orgId) : null);
+  const sites = sitesQ.data?.sites || null;
+  const storedSite = localStorage.getItem("kompas-gsc-site") || "";
+  const activeSite = storedSite && sites?.some((s) => s.site_url === storedSite) ? storedSite : sites?.[0]?.site_url || "";
+  const gsc = useCachedApi(activeSite ? gscReportUrl(activeSite, start, end, compare, orgId) : null);
+
+  // Google Ads (opgeslagen account of het eerste).
+  const accQ = useCachedApi(has("google_ads") ? adsAccountsUrl(orgId) : null);
+  const accounts = accQ.data?.accounts || null;
+  const storedAcc = localStorage.getItem("kompas-ads-account") || "";
+  const activeAcc = storedAcc && accounts?.some((a) => a.customer_id === storedAcc) ? storedAcc : accounts?.[0]?.customer_id || "";
+  const gads = useCachedApi(activeAcc ? adsReportUrl(activeAcc, start, end, compare, orgId) : null);
+
+  // META (advertentieaccount + pagina; eerste van elk).
+  const assetsQ = useCachedApi(has("meta_ads") ? metaAccountsUrl(orgId) : null);
+  const adAccount = assetsQ.data?.ad_accounts?.[0] || null;
+  const mads = useCachedApi(adAccount ? metaAdsReportUrl(adAccount.id, start, end, compare, orgId) : null);
+  const metaPage = assetsQ.data?.pages?.[0] || null;
+  const morg = useCachedApi(metaPage ? metaOrganicReportUrl(metaPage.id, metaPage.instagram?.id, start, end, orgId) : null);
+
+  // WooCommerce.
+  const woo = useCachedApi(has("woocommerce") ? wcReportUrl(start, end, compare, orgId) : null);
+
+  const catalog = useMemo(() => buildOverviewCatalog(active), [connData]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => ({
+    "analytics": ga.data,
+    "search-console": gsc.data,
+    "google-ads": gads.data,
+    "meta-ads": mads.data,
+    "meta-organic": morg.data,
+    "woocommerce": woo.data,
+  }), [ga.data, gsc.data, gads.data, mads.data, morg.data, woo.data]);
+  const anyData = Object.values(data).some(Boolean);
+  const loading = !anyData && [ga, gsc, gads, mads, morg, woo, sitesQ, accQ, assetsQ].some((q) => q.loading);
+  const ctx = useMemo(() => ({ "meta-ads": { currency: adAccount?.currency } }), [adAccount?.currency]);
+
+  if (loading) return <TabState loading />;
+
+  return (
+    <DashboardEditor
+      catalog={catalog} page="overview-mix" data={data} loading={false} error={null} ctx={ctx}
+      title="overzicht" subtitle={"alle kanalen in één dashboard · " + label}
+      exportFilename="overzicht-dashboard"
+    />
+  );
+}
 
 function AnalyticsData({ catalog }) {
   const { props, selected, choose, loading, error } = useProperties();
@@ -257,6 +326,7 @@ function WooCommerceData({ catalog }) {
 }
 
 const WRAPPERS = {
+  "overview": OverviewData,
   "analytics": AnalyticsData,
   "search-console": SearchConsoleData,
   "google-ads": GoogleAdsData,
