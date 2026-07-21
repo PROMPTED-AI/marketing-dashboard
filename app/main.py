@@ -22,6 +22,8 @@ GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
 import json
+import random
+import threading
 import time
 import uuid
 import logging
@@ -134,42 +136,63 @@ def _is_grant_revoked(e: Exception) -> bool:
 _GOOGLE_TRANSIENT_MSG = "Google is tijdelijk niet bereikbaar. Probeer het zo opnieuw."
 
 
+# Alle Google-providers van één organisatie delen hetzelfde refresh-token (het
+# wordt bij het koppelen drie keer opgeslagen: Analytics, Search Console en
+# Google Ads). Na een deploy is de cache leeg en zijn de access-tokens
+# verlopen, waardoor een pagina-load een burst gelijktijdige verversingen van
+# hetzélfde token afvuurt; daar reageert Google's token-endpoint geregeld met
+# fouten op. Eén lock per organisatie serialiseert het verversen: de winnaar
+# haalt een vers token op en slaat het op, de wachters lezen dat verse token
+# uit de database en hoeven zelf niet meer naar Google.
+_refresh_locks: dict[str, threading.Lock] = {}
+_refresh_locks_guard = threading.Lock()
+
+
+def _org_refresh_lock(org_id: str) -> threading.Lock:
+    with _refresh_locks_guard:
+        return _refresh_locks.setdefault(org_id, threading.Lock())
+
+
 def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credentials:
     """Load + refresh an org's credentials.
 
     Alleen een écht ingetrokken grant zet de status op revoked; een tijdelijke
     storing bij het verversen wordt een 503 zonder de koppeling aan te raken.
     """
-    conn = models.get_connection(org_id, provider=provider)
-    if not conn or conn["status"] != "connected":
-        raise HTTPException(status_code=409, detail="No active connection for this organization")
-    # Eén stille herkansing: haperingen bij Google's token-endpoint (5xx, even
-    # geen netwerk, drukte na een koude start) zijn meestal direct voorbij.
-    # Zonder herkansing zag de gebruiker daarvoor meteen een storingsmelding.
-    creds = None
-    for attempt in (1, 2):
-        try:
-            creds = oauth.credentials_from_dict(conn["creds"])
-            break
-        except RefreshError as e:
-            if _is_grant_revoked(e):
-                log.warning(
-                    "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
-                    org_id, provider, conn.get("google_email"), e,
-                )
-                models.set_connection_status(org_id, "revoked", provider=provider)
-                raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
-            log.warning("refresh tijdelijk mislukt (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
-            if attempt == 2:
-                raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
-        except TransportError as e:
-            log.warning("refresh netwerkfout (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
-            if attempt == 2:
-                raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
-        time.sleep(1.0)
-    # Persist any refreshed access token.
-    models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
-    return creds
+    with _org_refresh_lock(org_id):
+        # Binnen de lock (opnieuw) laden: als een andere request net ververst
+        # heeft, staat hier al een geldig access-token en is verversen klaar.
+        conn = models.get_connection(org_id, provider=provider)
+        if not conn or conn["status"] != "connected":
+            raise HTTPException(status_code=409, detail="No active connection for this organization")
+        # Eén stille herkansing met spreiding: haperingen bij Google's
+        # token-endpoint (5xx, drukte na een koude start) zijn meestal direct
+        # voorbij. De jitter voorkomt dat gelijktijdige verliezers in
+        # verschillende instanties synchroon opnieuw botsen.
+        creds = None
+        for attempt in (1, 2):
+            try:
+                creds = oauth.credentials_from_dict(conn["creds"])
+                break
+            except RefreshError as e:
+                if _is_grant_revoked(e):
+                    log.warning(
+                        "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
+                        org_id, provider, conn.get("google_email"), e,
+                    )
+                    models.set_connection_status(org_id, "revoked", provider=provider)
+                    raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
+                log.warning("refresh tijdelijk mislukt (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
+                if attempt == 2:
+                    raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+            except TransportError as e:
+                log.warning("refresh netwerkfout (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
+                if attempt == 2:
+                    raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+            time.sleep(0.5 + random.random())
+        # Persist any refreshed access token.
+        models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
+        return creds
 
 
 def _google_data(org_id: str, provider: str, fn):
