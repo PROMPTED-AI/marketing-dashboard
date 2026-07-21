@@ -495,3 +495,54 @@ def probe_tool_support(api_key: str, base_url: str, model: str) -> dict:
     except Exception as e:  # noqa: BLE001
         log.warning("probe tool-support faalde (model=%s): %s", model, e)
         return {"model": model, "supports_tools": None, "detail": type(e).__name__}
+
+
+# ------------------------------------------------------------ feedback-analyse
+
+FEEDBACK_PROMPT = (
+    "Je bent productmanager van een marketingdashboard (kanalen: Google "
+    "Analytics, Search Console, Google Ads, Meta Ads en Organisch, WooCommerce; "
+    "samenstelbare dashboards met widgets; een AI-assistent; multi-tenant met "
+    "klantorganisaties). Je krijgt één stuk gebruikersfeedback. Werk die uit "
+    "voor het ontwikkelteam, in het Nederlands, met deze Markdown-koppen:\n"
+    "## Uitgewerkte omschrijving\n"
+    "Herschrijf de feedback als een volledig, ondubbelzinnig verzoek of "
+    "probleemrapport. Vul redelijke aannames expliciet in.\n"
+    "## Advies voor verwerking\n"
+    "Concreet advies hoe dit in het dashboard te verwerken: welke schermen of "
+    "onderdelen het raakt, een voorgestelde aanpak en eventuele aandachtspunten.\n"
+    "## Inschatting\n"
+    "Prioriteit (laag, middel, hoog) met één zin motivatie, en een grove "
+    "omvang (klein, middel, groot).\n"
+    "Schrijf volledige zinnen die met een hoofdletter beginnen en gebruik "
+    "nooit een gedachtestreepje."
+)
+
+
+def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> str:
+    """Werk één feedback-item uit via EuRouter en geef de tekst terug."""
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    parts = [
+        f"Categorie: {item.get('category')}",
+        f"Toelichting: {item.get('message')}",
+    ]
+    if item.get("severity"):
+        parts.append(f"Impact volgens gebruiker: {item['severity']}")
+    if item.get("page"):
+        parts.append(f"Pagina waar de feedback gegeven werd: {item['page']}")
+    if item.get("org_name"):
+        parts.append(f"Organisatie: {item['org_name']}")
+    stream = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": FEEDBACK_PROMPT},
+            {"role": "user", "content": "\n".join(parts)},
+        ],
+        max_tokens=1500,
+        stream=True,
+    )
+    out = []
+    for chunk in stream:
+        if chunk.choices and getattr(chunk.choices[0].delta, "content", None):
+            out.append(chunk.choices[0].delta.content)
+    return "".join(out).strip()

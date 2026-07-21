@@ -133,3 +133,22 @@ def init_schema() -> None:
             "CREATE INDEX IF NOT EXISTS dashboards_org_page_idx "
             "ON dashboards (organization_id, page)"
         )
+        # Gebruikersfeedback over de applicatie. `status` volgt de kolommen van
+        # het kanban-bord in de beheeromgeving (requests -> in_progress ->
+        # done / rejected); `ai_analysis` is de door AI uitgewerkte versie.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback (
+                id               TEXT PRIMARY KEY,
+                organization_id  TEXT,
+                user_email       TEXT NOT NULL,
+                category         TEXT NOT NULL,
+                message          TEXT NOT NULL,
+                page             TEXT,
+                severity         TEXT,
+                status           TEXT NOT NULL DEFAULT 'requests',
+                ai_analysis      TEXT,
+                created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )

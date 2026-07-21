@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { api, LOGOUT_URL } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 import Topbar from "../components/Topbar.jsx";
-import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChevDown, IcPlus } from "../components/icons.jsx";
+import AdminFeedback from "./AdminFeedback.jsx";
+import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus } from "../components/icons.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -38,6 +39,7 @@ export default function Admin() {
   const [orgs, setOrgs] = useState(null);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState("klanten"); // 'klanten' | 'feedback'
 
   const reload = () => api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
 
@@ -61,7 +63,8 @@ export default function Admin() {
         </div>
         <div style={menuLabel}>Platform</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
-          <div style={navActive}><IcUsers s={18} />Klanten</div>
+          <div style={tab === "klanten" ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab("klanten")}><IcUsers s={18} />Klanten</div>
+          <div style={tab === "feedback" ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab("feedback")}><IcChat s={18} />Feedback</div>
           {[["Gebruikers & rollen", IcUsers], ["Koppelingen", IcPlug], ["Pakketten & facturatie", IcDoc], ["Activiteitenlog", IcDoc], ["Instellingen", IcCog]].map(([label, Icon]) => (
             <div key={label} style={navItem}><Icon s={18} />{label}</div>
           ))}
@@ -81,6 +84,7 @@ export default function Admin() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
         <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
+          {tab === "feedback" ? <AdminFeedback /> : (<>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div className="display" style={{ fontSize: 30 }}>klanten</div>
@@ -127,6 +131,7 @@ export default function Admin() {
           </div>
 
           <ModelDiagnostics />
+          </>)}
         </div>
       </div>
 
