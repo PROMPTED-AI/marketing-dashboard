@@ -7,9 +7,10 @@ import { IcChevDown, IcPlus } from "../../components/icons.jsx";
 // Het raamwerk: een vaste set KPI-rijen per maand, zoals een bureau die in een
 // spreadsheet bijhoudt. Grijze cellen komen automatisch uit de gekoppelde
 // kanalen of worden berekend; witte cellen vul je zelf in en worden per maand
-// opgeslagen. Er zijn twee varianten: leadgeneratie en e-commerce.
+// opgeslagen. Welke variant je ziet volgt het bedrijfstype van de organisatie
+// (gekozen in de onboarding of aan te passen in de instellingen).
 const ROWS_LEADGEN = [
-  { key: "budget", label: "Budget", type: "manual", fmt: "euro", hint: "Het afgesproken maandbudget" },
+  { key: "budget", label: "Bureaukosten", type: "manual", fmt: "euro", hint: "De maandelijkse kosten van het bureau" },
   {
     key: "ads_kosten", label: "Advertentiekosten", type: "auto", fmt: "euro",
     sub: [
@@ -25,7 +26,7 @@ const ROWS_LEADGEN = [
 ];
 
 const ROWS_ECOMMERCE = [
-  { key: "budget", label: "Budget", type: "manual", fmt: "euro", hint: "Het afgesproken maandbudget" },
+  { key: "budget", label: "Bureaukosten", type: "manual", fmt: "euro", hint: "De maandelijkse kosten van het bureau" },
   {
     key: "ads_kosten", label: "Advertentiekosten", type: "auto", fmt: "euro",
     sub: [
@@ -66,7 +67,6 @@ function fmtValue(v, fmt) {
 }
 
 const MONTHS_KEY = "kompas-framework-months";
-const VIEW_KEY = (orgId) => `kompas-framework-view-${orgId || ""}`;
 
 export default function Framework() {
   const { orgId, businessType } = useActiveOrg();
@@ -74,10 +74,6 @@ export default function Framework() {
     const n = Number(localStorage.getItem(MONTHS_KEY));
     return n >= 1 && n <= 24 ? n : 3;
   });
-  // Lokale keuze tussen de twee raamwerken; standaard volgt die het profiel
-  // van de organisatie (leadgeneratie of e-commerce).
-  const [view, setView] = useState(null);
-  const activeView = view || localStorage.getItem(VIEW_KEY(orgId)) || businessType || "leadgen";
 
   const property = localStorage.getItem("kompas-property");
   const url = orgId
@@ -95,12 +91,11 @@ export default function Framework() {
     return data.months.map((m) => patched[m.month] || m);
   }, [data, patched]);
 
-  const rows = activeView === "ecommerce" ? ROWS_ECOMMERCE : ROWS_LEADGEN;
-
-  const pickView = (v) => {
-    setView(v);
-    try { localStorage.setItem(VIEW_KEY(orgId), v); } catch { /* best effort */ }
-  };
+  // De variant volgt het bedrijfstype van de organisatie: de server geeft het
+  // actuele type mee; tot de eerste load valt de UI terug op het type uit de
+  // org-context, zodat er geen verkeerde rijenset opflitst.
+  const activeType = data?.business_type || businessType || "leadgen";
+  const rows = activeType === "ecommerce" ? ROWS_ECOMMERCE : ROWS_LEADGEN;
 
   const addMonth = () => {
     const n = Math.min(monthCount + 1, 24);
@@ -126,17 +121,16 @@ export default function Framework() {
         <div>
           <div className="display" style={{ fontSize: 30 }}>raamwerk</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
-            Je marketingcijfers per maand in één overzicht. Grijze velden worden automatisch gevuld, witte velden vul je zelf in.
+            Je marketingcijfers per maand in één overzicht. Grijze velden worden automatisch gevuld, witte velden vul je zelf in. De variant volgt het bedrijfstype uit de instellingen.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={seg}>
-            {[["leadgen", "Leadgeneratie"], ["ecommerce", "E-commerce"]].map(([v, label]) => (
-              <button key={v} type="button" className="pill-btn" onClick={() => pickView(v)} style={segBtn(activeView === v)}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <span
+            className="pill accent"
+            title="Het raamwerk volgt het bedrijfstype van de organisatie. Aan te passen via Instellingen."
+          >
+            {activeType === "ecommerce" ? "E-commerce" : "Leadgeneratie"}
+          </span>
           <button type="button" className="btn-primary" onClick={addMonth} disabled={monthCount >= 24}
             style={{ height: 38, padding: "0 14px", fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>
             <IcPlus s={14} />
@@ -261,14 +255,6 @@ function ManualCell({ row, month, onSave }) {
   );
 }
 
-const seg = { display: "flex", gap: 4, padding: 4, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const segBtn = (active) => ({
-  height: 30, padding: "0 12px", borderRadius: 8, border: "none", cursor: "pointer",
-  fontFamily: "inherit", fontSize: 12.5, fontWeight: 700,
-  background: active ? "var(--c-surface)" : "transparent",
-  color: active ? "var(--c-accent)" : "var(--c-muted)",
-  boxShadow: active ? "var(--sh-sm)" : "none",
-});
 const headRow = {
   display: "grid", gap: 12, alignItems: "center", padding: "13px 20px",
   fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase",
