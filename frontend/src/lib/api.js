@@ -46,6 +46,59 @@ export async function passwordLogin(email, password) {
   return res.json();
 }
 
+// --- accountflow: uitnodigingen + wachtwoord vergeten ---
+
+// Admin: nodig iemand uit voor een organisatie. Geeft {invite_url, emailed}.
+export function createInvitation(email, orgId, role = "client") {
+  return api("/api/admin/invitations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, org_id: orgId, role }),
+  });
+}
+
+// Admin: genereer een wachtwoord-resetlink voor een bestaande gebruiker.
+export function createResetLink(userId) {
+  return api(`/api/admin/users/${userId}/reset-link`, { method: "POST" });
+}
+
+// Publiek: gegevens van een uitnodiging (voor het instelscherm).
+export function invitationInfo(token) {
+  return api(`/api/invitations/${encodeURIComponent(token)}`);
+}
+
+// Publiek: wachtwoord instellen via een uitnodiging (logt meteen in).
+export function acceptInvitation(token, password) {
+  return api(`/api/invitations/${encodeURIComponent(token)}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+}
+
+// Publiek: vraag een wachtwoord-resetlink aan (antwoordt altijd hetzelfde).
+export function forgotPassword(email) {
+  return api("/api/auth/forgot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+// Publiek: controleer een resetlink (geeft het e-mailadres).
+export function resetInfo(token) {
+  return api(`/api/auth/reset/${encodeURIComponent(token)}`);
+}
+
+// Publiek: stel een nieuw wachtwoord in via een resetlink.
+export function resetPassword(token, password) {
+  return api(`/api/auth/reset/${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+}
+
 // Set the signed-in user's own organization profile (leadgen | ecommerce).
 export function setBusinessType(businessType) {
   return api("/api/organizations/me/business-type", {

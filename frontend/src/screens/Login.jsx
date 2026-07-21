@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LOGIN_URL, passwordLogin } from "../lib/api.js";
+import { LOGIN_URL, passwordLogin, forgotPassword } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 
 const Star = ({ s = 20 }) => (
@@ -16,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -70,7 +71,7 @@ export default function Login() {
               <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--c-ink-soft)", fontWeight: 500 }}>
                 <input type="checkbox" /> onthoud mij
               </label>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>Wachtwoord vergeten?</span>
+              <span onClick={() => setForgot(true)} style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent)", cursor: "pointer" }}>Wachtwoord vergeten?</span>
             </div>
 
             <button type="submit" className="btn-primary" style={{ width: "100%", height: 52, fontSize: 15, opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer" }} disabled={busy}>
@@ -90,10 +91,12 @@ export default function Login() {
             inloggen met Google
           </a>
           <div style={{ fontSize: 13, color: "var(--c-muted)", marginTop: 24 }}>
-            nog geen account? <span style={{ color: "var(--c-accent)", fontWeight: 700 }}>vraag toegang aan</span>
+            nog geen account? <a href="mailto:info@prompted-ai.nl?subject=Toegang%20dashboard" style={{ color: "var(--c-accent)", fontWeight: 700, textDecoration: "none" }}>vraag toegang aan</a>
           </div>
         </div>
       </div>
+
+      {forgot && <ForgotModal onClose={() => setForgot(false)} />}
 
       {/* RIGHT — marketing panel (fills the blue half) */}
       <div className="login-aside" style={{ flex: 1, maxWidth: 640, background: "var(--c-accent)", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px clamp(44px, 5vw, 76px)" }}>
@@ -114,6 +117,55 @@ export default function Login() {
     </div>
   );
 }
+
+// Wachtwoord vergeten: vraag een resetlink aan. Om te voorkomen dat je via dit
+// scherm kunt zien welke e-mailadressen een account hebben, toont de server
+// altijd dezelfde bevestiging.
+function ForgotModal({ onClose }) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await forgotPassword(email);
+    } catch { /* respons is altijd hetzelfde */ }
+    setSent(true);
+    setBusy(false);
+  };
+
+  return (
+    <div style={fmOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="card" style={{ width: 430, maxWidth: "calc(100vw - 32px)", padding: 28 }}>
+        {sent ? (
+          <div>
+            <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>controleer je mail</div>
+            <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 22 }}>
+              Als er een account bij dit e-mailadres hoort, is er een link verstuurd om je wachtwoord opnieuw in te stellen. De link is 1 uur geldig.
+            </div>
+            <button className="btn-primary" style={{ height: 44, width: "100%" }} onClick={onClose}>sluiten</button>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>wachtwoord vergeten</div>
+            <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Vul je e-mailadres in, dan sturen we een link om een nieuw wachtwoord in te stellen.</div>
+            <input autoFocus type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jij@bureau.nl"
+              style={{ width: "100%", height: 46, padding: "0 14px", boxSizing: "border-box", border: "1px solid var(--c-border)", borderRadius: 12, background: "var(--c-surface-2)", fontFamily: "Montserrat, sans-serif", fontSize: 14.5, color: "var(--c-ink)", outline: "none" }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button type="button" className="pill-btn" onClick={onClose} style={{ height: 42, padding: "0 16px", borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 }}>annuleren</button>
+              <button type="submit" disabled={busy || !email.trim()} className="btn-primary" style={{ height: 42, padding: "0 18px", opacity: busy ? 0.7 : 1 }}>{busy ? "bezig…" : "stuur link"}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const fmOverlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 
 const field = {
   display: "flex", alignItems: "center", gap: 10, padding: "0 16px", height: 50,

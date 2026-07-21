@@ -83,6 +83,19 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # Fernet key used to encrypt stored OAuth tokens at rest.
 TOKEN_ENCRYPTION_KEY = os.environ["TOKEN_ENCRYPTION_KEY"]
 
+# Uitnodigings- en wachtwoord-reset-e-mail via SMTP (optioneel). Zonder deze
+# variabelen wordt er geen e-mail verstuurd; de admin-UI toont dan de
+# uitnodigings-/resetlink om handmatig te delen. Werkt met elke SMTP-provider
+# (SendGrid, Postmark, Mailgun, Gmail, ...). APP_BASE_URL is de publieke basis-URL
+# voor de links in de e-mails; leeg = afgeleid uit het inkomende verzoek.
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587") or "587")
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", "") or SMTP_USER
+SMTP_STARTTLS = os.environ.get("SMTP_STARTTLS", "true").lower() != "false"
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+
 # Comma-separated emails that get the "agency_admin" role (see all orgs).
 AGENCY_ADMIN_EMAILS = {
     e.strip().lower()
