@@ -34,7 +34,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from google.api_core.exceptions import Unauthenticated
+from google.api_core.exceptions import PermissionDenied, Unauthenticated
 from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
@@ -151,6 +151,7 @@ def _is_grant_revoked(e: Exception) -> bool:
     txt = " ".join(str(a) for a in (getattr(e, "args", None) or [])).lower()
     return (
         "invalid_grant" in txt
+        or "invalid_scope" in txt
         or "expired or revoked" in txt
         or "invalid_rapt" in txt
         or "deleted_client" in txt
@@ -214,8 +215,11 @@ def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credent
                 if attempt == 2:
                     raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
             time.sleep(0.5 + random.random())
-        # Persist any refreshed access token.
-        models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
+        # Persist any refreshed access token; de scopes blijven puur ter
+        # informatie bewaard (het Credentials-object draagt ze niet meer).
+        refreshed = oauth.credentials_to_dict(creds)
+        refreshed["scopes"] = refreshed.get("scopes") or (conn["creds"] or {}).get("scopes")
+        models.save_connection(org_id, conn["google_email"], refreshed, provider=provider)
         return creds
 
 
@@ -229,7 +233,7 @@ def _google_data(org_id: str, provider: str, fn):
     """
     try:
         return fn()
-    except (RefreshError, Unauthenticated) as e:
+    except (RefreshError, Unauthenticated, PermissionDenied) as e:
         if isinstance(e, RefreshError) and not _is_grant_revoked(e):
             log.warning("google-call tijdelijk mislukt org=%s provider=%s err=%r", org_id, provider, e)
             raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
