@@ -997,25 +997,29 @@ def admin_feedback_status(request: Request, feedback_id: str, body: FeedbackStat
 
 @app.post("/api/admin/feedback/{feedback_id}/analyze")
 def admin_feedback_analyze(request: Request, feedback_id: str):
-    """Laat AI (EuRouter) de feedback uitwerken plus verwerkingsadvies geven."""
+    """Laat AI (EuRouter) de feedback uitwerken plus verwerkingsadvies geven.
+
+    Streamt de uitwerking als SSE (thinking/text/done/error), zodat de
+    beheerder ziet dat de AI bezig is en de tekst live verschijnt. Fouten na
+    de start van de stream komen als "error"-event; alleen configuratie- en
+    invoerfouten geven nog een HTTP-status.
+    """
     auth.require_admin(request)
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="De AI-uitwerking is niet geconfigureerd (EUROUTER_API_KEY ontbreekt).")
     item = models.get_feedback(feedback_id)
     if not item:
         raise HTTPException(status_code=404, detail="Feedback niet gevonden.")
-    try:
-        analysis = assistant.analyze_feedback(
-            item, api_key=config.EUROUTER_API_KEY,
-            base_url=config.EUROUTER_BASE_URL, model=config.EUROUTER_MODEL,
-        )
-    except Exception:
-        log.exception("feedback-analyse faalde id=%s", feedback_id)
-        raise HTTPException(status_code=502, detail="De AI-uitwerking is niet gelukt. Probeer het later opnieuw.")
-    if not analysis:
-        raise HTTPException(status_code=502, detail="De AI-uitwerking kwam leeg terug. Probeer het opnieuw.")
-    models.set_feedback_analysis(feedback_id, analysis)
-    return {"ok": True, "ai_analysis": analysis}
+    stream = assistant.stream_feedback_analysis(
+        item, api_key=config.EUROUTER_API_KEY,
+        base_url=config.EUROUTER_BASE_URL, model=config.EUROUTER_MODEL,
+        on_done=lambda text: models.set_feedback_analysis(feedback_id, text),
+    )
+    return StreamingResponse(
+        stream,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _connections_payload(target_org: str) -> dict:

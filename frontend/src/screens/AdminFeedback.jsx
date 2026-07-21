@@ -166,20 +166,47 @@ function statusPill(status) {
 
 function FeedbackDetail({ item, onClose, onStatus, onAnalyzed }) {
   const [busy, setBusy] = useState(false);
+  const [partial, setPartial] = useState("");
   const [error, setError] = useState(null);
 
+  // De uitwerking komt als SSE-stream binnen (thinking/text/done/error), zodat
+  // de beheerder ziet dat de AI bezig is en de tekst live verschijnt.
   const analyze = async () => {
     setBusy(true);
     setError(null);
+    setPartial("");
+    let text = "";
     try {
-      const d = await api(`/api/admin/feedback/${item.id}/analyze`, { method: "POST" });
-      onAnalyzed(d.ai_analysis);
+      const res = await fetch(`/api/admin/feedback/${item.id}/analyze`, { method: "POST", credentials: "include" });
+      if (!res.ok || !res.body) {
+        let msg = "De AI-uitwerking is niet gelukt.";
+        try { msg = JSON.parse(await res.text()).detail || msg; } catch { /* platte tekst */ }
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 2);
+          if (!line.startsWith("data:")) continue;
+          const ev = JSON.parse(line.slice(5).trim());
+          if (ev.type === "text") { text += ev.text; setPartial(text); }
+          else if (ev.type === "error") throw new Error(ev.message);
+        }
+      }
+      if (!text) throw new Error("De AI-uitwerking kwam leeg terug. Probeer het opnieuw.");
+      onAnalyzed(text);
     } catch (e) {
-      let msg = e?.message || "De AI-uitwerking is niet gelukt.";
-      try { msg = JSON.parse(msg).detail || msg; } catch { /* platte tekst */ }
-      setError(msg);
+      setError(e?.message || "De AI-uitwerking is niet gelukt.");
     } finally {
       setBusy(false);
+      setPartial("");
     }
   };
 
@@ -212,7 +239,24 @@ function FeedbackDetail({ item, onClose, onStatus, onAnalyzed }) {
 
       {error && <div style={{ fontSize: 13, color: "var(--c-neg)", fontWeight: 600, marginBottom: 12 }}>{error}</div>}
 
-      {item.ai_analysis && (
+      {busy && (
+        <div className="card" style={{ padding: 16, background: "var(--c-surface-2)" }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "var(--c-accent)", marginBottom: 8 }}>✦ AI-uitwerking en advies</div>
+          {partial && (
+            <div className="assistant-md" style={{ fontSize: 13, marginBottom: 10 }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{partial}</ReactMarkdown>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--c-muted)" }}>
+            <span className="typing-dots" aria-hidden="true">
+              <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+            </span>
+            <span className="thinking-label">{partial ? "schrijft verder…" : "de AI denkt na over deze feedback…"}</span>
+          </div>
+        </div>
+      )}
+
+      {!busy && item.ai_analysis && (
         <div className="card" style={{ padding: 16, background: "var(--c-surface-2)" }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: "var(--c-accent)", marginBottom: 8 }}>✦ AI-uitwerking en advies</div>
           <div className="assistant-md" style={{ fontSize: 13 }}>
