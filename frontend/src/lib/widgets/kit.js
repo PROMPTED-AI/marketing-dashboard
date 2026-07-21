@@ -83,10 +83,12 @@ export function newWidget(catalog, sourceId, kind) {
   return w;
 }
 
-// Maak een verse layout (met eigen widget-id's) uit een template.
+// Maak een verse layout (met eigen widget-id's) uit een template. Zonder
+// template (geen enkel kanaal gekoppeld) begint de gebruiker met een leeg
+// dashboard in plaats van een crash.
 export function instantiateTemplate(catalog, tpl) {
   return {
-    widgets: (tpl.widgets || []).map((w) => {
+    widgets: (tpl?.widgets || []).map((w) => {
       const src = catalog.SOURCES[w.source];
       const out = {
         id: newId(),

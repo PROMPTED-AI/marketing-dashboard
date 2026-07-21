@@ -25,6 +25,18 @@ import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
 // De tabs: het cross-kanaal Overzicht eerst, daarna de losse kanalen.
 const TABS = [{ key: "overview", label: "Overzicht", catalog: null }, ...CHANNELS];
 
+// Welke koppeling hoort bij welk tabblad. Net als in de sidebar tonen we
+// alleen de tabs van gekoppelde kanalen; META Organisch deelt de
+// META-koppeling en Overzicht (zonder provider) is altijd zichtbaar.
+const TAB_PROVIDER = {
+  analytics: "google_analytics",
+  "search-console": "search_console",
+  "google-ads": "google_ads",
+  "meta-ads": "meta_ads",
+  "meta-organic": "meta_ads",
+  woocommerce: "woocommerce",
+};
+
 const selectStyle = {
   height: 40, padding: "0 12px", fontSize: 13, borderRadius: 999, border: "1px solid var(--c-border)",
   background: "var(--c-surface)", color: "var(--c-ink)", fontWeight: 600, fontFamily: "inherit", maxWidth: 260,
@@ -37,7 +49,18 @@ function Empty({ children }) {
 export default function MyDashboards() {
   const [channel, setChannel] = useState(() => localStorage.getItem("kompas-mydash-channel") || "overview");
   const pick = (k) => { setChannel(k); localStorage.setItem("kompas-mydash-channel", k); };
-  const active = TABS.find((c) => c.key === channel) || TABS[0];
+
+  // Alleen tabs van gekoppelde kanalen. Zolang de status onbekend is (eerste
+  // load, geen cache) tonen we alles; daarna klapt de rij netjes terug.
+  const { data: connData } = useConnections();
+  const connected = connectedProviders(connData);
+  const tabs = connected
+    ? TABS.filter((c) => !TAB_PROVIDER[c.key] || connected.has(TAB_PROVIDER[c.key]))
+    : TABS;
+
+  // Wijst het opgeslagen tabblad naar een (inmiddels) ontkoppeld kanaal, val
+  // dan terug op het eerste zichtbare tabblad.
+  const active = tabs.find((c) => c.key === channel) || tabs[0];
   const Wrapper = WRAPPERS[active.key];
 
   return (
@@ -51,7 +74,7 @@ export default function MyDashboards() {
 
       {/* kanaalkeuze */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {TABS.map((c) => {
+        {tabs.map((c) => {
           const on = c.key === active.key;
           return (
             <button
@@ -130,6 +153,8 @@ function OverviewData() {
   const ctx = useMemo(() => ({ "meta-ads": { currency: adAccount?.currency } }), [adAccount?.currency]);
 
   if (loading) return <TabState loading />;
+  if (active && active.size === 0)
+    return <Empty>Koppel eerst een kanaal via Integraties, daarna kun je hier een overzichtsdashboard samenstellen.</Empty>;
 
   return (
     <DashboardEditor
