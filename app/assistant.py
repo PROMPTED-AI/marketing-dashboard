@@ -241,6 +241,8 @@ def _run_tool_loop(client, model, convo, execute, state):
     `state["text"]` wordt True zodra er antwoordtekst is gestreamd, zodat de
     aanroeper weet of een fallback nog veilig is.
     """
+    used_tools = False
+    content = ""
     for _ in range(MAX_TOOL_ITERATIONS):
         stream = client.chat.completions.create(
             model=model, messages=convo, tools=TOOLS, max_tokens=2500, stream=True,
@@ -276,6 +278,7 @@ def _run_tool_loop(client, model, convo, execute, state):
                 for c in calls.values()
             ],
         })
+        used_tools = True
         state["rounds"] = state.get("rounds", 0) + 1
         state["tools"] = state.get("tools", 0) + len(calls)
         # Meld eerst alle tools aan de UI, voer ze daarna parallel uit: modellen
@@ -299,13 +302,19 @@ def _run_tool_loop(client, model, convo, execute, state):
         for (call_id, _name, _args), result in zip(parsed, results):
             convo.append({"role": "tool", "tool_call_id": call_id, "content": result})
 
-    # Vangnet: eindigde de loop zonder één stukje antwoordtekst (het model bleef
-    # tools aanroepen tot de limiet, of gaf een lege completion), forceer dan een
-    # afronding zonder tools. Zonder dit vangnet eindigt de stream stil en blijft
-    # de gebruiker naar "denkt na" kijken; dit trad op bij vervolgvragen.
-    if not state["text"]:
+    # Vangnet in twee gevallen: (a) er is helemaal geen antwoordtekst gestreamd
+    # (model bleef tools aanroepen tot de limiet of gaf een lege completion), of
+    # (b) er zijn tools gebruikt maar de LAATSTE ronde leverde geen tekst op. Dat
+    # tweede geval is het productiepatroon "model kondigt aan dat het data gaat
+    # ophalen, roept de tool aan en zwijgt daarna": de gebruiker krijgt alleen de
+    # aankondiging en denkt dat de chat stuk is. Forceer dan een afronding
+    # zonder tools, zodat het echte antwoord alsnog volgt.
+    if not state["text"] or (used_tools and not content.strip()):
         state["fallback"] = True
-        log.warning("assistant: tool-loop eindigde zonder tekst (model=%s); afronding geforceerd", model)
+        log.warning(
+            "assistant: geen (slot)tekst na tool-gebruik (model=%s, text=%s); afronding geforceerd",
+            model, state["text"],
+        )
         closing = convo + [{
             "role": "user",
             "content": "Formuleer nu je definitieve antwoord op basis van de al opgehaalde gegevens hierboven. Roep geen tools meer aan.",
