@@ -449,6 +449,118 @@ def admin_manage_trial(request: Request, org_id: str, payload: TrialIn):
     return {"organization": updated, "subscription": models.subscription_info(updated)}
 
 
+@app.get("/api/admin/users")
+def admin_users(request: Request):
+    auth.require_admin(request)
+    return {"users": models.list_users()}
+
+
+class RoleIn(BaseModel):
+    role: str
+
+
+@app.patch("/api/admin/users/{user_id}")
+def admin_set_role(request: Request, user_id: str, payload: RoleIn):
+    """Wijzig de rol van een gebruiker (client of agency_admin)."""
+    admin_user = auth.require_admin(request)
+    if payload.role not in ("client", "agency_admin"):
+        raise HTTPException(status_code=400, detail="Onbekende rol.")
+    target = models.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Gebruiker niet gevonden.")
+    if target["id"] == admin_user["id"] and payload.role != "agency_admin":
+        raise HTTPException(status_code=400, detail="Je kunt je eigen beheerdersrol niet afnemen.")
+    models.set_user_role(user_id, payload.role)
+    return {"ok": True}
+
+
+@app.get("/api/admin/activity")
+def admin_activity(request: Request):
+    auth.require_admin(request)
+    return {"activity": models.activity_feed()}
+
+
+@app.get("/api/admin/diagnose/google")
+def admin_diagnose_google(request: Request, org_id: str, provider: str = "google_analytics"):
+    """Test een Google-koppeling en geef de exacte foutreden terug (admin).
+
+    Probeert het token te verversen en daarna een minimale API-call. Zo is in
+    productie direct te zien waaróm een koppeling faalt (ingetrokken grant,
+    ontbrekende scope, tijdelijke storing) in plaats van alleen een generieke
+    melding. De respons bevat geen tokens, alleen de foutomschrijving.
+    """
+    auth.require_admin(request)
+    if provider not in config.GOOGLE_PROVIDERS:
+        raise HTTPException(status_code=400, detail="Onbekende provider.")
+    conn = models.get_connection(org_id, provider=provider)
+    if not conn:
+        return {"ok": False, "step": "load", "error": "Geen koppeling opgeslagen voor deze organisatie."}
+    stored_scopes = (conn.get("creds") or {}).get("scopes")
+    try:
+        creds = oauth.credentials_from_dict(conn["creds"])
+    except Exception as e:  # noqa: BLE001 - de fout zelf is hier het antwoord
+        return {
+            "ok": False, "step": "refresh", "status": conn["status"],
+            "error": f"{type(e).__name__}: {str(e)[:400]}",
+            "als_ingetrokken_herkend": isinstance(e, RefreshError) and _is_grant_revoked(e),
+            "stored_scopes": stored_scopes,
+        }
+    try:
+        if provider == "google_analytics":
+            analytics.list_properties(creds)
+        elif provider == "search_console":
+            search_console.list_sites(creds)
+        # google_ads: alleen het verversen testen, een API-call vergt accountkeuze.
+        return {"ok": True, "step": "api", "status": conn["status"], "scopes": creds.scopes}
+    except Exception as e:  # noqa: BLE001
+        return {
+            "ok": False, "step": "api", "status": conn["status"],
+            "error": f"{type(e).__name__}: {str(e)[:400]}",
+            "scopes": creds.scopes,
+        }
+
+
+class PackageIn(BaseModel):
+    package: str | None = None
+
+
+@app.post("/api/admin/organizations/{org_id}/package")
+def admin_set_package(request: Request, org_id: str, payload: PackageIn):
+    auth.require_admin(request)
+    if payload.package is not None and payload.package not in models.PACKAGES:
+        raise HTTPException(status_code=400, detail="Onbekend pakket.")
+    if not models.get_organization(org_id):
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    models.set_package(org_id, payload.package)
+    return {"ok": True, "package": payload.package}
+
+
+@app.get("/api/admin/organizations/{org_id}/billing")
+def admin_get_billing(request: Request, org_id: str):
+    auth.require_admin(request)
+    if not models.get_organization(org_id):
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    return {"billing": models.get_billing_details(org_id)}
+
+
+class BillingIn(BaseModel):
+    company_name: str = ""
+    billing_email: str = ""
+    address: str = ""
+    postal_city: str = ""
+    kvk: str = ""
+    btw: str = ""
+    reference: str = ""
+
+
+@app.put("/api/admin/organizations/{org_id}/billing")
+def admin_save_billing(request: Request, org_id: str, payload: BillingIn):
+    auth.require_admin(request)
+    if not models.get_organization(org_id):
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    return {"billing": models.save_billing_details(org_id, payload.model_dump())}
+
+
 class OrgRename(BaseModel):
     name: str
     business_type: str | None = None

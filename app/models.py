@@ -159,6 +159,117 @@ def activate_org(org_id: str) -> None:
         )
 
 
+# ------------------------------------------------------- pakketten & facturatie
+
+PACKAGES = ("start", "groei", "pro")
+
+
+def set_package(org_id: str, package: str | None) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE organizations SET package = %s WHERE id = %s", (package, org_id))
+
+
+_BILLING_FIELDS = ("company_name", "billing_email", "address", "postal_city", "kvk", "btw", "reference")
+
+
+def get_billing_details(org_id: str) -> dict:
+    with db.get_conn() as conn:
+        row = conn.execute(
+            f"SELECT {', '.join(_BILLING_FIELDS)}, updated_at FROM billing_details "
+            "WHERE organization_id = %s",
+            (org_id,),
+        ).fetchone()
+    if not row:
+        return {f: "" for f in _BILLING_FIELDS} | {"updated_at": None}
+    out = dict(zip(_BILLING_FIELDS, row[:-1]))
+    out["updated_at"] = row[-1].isoformat() if row[-1] else None
+    return out
+
+
+def save_billing_details(org_id: str, data: dict) -> dict:
+    values = [str(data.get(f) or "")[:300] for f in _BILLING_FIELDS]
+    with db.get_conn() as conn:
+        conn.execute(
+            f"""
+            INSERT INTO billing_details (organization_id, {', '.join(_BILLING_FIELDS)}, updated_at)
+            VALUES (%s, {', '.join(['%s'] * len(_BILLING_FIELDS))}, now())
+            ON CONFLICT (organization_id) DO UPDATE SET
+              {', '.join(f'{f} = EXCLUDED.{f}' for f in _BILLING_FIELDS)},
+              updated_at = now()
+            """,
+            (org_id, *values),
+        )
+    return get_billing_details(org_id)
+
+
+# ------------------------------------------------------------ gebruikersbeheer
+
+
+def list_users() -> list[dict]:
+    """Alle gebruikers met hun organisatie, voor de admin-pagina Gebruikers & rollen."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT u.id, u.email, u.role, u.created_at, u.password_hash IS NOT NULL,
+                   o.id, o.name, o.is_demo
+            FROM users u JOIN organizations o ON o.id = u.organization_id
+            ORDER BY u.created_at DESC
+            """
+        ).fetchall()
+    return [
+        {
+            "id": r[0], "email": r[1], "role": r[2],
+            "created_at": r[3].isoformat() if r[3] else None,
+            "has_password": r[4],
+            "organization_id": r[5], "organization_name": r[6], "is_demo": r[7],
+        }
+        for r in rows
+    ]
+
+
+def set_user_role(user_id: str, role: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE users SET role = %s WHERE id = %s", (role, user_id))
+
+
+# ------------------------------------------------------------- activiteitenfeed
+
+
+def activity_feed(limit: int = 60) -> list[dict]:
+    """Recente gebeurtenissen, afgeleid uit bestaande tabellen.
+
+    Geen aparte log-tabel: nieuwe klanten en gebruikers, bijgewerkte
+    koppelingen, opgeslagen dashboards en binnengekomen feedback hebben elk al
+    een tijdstempel. Samengevoegd en gesorteerd geeft dat een bruikbaar
+    activiteitenoverzicht zonder overal schrijf-hooks te hoeven plaatsen.
+    """
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            (SELECT 'org' AS kind, o.created_at AS ts, o.name, NULL, NULL
+               FROM organizations o WHERE o.is_personal = false)
+            UNION ALL
+            (SELECT 'user', u.created_at, o.name, u.email, u.role
+               FROM users u JOIN organizations o ON o.id = u.organization_id)
+            UNION ALL
+            (SELECT 'connection', c.updated_at, o.name, c.provider, c.status
+               FROM connections c JOIN organizations o ON o.id = c.organization_id)
+            UNION ALL
+            (SELECT 'dashboard', d.updated_at, o.name, d.name, d.page
+               FROM dashboards d JOIN organizations o ON o.id = d.organization_id)
+            UNION ALL
+            (SELECT 'feedback', f.created_at, COALESCE(o.name, f.user_email), f.category, f.status
+               FROM feedback f LEFT JOIN organizations o ON o.id = f.organization_id)
+            ORDER BY ts DESC LIMIT %s
+            """,
+            (limit,),
+        ).fetchall()
+    return [
+        {"kind": r[0], "ts": r[1].isoformat() if r[1] else None, "org": r[2], "a": r[3], "b": r[4]}
+        for r in rows
+    ]
+
+
 def is_demo_org(org_id: str) -> bool:
     org = get_organization(org_id)
     return bool(org and org.get("is_demo"))
@@ -377,7 +488,7 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at "
+            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package "
             "FROM organizations WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
@@ -393,7 +504,7 @@ def list_organizations_with_connections() -> list[dict]:
         }
 
     out = []
-    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at in orgs:
+    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -408,6 +519,7 @@ def list_organizations_with_connections() -> list[dict]:
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,
+                "package": package,
                 "subscription": subscription_info({
                     "is_demo": is_demo, "plan": plan,
                     "trial_ends_at": trial_ends_at.isoformat() if trial_ends_at else None,

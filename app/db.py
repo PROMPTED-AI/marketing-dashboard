@@ -91,6 +91,27 @@ def init_schema() -> None:
             "UPDATE organizations SET plan = 'active' "
             "WHERE plan = 'trial' AND trial_ends_at IS NULL"
         )
+        # Gekozen pakket per organisatie (start | groei | pro), NULL = nog geen.
+        conn.execute(
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS package TEXT"
+        )
+        # Facturatiegegevens per organisatie, ingevuld door de agency admin op
+        # de pagina Pakketten & facturatie.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_details (
+                organization_id  TEXT PRIMARY KEY REFERENCES organizations(id),
+                company_name     TEXT NOT NULL DEFAULT '',
+                billing_email    TEXT NOT NULL DEFAULT '',
+                address          TEXT NOT NULL DEFAULT '',
+                postal_city      TEXT NOT NULL DEFAULT '',
+                kvk              TEXT NOT NULL DEFAULT '',
+                btw              TEXT NOT NULL DEFAULT '',
+                reference        TEXT NOT NULL DEFAULT '',
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
