@@ -116,6 +116,10 @@ def _day_row(d: date) -> dict:
         "conversions": round(sessions * 0.031 * _jitter("conv", d)),
         "engagedSessions": round(sessions * 0.58 * _jitter("engs", d)),
         "revenue": round(sessions * 2.2 * _jitter("rev", d), 2),
+        # E-commerce funnel per dag: winkelwagen -> checkout -> bestelling.
+        "addToCarts": round(sessions * 0.085 * _jitter("cart", d)),
+        "checkouts": round(sessions * 0.034 * _jitter("chk", d)),
+        "transactions": round(sessions * 0.014 * _jitter("trans", d)),
         "bounceRate": 0.41 * _jitter("bounce", d, spread=0.15),
         "avgSessionDuration": 168.0 * _jitter("dur", d, spread=0.15),
         "avgEngagementTime": 92.0 * _jitter("eng-t", d, spread=0.15),
@@ -135,6 +139,8 @@ def _totals(series: list[dict]) -> dict:
     sessions = s("sessions")
     users = s("users")
     pageViews = s("pageViews")
+    transactions = s("transactions")
+    revenue = round(s("revenue"), 2)
     return {
         "sessions": sessions,
         "users": users,
@@ -143,7 +149,12 @@ def _totals(series: list[dict]) -> dict:
         "eventCount": s("eventCount"),
         "conversions": s("conversions"),
         "engagedSessions": s("engagedSessions"),
-        "revenue": round(s("revenue"), 2),
+        "revenue": revenue,
+        "addToCarts": s("addToCarts"),
+        "checkouts": s("checkouts"),
+        "transactions": transactions,
+        "avgOrderValue": round(revenue / transactions, 2) if transactions else 0.0,
+        "firstTimePurchasers": round(transactions * 0.62),
         "bounceRate": avg("bounceRate"),
         "engagementRate": avg("engagementRate"),
         "avgSessionDuration": avg("avgSessionDuration"),
@@ -185,6 +196,11 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
         "eventCount": cur["eventCount"],
         "conversions": cur["conversions"],
         "revenue": cur["revenue"],
+        "transactions": cur["transactions"],
+        "avgOrderValue": cur["avgOrderValue"],
+        "addToCarts": cur["addToCarts"],
+        "checkouts": cur["checkouts"],
+        "firstTimePurchasers": cur["firstTimePurchasers"],
     }
 
     deltas = None
@@ -196,6 +212,8 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
                 "users", "newUsers", "sessions", "engagedSessions", "pageViews",
                 "bounceRate", "avgSessionDuration", "engagementRate", "eventCount",
                 "conversions", "revenue", "viewsPerSession", "sessionsPerUser",
+                "transactions", "avgOrderValue", "addToCarts", "checkouts",
+                "firstTimePurchasers",
             )
         }
 
@@ -293,6 +311,24 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
         for name, share in conv_defs
     ]
 
+    # Top verkochte producten (GA4 item-scope), afgeleid van de periode-omzet.
+    item_defs = [
+        ("Loungestoel Vigo", 0.14), ("Eettafel Nordic", 0.12),
+        ("Boekenkast Bergen", 0.10), ("Vloerkleed Fez", 0.08),
+        ("Wandlamp Oslo", 0.07), ("Spiegel Anna", 0.06),
+        ("Bijzettafel Rond", 0.05), ("Plaid Wolmix", 0.04),
+        ("Kussenset Linnen", 0.035), ("Vaas Amber", 0.03),
+    ]
+    aov = cur["avgOrderValue"] or 1.0
+    top_items = []
+    for name, share in item_defs:
+        rev = round(cur["revenue"] * share * _jitter(seed, "item", name), 2)
+        top_items.append({
+            "name": name,
+            "qty": max(1, round(rev / aov * 1.6)),
+            "revenue": rev,
+        })
+
     return {
         "kpis": kpis,
         "deltas": deltas,
@@ -313,6 +349,7 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
         "page_titles": page_titles,
         "landing_pages": landing_pages,
         "conversions": conversions,
+        "top_items": top_items,
     }
 
 

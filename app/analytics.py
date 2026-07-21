@@ -203,6 +203,41 @@ def run_ga_overview(
             "revenue": edelta("totalRevenue"),
         })
 
+    # --- e-commerce KPI's (GA4 monetization) ---
+    # Eigen safe()-report: een property zonder e-commerce-meting levert dan
+    # gewoon nullen in plaats van een fout. averagePurchaseRevenue is de
+    # "gemiddelde orderwaarde" zoals de GA4-interface die toont; addToCarts en
+    # checkouts vormen samen met transactions de winkelfunnel.
+    ecom_metrics = [
+        "transactions", "averagePurchaseRevenue", "addToCarts",
+        "checkouts", "firstTimePurchasers",
+    ]
+
+    def _ecom_kpis():
+        r = report([], ecom_metrics, ranges)
+        for row in r.rows:
+            which = row.dimension_values[0].value if row.dimension_values else "current"
+            target = prev_vals if which == "previous" else cur_vals
+            for i, m in enumerate(ecom_metrics):
+                target[m] = float(row.metric_values[i].value)
+
+    safe(_ecom_kpis, None)
+    kpis.update({
+        "transactions": int(cur_vals.get("transactions", 0)),
+        "avgOrderValue": cur_vals.get("averagePurchaseRevenue", 0.0),
+        "addToCarts": int(cur_vals.get("addToCarts", 0)),
+        "checkouts": int(cur_vals.get("checkouts", 0)),
+        "firstTimePurchasers": int(cur_vals.get("firstTimePurchasers", 0)),
+    })
+    if deltas is not None:
+        deltas.update({
+            "transactions": edelta("transactions"),
+            "avgOrderValue": edelta("averagePurchaseRevenue"),
+            "addToCarts": edelta("addToCarts"),
+            "checkouts": edelta("checkouts"),
+            "firstTimePurchasers": edelta("firstTimePurchasers"),
+        })
+
     # --- metrics over time ---
     # One dated report covers every scalar KPI, so each KPI-card can show its own
     # daily trend (sparkline), not just sessions. Same fallback as the KPI block
@@ -246,7 +281,7 @@ def run_ga_overview(
     # Enrich the daily series with the extra headline metrics (their own trend +
     # sparkline). Separate report to stay within the per-request metric limit.
     def _extra_series():
-        r = report(["date"], ["activeUsers", "engagedSessions", "totalRevenue"],
+        r = report(["date"], ["activeUsers", "engagedSessions", "totalRevenue", "transactions"],
                    cur_only, order_bys=date_order)
         by_d = {row.dimension_values[0].value: row for row in r.rows}
         for item in series_by_date:
@@ -256,6 +291,7 @@ def run_ga_overview(
             item["activeUsers"] = _int(row.metric_values[0].value)
             item["engagedSessions"] = _int(row.metric_values[1].value)
             item["revenue"] = float(row.metric_values[2].value)
+            item["transactions"] = _int(row.metric_values[3].value)
 
     safe(_extra_series, None)
 
@@ -337,6 +373,25 @@ def run_ga_overview(
 
     conversions = safe(_conversions, [])
 
+    # Top verkochte producten (GA4 item-scope): itemName gerangschikt op
+    # itemomzet. Eigen safe()-report, want item-metrics mogen niet met
+    # event-metrics gemixt worden en niet elke property meet e-commerce.
+    def _top_items():
+        rep = report(
+            ["itemName"], ["itemsPurchased", "itemRevenue"],
+            cur_only, order_bys=[_metric_desc("itemRevenue")], limit=10,
+        )
+        return [
+            {
+                "name": r.dimension_values[0].value,
+                "qty": _int(r.metric_values[0].value),
+                "revenue": float(r.metric_values[1].value),
+            }
+            for r in rep.rows
+        ]
+
+    top_items = safe(_top_items, [])
+
     return {
         "kpis": kpis,
         "deltas": deltas,
@@ -364,6 +419,7 @@ def run_ga_overview(
         "page_titles": page_titles,
         "landing_pages": landing_pages,
         "conversions": conversions,
+        "top_items": top_items,
     }
 
 
