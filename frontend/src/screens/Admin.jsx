@@ -106,7 +106,7 @@ export default function Admin() {
 
           <div className="card" style={{ overflow: "hidden" }}>
             <div style={{ ...headRow }}>
-              <span>Klant</span><span>Gekoppelde tools</span><span>Status</span><span>Laatste sync</span>
+              <span>Klant</span><span>Gekoppelde tools</span><span>Status</span><span>Laatste sync</span><span>Proefperiode</span>
             </div>
             {(orgs || []).map((o) => {
               const st = orgStatus(o);
@@ -124,6 +124,7 @@ export default function Admin() {
                   </div>
                   <span><span className={`pill ${st.cls}`}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />{st.label}</span></span>
                   <span style={{ color: "var(--c-muted)", fontSize: 13 }}>{ago(o.last_sync)}</span>
+                  <TrialCell org={o} onChanged={reload} />
                 </div>
               );
             })}
@@ -293,13 +294,58 @@ function Stat({ label, value, danger }) {
   );
 }
 
+// Proefperiode-kolom in de klantentabel: status-pill plus beheerknoppen.
+// Verlengen telt 14 dagen op bij het latere van nu of de huidige einddatum,
+// stoppen beëindigt per direct (klant ziet het verloopscherm), activeren zet
+// de organisatie op betaald/onbeperkt.
+function TrialCell({ org, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const sub = org.subscription || { plan: "active", expired: false };
+
+  const act = async (action) => {
+    setBusy(true);
+    try {
+      await api(`/api/admin/organizations/${org.id}/trial`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, days: 14 }),
+      });
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+
+  const pill = sub.plan === "active"
+    ? <span className="pill pos">Actief</span>
+    : sub.expired
+      ? <span className="pill neg">Verlopen</span>
+      : <span className="pill accent">Nog {sub.days_left} {sub.days_left === 1 ? "dag" : "dagen"}</span>;
+
+  const miniBtn = { height: 26, padding: "0 9px", fontSize: 11.5, borderRadius: 8 };
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      {pill}
+      {sub.plan === "trial" && (
+        <>
+          <button className="btn-ghost" disabled={busy} style={miniBtn} onClick={() => act("extend")} title="Verleng de proefperiode met 14 dagen">+14 dagen</button>
+          {!sub.expired && (
+            <button className="btn-ghost" disabled={busy} style={{ ...miniBtn, color: "var(--c-neg)" }} onClick={() => act("stop")} title="Beëindig de proefperiode per direct">Stop</button>
+          )}
+          <button className="btn-ghost" disabled={busy} style={{ ...miniBtn, color: "var(--c-accent)" }} onClick={() => act("activate")} title="Zet deze organisatie op betaald/onbeperkt">Activeer</button>
+        </>
+      )}
+    </span>
+  );
+}
+
 const sidebar = { width: 240, background: "var(--c-sidebar)", borderRight: "1px solid var(--c-border)", display: "flex", flexDirection: "column", flex: "none" };
 const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "var(--c-muted)", textTransform: "uppercase", margin: "8px 0 6px 8px" };
 const navActive = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
-const headRow = { display: "grid", gridTemplateColumns: "2.2fr 1.4fr 1.1fr 1fr", gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const dataRow = { display: "grid", gridTemplateColumns: "2.2fr 1.4fr 1.1fr 1fr", gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", margin: "12px 0 6px" };
 const inp = { width: "100%", height: 44, padding: "0 14px", fontSize: 14, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", boxSizing: "border-box" };

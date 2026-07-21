@@ -1,6 +1,7 @@
 """Data access for organizations, users, connections, and dashboards."""
 import json
 import uuid
+from datetime import datetime, timezone
 
 from psycopg.types.json import Jsonb
 
@@ -36,8 +37,8 @@ def get_or_create_personal_org(email: str) -> dict:
             return {"id": row[0], "name": row[1], "domain": row[2]}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain, is_personal) "
-            "VALUES (%s, %s, %s, true)",
+            "INSERT INTO organizations (id, name, domain, is_personal, plan, trial_ends_at) "
+            "VALUES (%s, %s, %s, true, 'trial', now() + interval '14 days')",
             (org_id, email, email),
         )
         return {"id": org_id, "name": email, "domain": email}
@@ -69,7 +70,8 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
             return {"id": row[0], "name": name, "domain": domain}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain) VALUES (%s, %s, %s)",
+            "INSERT INTO organizations (id, name, domain, plan, trial_ends_at) "
+            "VALUES (%s, %s, %s, 'trial', now() + interval '14 days')",
             (org_id, name, domain),
         )
         return {"id": org_id, "name": name, "domain": domain}
@@ -78,14 +80,83 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain, is_demo, business_type FROM organizations WHERE id = %s",
+            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at "
+            "FROM organizations WHERE id = %s",
             (org_id,),
         ).fetchone()
     return (
-        {"id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3], "business_type": row[4]}
+        {
+            "id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3],
+            "business_type": row[4], "plan": row[5],
+            "trial_ends_at": row[6].isoformat() if row[6] else None,
+        }
         if row
         else None
     )
+
+
+# ------------------------------------------------------------------ abonnement
+#
+# Nieuwe organisaties starten met een proefperiode van 14 dagen. 'active' is
+# betaald/onbeperkt. De agency admin beheert dit per organisatie: verlengen,
+# per direct stoppen of activeren. Demo-organisaties zijn altijd actief.
+
+TRIAL_DAYS = 14
+
+
+def subscription_info(org: dict | None) -> dict:
+    """Abonnementsstatus voor /api/me en de toegangscontrole."""
+    if not org or org.get("is_demo") or org.get("plan") != "trial":
+        return {"plan": "active", "trial_ends_at": None, "expired": False, "days_left": None}
+    ends = org.get("trial_ends_at")
+    ends_dt = datetime.fromisoformat(ends) if ends else None
+    now = datetime.now(timezone.utc)
+    expired = bool(ends_dt and ends_dt <= now)
+    days_left = max(0, (ends_dt - now).days + 1) if ends_dt and not expired else 0
+    return {"plan": "trial", "trial_ends_at": ends, "expired": expired, "days_left": days_left}
+
+
+def trial_expired(org_id: str) -> bool:
+    return subscription_info(get_organization(org_id))["expired"]
+
+
+def start_trial(org_id: str, days: int = TRIAL_DAYS) -> None:
+    """Zet (of reset) een proefperiode van `days` dagen vanaf nu."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE organizations SET plan = 'trial', "
+            "trial_ends_at = now() + make_interval(days => %s) WHERE id = %s",
+            (days, org_id),
+        )
+
+
+def extend_trial(org_id: str, days: int = TRIAL_DAYS) -> None:
+    """Verleng de proefperiode: `days` dagen bovenop het latere van nu of de huidige einddatum."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE organizations SET plan = 'trial', trial_ends_at = "
+            "GREATEST(COALESCE(trial_ends_at, now()), now()) + make_interval(days => %s) "
+            "WHERE id = %s",
+            (days, org_id),
+        )
+
+
+def stop_trial(org_id: str) -> None:
+    """Beëindig de proefperiode per direct (de organisatie ziet het verloopscherm)."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE organizations SET plan = 'trial', trial_ends_at = now() WHERE id = %s",
+            (org_id,),
+        )
+
+
+def activate_org(org_id: str) -> None:
+    """Zet de organisatie op betaald/onbeperkt."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE organizations SET plan = 'active', trial_ends_at = NULL WHERE id = %s",
+            (org_id,),
+        )
 
 
 def is_demo_org(org_id: str) -> bool:
@@ -120,8 +191,8 @@ def create_demo_organization(name: str, domain: str, business_type: str = "ecomm
             return {"id": row[0], "name": name, "domain": domain, "is_demo": True, "business_type": business_type}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain, is_demo, business_type) "
-            "VALUES (%s, %s, %s, true, %s)",
+            "INSERT INTO organizations (id, name, domain, is_demo, business_type, plan) "
+            "VALUES (%s, %s, %s, true, %s, 'active')",
             (org_id, name, domain, business_type),
         )
         return {"id": org_id, "name": name, "domain": domain, "is_demo": True, "business_type": business_type}
@@ -306,8 +377,8 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain, business_type FROM organizations "
-            "WHERE is_personal = false ORDER BY name"
+            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at "
+            "FROM organizations WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
             "SELECT organization_id, provider, status, google_email, updated_at FROM connections"
@@ -322,7 +393,7 @@ def list_organizations_with_connections() -> list[dict]:
         }
 
     out = []
-    for org_id, name, domain, business_type in orgs:
+    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -337,6 +408,10 @@ def list_organizations_with_connections() -> list[dict]:
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,
+                "subscription": subscription_info({
+                    "is_demo": is_demo, "plan": plan,
+                    "trial_ends_at": trial_ends_at.isoformat() if trial_ends_at else None,
+                }),
             }
         )
     return out

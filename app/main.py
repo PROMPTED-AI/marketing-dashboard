@@ -94,10 +94,23 @@ def _safe_return(path: str | None, default: str) -> str:
 
 
 def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
-    """Clients are pinned to their own org; admins may target any org."""
-    if requested_org_id and user["role"] == "agency_admin":
-        return requested_org_id
-    return user["organization_id"]
+    """Clients are pinned to their own org; admins may target any org.
+
+    Dit is het centrale punt waar alle org-gebonden data-endpoints langskomen,
+    dus hier dwingen we ook de proefperiode af: is de trial van de eigen
+    organisatie verlopen, dan krijgt de gebruiker een 402 en toont de app het
+    verloopscherm. De agency admin behoudt altijd toegang (die beheert de
+    trials en moet mee kunnen kijken).
+    """
+    if user["role"] == "agency_admin":
+        return requested_org_id or user["organization_id"]
+    org_id = user["organization_id"]
+    if models.trial_expired(org_id):
+        raise HTTPException(
+            status_code=402,
+            detail="De proefperiode is verlopen. Neem contact op voor een betaalde verlenging.",
+        )
+    return org_id
 
 
 def _require_period(*dates: str | None) -> None:
@@ -251,11 +264,13 @@ def healthz():
 def me(request: Request):
     user = auth.current_user(request)
     org = models.get_organization(user["organization_id"])
+    subscription = models.subscription_info(org)
     if org and org.get("is_demo"):
         return {
             "email": user["email"],
             "role": user["role"],
             "organization": org,
+            "subscription": subscription,
             "connection_status": "connected",
         }
     conn = models.get_connection(user["organization_id"])
@@ -263,6 +278,7 @@ def me(request: Request):
         "email": user["email"],
         "role": user["role"],
         "organization": org,
+        "subscription": subscription,
         "connection_status": conn["status"] if conn else "not_connected",
     }
 
@@ -396,6 +412,41 @@ def admin_add_organization(request: Request, payload: OrgIn):
         )
     org = models.create_or_rename_organization(name, domain)
     return {"organization": org}
+
+
+class TrialIn(BaseModel):
+    action: str  # extend | stop | activate | restart
+    days: int = models.TRIAL_DAYS
+
+
+@app.post("/api/admin/organizations/{org_id}/trial")
+def admin_manage_trial(request: Request, org_id: str, payload: TrialIn):
+    """Beheer de proefperiode van een organisatie (alleen agency admin).
+
+    extend: verleng met `days` dagen bovenop nu of de huidige einddatum.
+    stop: beëindig de proefperiode per direct (verloopscherm).
+    activate: zet de organisatie op betaald/onbeperkt.
+    restart: nieuwe proefperiode van `days` dagen vanaf nu.
+    """
+    auth.require_admin(request)
+    org = models.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    if org.get("is_demo"):
+        raise HTTPException(status_code=400, detail="De demo-organisatie heeft geen proefperiode.")
+    days = max(1, min(int(payload.days or models.TRIAL_DAYS), 365))
+    if payload.action == "extend":
+        models.extend_trial(org_id, days)
+    elif payload.action == "stop":
+        models.stop_trial(org_id)
+    elif payload.action == "activate":
+        models.activate_org(org_id)
+    elif payload.action == "restart":
+        models.start_trial(org_id, days)
+    else:
+        raise HTTPException(status_code=400, detail="Onbekende actie.")
+    updated = models.get_organization(org_id)
+    return {"organization": updated, "subscription": models.subscription_info(updated)}
 
 
 class OrgRename(BaseModel):
