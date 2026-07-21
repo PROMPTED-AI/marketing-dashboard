@@ -141,6 +141,26 @@ def init_schema() -> None:
         conn.execute(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
         )
+        # Eenmalige tokens voor uitnodigingen en wachtwoord-reset. Alleen de
+        # hash van de token wordt bewaard; de link bevat de ruwe token. `kind`
+        # is 'invite' of 'reset'. `used_at`/`expires_at` maken de token
+        # eenmalig en tijdgebonden.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS access_tokens (
+                id               TEXT PRIMARY KEY,
+                kind             TEXT NOT NULL,
+                email            TEXT NOT NULL,
+                organization_id  TEXT REFERENCES organizations(id),
+                role             TEXT,
+                token_hash       TEXT NOT NULL UNIQUE,
+                expires_at       TIMESTAMPTZ NOT NULL,
+                used_at          TIMESTAMPTZ,
+                created_by       TEXT,
+                created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS connections (

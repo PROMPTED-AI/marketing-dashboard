@@ -278,6 +278,61 @@ def set_user_role(user_id: str, role: str) -> None:
         conn.execute("UPDATE users SET role = %s WHERE id = %s", (role, user_id))
 
 
+# ---------------------------------------------- uitnodigingen + wachtwoord-reset
+
+
+def create_access_token(
+    kind: str,
+    email: str,
+    token_hash: str,
+    expires_at: datetime,
+    organization_id: str | None = None,
+    role: str | None = None,
+    created_by: str | None = None,
+) -> None:
+    """Sla een eenmalige token op. Openstaande tokens van dezelfde soort voor
+    hetzelfde e-mailadres worden eerst opgeruimd, zodat een nieuwe link de oude
+    ongeldig maakt."""
+    with db.get_conn() as conn:
+        conn.execute(
+            "DELETE FROM access_tokens WHERE kind = %s AND email = %s AND used_at IS NULL",
+            (kind, email.lower()),
+        )
+        conn.execute(
+            "INSERT INTO access_tokens "
+            "(id, kind, email, organization_id, role, token_hash, expires_at, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (str(uuid.uuid4()), kind, email.lower(), organization_id, role,
+             token_hash, expires_at, created_by),
+        )
+
+
+def get_access_token(token_hash: str, kind: str) -> dict | None:
+    """Geef een geldige (niet-gebruikte, niet-verlopen) token, anders None."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT email, organization_id, role, expires_at, used_at "
+            "FROM access_tokens WHERE token_hash = %s AND kind = %s",
+            (token_hash, kind),
+        ).fetchone()
+    if not row:
+        return None
+    email, org_id, role, expires_at, used_at = row
+    if used_at is not None:
+        return None
+    if expires_at <= datetime.now(timezone.utc):
+        return None
+    return {"email": email, "organization_id": org_id, "role": role}
+
+
+def use_access_token(token_hash: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute(
+            "UPDATE access_tokens SET used_at = now() WHERE token_hash = %s",
+            (token_hash,),
+        )
+
+
 # ------------------------------------------------------------- activiteitenfeed
 
 

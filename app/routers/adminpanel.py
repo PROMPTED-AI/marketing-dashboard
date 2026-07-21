@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -11,8 +11,8 @@ from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
 
 from .. import (
-    analytics, assistant, auth, cache, config, demo, google_ads, insights, meta,
-    meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
+    analytics, assistant, auth, cache, config, demo, email as mailer, google_ads,
+    insights, meta, meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
@@ -109,6 +109,28 @@ def admin_set_role(request: Request, user_id: str, payload: RoleIn):
         raise HTTPException(status_code=400, detail="Je kunt je eigen beheerdersrol niet afnemen.")
     models.set_user_role(user_id, payload.role)
     return {"ok": True}
+
+
+@router.post("/api/admin/users/{user_id}/reset-link")
+def admin_reset_link(request: Request, user_id: str):
+    """Genereer een wachtwoord-resetlink voor een gebruiker (alleen agency admin).
+
+    Handig als e-mail niet geconfigureerd is: de admin deelt de link zelf. Is
+    SMTP wel ingesteld, dan wordt de link ook direct gemaild.
+    """
+    auth.require_admin(request)
+    target = models.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Gebruiker niet gevonden.")
+    raw, token_hash = auth.generate_token()
+    models.create_access_token(
+        "reset", target["email"], token_hash,
+        datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    base = config.APP_BASE_URL or str(request.base_url).rstrip("/")
+    link = f"{base}/reset/{raw}"
+    emailed = mailer.send_reset(target["email"], link) if mailer.is_configured() else False
+    return {"email": target["email"], "reset_url": link, "emailed": emailed}
 
 
 @router.get("/api/admin/activity")

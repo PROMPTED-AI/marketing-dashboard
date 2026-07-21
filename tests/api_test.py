@@ -136,6 +136,46 @@ def test_framework(demo):
     print("raamwerk: autowaarden, opslaan, afgeleide formules en validatie slagen")
 
 
+def test_account_flow(admin, tk_org_id):
+    invitee = "nieuw@testklant.nl"
+    # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
+    r = admin.post(f"{BASE}/api/admin/invitations", json={"email": invitee, "org_id": tk_org_id, "role": "client"})
+    assert r.status_code == 200, (r.status_code, r.text)
+    inv = r.json()
+    assert inv["emailed"] is False and "/invite/" in inv["invite_url"], inv
+    token = inv["invite_url"].rsplit("/", 1)[1]
+
+    # 2. info + 3. te kort wachtwoord + 4. accepteren logt in
+    info = requests.get(f"{BASE}/api/invitations/{token}").json()
+    assert info["email"] == invitee and info["organization_name"], info
+    assert requests.post(f"{BASE}/api/invitations/{token}/accept", json={"password": "kort"}).status_code == 400
+    s = requests.Session()
+    assert s.post(f"{BASE}/api/invitations/{token}/accept", json={"password": "geheim123"}).status_code == 200
+    assert s.get(f"{BASE}/api/me").json()["email"] == invitee
+    # 5. token is eenmalig + 6. login met nieuw wachtwoord werkt
+    assert requests.get(f"{BASE}/api/invitations/{token}").status_code == 404
+    assert requests.post(f"{BASE}/api/auth/login", json={"email": invitee, "password": "geheim123"}).status_code == 200
+
+    # 7. forgot geeft altijd 200 (geen enumeratie)
+    assert requests.post(f"{BASE}/api/auth/forgot", json={"email": "bestaatniet@nergens.nl"}).status_code == 200
+    assert requests.post(f"{BASE}/api/auth/forgot", json={"email": invitee}).status_code == 200
+
+    # 8. admin-resetlink -> nieuw wachtwoord -> eenmalig -> login
+    uid = next(u for u in admin.get(f"{BASE}/api/admin/users").json()["users"] if u["email"] == invitee)["id"]
+    rt = admin.post(f"{BASE}/api/admin/users/{uid}/reset-link").json()["reset_url"].rsplit("/", 1)[1]
+    assert requests.get(f"{BASE}/api/auth/reset/{rt}").json()["email"] == invitee
+    assert requests.post(f"{BASE}/api/auth/reset/{rt}", json={"password": "nieuwpass1"}).status_code == 200
+    assert requests.post(f"{BASE}/api/auth/reset/{rt}", json={"password": "weer"}).status_code == 404
+    assert requests.post(f"{BASE}/api/auth/login", json={"email": invitee, "password": "nieuwpass1"}).status_code == 200
+
+    # 9. validatie + 10. autorisatie (klant mag niet uitnodigen)
+    assert admin.post(f"{BASE}/api/admin/invitations", json={"email": "geenmail", "org_id": tk_org_id}).status_code == 400
+    assert admin.post(f"{BASE}/api/admin/invitations", json={"email": "a@b.nl", "org_id": "nope"}).status_code == 404
+    client = login(invitee, "nieuwpass1")
+    assert client.post(f"{BASE}/api/admin/invitations", json={"email": "x@y.nl", "org_id": tk_org_id}).status_code == 403
+    print("accountflow: uitnodigen, wachtwoord instellen, reset en autorisatie slagen")
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -155,5 +195,6 @@ if __name__ == "__main__":
     test_trial_management(admin, tk_org_id)
     test_admin_pages(admin, tk_org_id)
     test_framework(demo)
+    test_account_flow(admin, tk_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

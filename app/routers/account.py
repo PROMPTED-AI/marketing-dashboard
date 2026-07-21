@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -11,8 +11,8 @@ from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
 
 from .. import (
-    analytics, assistant, auth, cache, config, demo, google_ads, insights, meta,
-    meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
+    analytics, assistant, auth, cache, config, demo, email as mailer, google_ads,
+    insights, meta, meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
@@ -157,6 +157,143 @@ def callback(request: Request):
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
+
+
+# --------------------------------------- uitnodigingen + wachtwoord vergeten
+#
+# Nieuwe accounts met wachtwoord ontstaan via een uitnodiging: de admin maakt
+# er een aan, de klant stelt via een eenmalige, tijdgebonden link zelf een
+# wachtwoord in. Wachtwoord vergeten werkt met dezelfde token-infrastructuur.
+# Alleen de hash van de token staat in de database (zie models.create_access_token).
+
+INVITE_TTL = timedelta(days=7)
+RESET_TTL = timedelta(hours=1)
+
+
+def _base_url(request: Request) -> str:
+    """Publieke basis-URL voor de links (config wint, anders uit het verzoek)."""
+    return config.APP_BASE_URL or str(request.base_url).rstrip("/")
+
+
+class InviteIn(BaseModel):
+    email: str
+    org_id: str
+    role: str = "client"
+
+
+@router.post("/api/admin/invitations")
+def create_invitation(request: Request, payload: InviteIn):
+    """Nodig iemand uit voor een organisatie (alleen agency admin).
+
+    Geeft de uitnodigingslink terug (om te delen) en of hij per e-mail is
+    verstuurd. E-mail gaat alleen als SMTP geconfigureerd is; anders deelt de
+    admin de link zelf.
+    """
+    admin = auth.require_admin(request)
+    email = payload.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Voer een geldig e-mailadres in.")
+    if payload.role not in ("client", "agency_admin"):
+        raise HTTPException(status_code=400, detail="Onbekende rol.")
+    org = models.get_organization(payload.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    raw, token_hash = auth.generate_token()
+    models.create_access_token(
+        "invite", email, token_hash,
+        datetime.now(timezone.utc) + INVITE_TTL,
+        organization_id=payload.org_id, role=payload.role, created_by=admin["email"],
+    )
+    link = f"{_base_url(request)}/invite/{raw}"
+    emailed = mailer.send_invite(email, link, org["name"]) if mailer.is_configured() else False
+    return {"email": email, "invite_url": link, "emailed": emailed}
+
+
+@router.get("/api/invitations/{token}")
+def invitation_info(token: str):
+    """Toon voor welk e-mailadres/organisatie de uitnodiging geldt (publiek)."""
+    data = models.get_access_token(auth.hash_token(token), "invite")
+    if not data:
+        raise HTTPException(status_code=404, detail="Deze uitnodiging is verlopen of al gebruikt.")
+    org = models.get_organization(data["organization_id"]) if data["organization_id"] else None
+    return {"email": data["email"], "organization_name": org["name"] if org else None}
+
+
+class SetPasswordIn(BaseModel):
+    password: str
+
+
+@router.post("/api/invitations/{token}/accept")
+def accept_invitation(request: Request, token: str, payload: SetPasswordIn):
+    """Wachtwoord instellen via een uitnodiging en meteen inloggen (publiek)."""
+    if not ratelimit.allow("invite-accept", limit=30, window_s=60):
+        raise HTTPException(status_code=429, detail="Te veel pogingen - probeer het zo weer.")
+    token_hash = auth.hash_token(token)
+    data = models.get_access_token(token_hash, "invite")
+    if not data:
+        raise HTTPException(status_code=404, detail="Deze uitnodiging is verlopen of al gebruikt.")
+    problem = auth.password_problem(payload.password)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    user = models.upsert_user(data["email"], data["organization_id"], data["role"] or "client")
+    models.set_user_password(data["email"], auth.hash_password(payload.password))
+    models.use_access_token(token_hash)
+    request.session["user_id"] = user["id"]
+    return {"email": user["email"], "role": user["role"]}
+
+
+class ForgotIn(BaseModel):
+    email: str
+
+
+@router.post("/api/auth/forgot")
+def forgot_password(request: Request, payload: ForgotIn):
+    """Stuur een wachtwoord-resetlink (publiek).
+
+    Antwoordt altijd hetzelfde, of het account nu bestaat of niet, zodat je via
+    deze route niet kunt achterhalen welke e-mailadressen een account hebben.
+    """
+    email = payload.email.strip().lower()
+    per_email = ratelimit.allow(f"forgot|{email}", limit=3, window_s=900)
+    globally = ratelimit.allow("forgot", limit=60, window_s=60)
+    if email and per_email and globally:
+        user = models.get_user_by_email(email)
+        if user:
+            raw, token_hash = auth.generate_token()
+            models.create_access_token(
+                "reset", email, token_hash, datetime.now(timezone.utc) + RESET_TTL,
+            )
+            mailer.send_reset(email, f"{_base_url(request)}/reset/{raw}")
+    return {"ok": True}
+
+
+@router.get("/api/auth/reset/{token}")
+def reset_info(token: str):
+    """Controleer een resetlink en geef het bijbehorende e-mailadres (publiek)."""
+    data = models.get_access_token(auth.hash_token(token), "reset")
+    if not data:
+        raise HTTPException(status_code=404, detail="Deze resetlink is verlopen of al gebruikt.")
+    return {"email": data["email"]}
+
+
+@router.post("/api/auth/reset/{token}")
+def reset_password(request: Request, token: str, payload: SetPasswordIn):
+    """Stel een nieuw wachtwoord in via een resetlink en log in (publiek)."""
+    if not ratelimit.allow("reset", limit=30, window_s=60):
+        raise HTTPException(status_code=429, detail="Te veel pogingen - probeer het zo weer.")
+    token_hash = auth.hash_token(token)
+    data = models.get_access_token(token_hash, "reset")
+    if not data:
+        raise HTTPException(status_code=404, detail="Deze resetlink is verlopen of al gebruikt.")
+    problem = auth.password_problem(payload.password)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    models.set_user_password(data["email"], auth.hash_password(payload.password))
+    models.use_access_token(token_hash)
+    user = models.get_user_by_email(data["email"])
+    if user:
+        request.session["user_id"] = user["id"]
+    return {"ok": True}
 
 
 

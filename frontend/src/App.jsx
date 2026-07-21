@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useMe } from "./lib/useMe.jsx";
 import { useConnections, connectedProviders } from "./lib/useConnections.jsx";
 import Login from "./screens/Login.jsx";
+import { Invite, ResetPassword } from "./screens/PasswordFlow.jsx";
 import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
 import Assistant from "./screens/dashboard/Assistant.jsx";
@@ -61,6 +62,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={loading ? <FullLoader /> : me ? <Navigate to="/app" replace /> : <Login />} />
+      <Route path="/invite/:token" element={<Invite />} />
+      <Route path="/reset/:token" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
 
       <Route path="/app" element={<RequireAuth><Dashboard /></RequireAuth>}>

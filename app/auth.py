@@ -32,6 +32,34 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+# --- eenmalige tokens (uitnodiging + wachtwoord-reset) + wachtwoordbeleid ---
+
+MIN_PASSWORD_LENGTH = 8
+
+
+def generate_token() -> tuple[str, str]:
+    """Geef (ruwe token voor in de link, hash voor in de database).
+
+    Alleen de hash wordt opgeslagen, zodat een databaselek de links niet
+    bruikbaar maakt. De ruwe token gaat eenmalig naar de gebruiker.
+    """
+    raw = secrets.token_urlsafe(32)
+    return raw, hash_token(raw)
+
+
+def hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def password_problem(password: str) -> str | None:
+    """Geef een foutmelding als het wachtwoord niet voldoet, anders None."""
+    if not password or len(password) < MIN_PASSWORD_LENGTH:
+        return f"Wachtwoord moet minimaal {MIN_PASSWORD_LENGTH} tekens zijn."
+    if len(password) > 200:
+        return "Wachtwoord is te lang."
+    return None
+
+
 def is_agency_admin(email: str) -> bool:
     return email.lower() in config.AGENCY_ADMIN_EMAILS
 
