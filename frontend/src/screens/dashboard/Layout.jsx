@@ -8,6 +8,7 @@ import TrialExpired from "../../components/TrialExpired.jsx";
 import { useMe } from "../../lib/useMe.jsx";
 import { useConnections } from "../../lib/useConnections.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
+import Prefetcher from "../../lib/Prefetcher.jsx";
 
 // Dashboard shell: sidebar + (topbar over a scrolling content area).
 // On mobile the sidebar collapses into a slide-in drawer toggled from the topbar.
@@ -60,6 +61,7 @@ export default function Layout() {
         </div>
       </div>
       <FeedbackButton />
+      <Prefetcher />
     </div>
   );
 }

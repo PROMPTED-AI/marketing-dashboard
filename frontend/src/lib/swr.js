@@ -1,35 +1,42 @@
 // Stale-while-revalidate cache for GET responses.
 //
-// Keeps a per-tab in-memory map plus a sessionStorage mirror so that revisiting
-// a tab, period or client you've already seen paints instantly while a fresh
-// copy is fetched in the background. Keyed by the full request URL (which
-// already encodes property/site, dates, compare and org_id).
+// Keeps a per-tab in-memory map plus a localStorage mirror, so that a next
+// visit (also after a browser restart) paints instantly with the last known
+// data while a fresh copy is fetched in the background. Keyed by the full
+// request URL (which already encodes property/site, dates, compare and
+// org_id).
+//
+// Entries older than MAX_AGE are dropped; anything younger is shown
+// immediately, regardless of age, and always revalidated. On quota errors the
+// whole mirror is cleared (cache is best effort).
 
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
 
-const TTL = 5 * 60 * 1000; // entries older than this are ignored (still revalidated)
+const MAX_AGE = 7 * 24 * 60 * 60 * 1000; // ouder dan een week negeren
+const PREFIX = "swr:";
 const mem = new Map(); // url -> { ts, data }
 
-function fresh(entry) {
-  return entry && Date.now() - entry.ts < TTL;
+function usable(entry) {
+  return entry && Date.now() - entry.ts < MAX_AGE;
 }
 
 export function cachedGet(url) {
   if (!url) return undefined;
   let e = mem.get(url);
-  if (fresh(e)) return e.data;
+  if (usable(e)) return e.data;
   try {
-    const raw = sessionStorage.getItem("swr:" + url);
+    const raw = localStorage.getItem(PREFIX + url);
     if (raw) {
       e = JSON.parse(raw);
-      if (fresh(e)) {
+      if (usable(e)) {
         mem.set(url, e);
         return e.data;
       }
+      localStorage.removeItem(PREFIX + url);
     }
   } catch {
-    /* sessionStorage unavailable / quota */
+    /* localStorage unavailable / corrupt entry */
   }
   return undefined;
 }
@@ -39,9 +46,22 @@ export function cachedSet(url, data) {
   const e = { ts: Date.now(), data };
   mem.set(url, e);
   try {
-    sessionStorage.setItem("swr:" + url, JSON.stringify(e));
+    localStorage.setItem(PREFIX + url, JSON.stringify(e));
   } catch {
-    /* ignore quota errors */
+    // Quota vol: hele spiegel leegmaken en één keer opnieuw proberen.
+    try {
+      clearMirror();
+      localStorage.setItem(PREFIX + url, JSON.stringify(e));
+    } catch {
+      /* dan alleen in-memory */
+    }
+  }
+}
+
+function clearMirror() {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(PREFIX)) localStorage.removeItem(k);
   }
 }
 
@@ -51,17 +71,38 @@ export function invalidateOrg(orgId) {
   invalidate((url) => url.startsWith("/api/") && (!needle || url.includes(needle)));
 }
 
-// Drop everything we've cached for one org (after connect/disconnect/switch).
+// Alles wissen (bij uitloggen: geen klantdata achterlaten in de browser).
+export function invalidateAll() {
+  mem.clear();
+  try {
+    clearMirror();
+  } catch {
+    /* ignore */
+  }
+}
+
+// Drop everything we've cached matching a predicate (after connect/disconnect/switch).
 export function invalidate(predicate) {
   for (const k of [...mem.keys()]) if (predicate(k)) mem.delete(k);
   try {
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith("swr:") && predicate(k.slice(4))) sessionStorage.removeItem(k);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PREFIX) && predicate(k.slice(PREFIX.length))) localStorage.removeItem(k);
     }
   } catch {
     /* ignore */
   }
+}
+
+// Warm the cache in the background without a component asking for the data
+// yet (used to preload reports right after login).
+export function prefetch(url) {
+  if (!url || cachedGet(url) !== undefined) return;
+  api(url)
+    .then((d) => cachedSet(url, d))
+    .catch(() => {
+      /* voorladen is best effort */
+    });
 }
 
 // Hook: returns { data, loading, error }. Shows cached data immediately (no

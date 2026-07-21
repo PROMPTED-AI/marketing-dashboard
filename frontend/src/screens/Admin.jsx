@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, LOGOUT_URL } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
+import { invalidateAll } from "../lib/swr.js";
 import Topbar from "../components/Topbar.jsx";
 import AdminFeedback from "./AdminFeedback.jsx";
 import AdminUsers from "./admin/AdminUsers.jsx";
@@ -88,7 +89,7 @@ export default function Admin() {
         <div style={userFoot}>
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--c-ink)", color: "var(--c-surface)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{initials(me.email)}</div>
           <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div><div style={{ fontSize: 11, color: "var(--c-muted)" }}>platform-admin</div></div>
-          <a href={LOGOUT_URL} style={{ color: "var(--c-muted)" }} title="uitloggen"><IcChevDown s={16} /></a>
+          <a href={LOGOUT_URL} onClick={() => invalidateAll()} style={{ color: "var(--c-muted)" }} title="uitloggen"><IcChevDown s={16} /></a>
         </div>
       </div>
 

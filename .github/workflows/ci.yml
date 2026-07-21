@@ -1,0 +1,102 @@
+# CI: bouwt de frontend, start de volledige teststack (Postgres, nep-EuRouter,
+# uvicorn) en draait de API-regressietests plus de Playwright e2e-tests.
+# Draait op elke pull request naar main, zodat regressies gevangen worden
+# voordat de auto-deploy ze live zet.
+
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kompas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/kompas
+      TOKEN_ENCRYPTION_KEY: tkZAJkGcx0m8bi5j6no66Byp7QGXm_ZIX2M7kD4qVes=
+      GOOGLE_CLIENT_ID: dummy.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: dummy-secret
+      GOOGLE_REDIRECT_URI: http://localhost:8000/api/auth/google/callback
+      SESSION_SECRET: ci-session-secret
+      SESSION_COOKIE_SECURE: "false"
+      AGENCY_ADMIN_EMAILS: admin@prompted-ai.nl
+      EUROUTER_API_KEY: fake-ci-key
+      EUROUTER_MODEL: fake
+      EUROUTER_BASE_URL: http://127.0.0.1:9099/v1
+      BASE_URL: http://127.0.0.1:8000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Python-dependencies
+        run: pip install -r requirements.txt requests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend bouwen
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          # static_spa staat in .gitignore en ontbreekt in een verse checkout.
+          mkdir -p ../app/static_spa
+          rm -rf ../app/static_spa/assets
+          cp -r dist/* ../app/static_spa/
+
+      - name: Teststack starten
+        run: |
+          python tests/fake_eurouter.py > fake.log 2>&1 &
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8000/api/me && break || true
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/me || true)
+            [ "$code" = "401" ] && break
+            sleep 1
+          done
+          python tests/seed.py
+
+      - name: API-tests
+        run: python tests/api_test.py
+
+      - name: Playwright installeren
+        working-directory: tests
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: E2E-tests
+        working-directory: tests
+        run: npm run e2e
+
+      - name: Logs bij falen
+        if: failure()
+        run: |
+          echo "=== server.log ==="; tail -100 server.log || true
+          echo "=== fake.log ==="; tail -30 fake.log || true

@@ -21,3 +21,4 @@ env/
 frontend/node_modules/
 frontend/dist/
 app/static_spa/
+tests/node_modules/

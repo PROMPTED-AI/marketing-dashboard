@@ -51,6 +51,17 @@ from . import (
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 log = logging.getLogger("dashboard")
 
+# Foutbewaking: alleen actief wanneer SENTRY_DSN gezet is. De sdk is een
+# optionele dependency; ontbreekt die, dan draait alles gewoon zonder.
+if config.SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(dsn=config.SENTRY_DSN, traces_sample_rate=0.0, send_default_pii=False)
+        log.info("Sentry-foutbewaking actief")
+    except ImportError:
+        log.warning("SENTRY_DSN gezet maar sentry-sdk niet geinstalleerd; foutbewaking uit")
+
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
 SPA_DIR = Path(__file__).resolve().parent / "static_spa"
 SPA_INDEX = SPA_DIR / "index.html"
