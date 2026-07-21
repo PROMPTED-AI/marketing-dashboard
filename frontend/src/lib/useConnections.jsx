@@ -23,7 +23,9 @@ export function ConnectionsProvider({ children }) {
     if (!me) return Promise.resolve(); // not signed in yet: nothing to fetch
     return api(url)
       .then((d) => { cachedSet(url, d); setData(d); })
-      .catch(() => setData(null))
+      // Transient fetch failure (deploy restart, network blip): keep the last
+      // known state instead of dropping to "nothing connected".
+      .catch(() => setData((prev) => prev ?? null))
       .finally(() => setLoading(false));
   }, [url, me]);
 

@@ -520,7 +520,13 @@ FEEDBACK_PROMPT = (
 
 
 def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> str:
-    """Werk één feedback-item uit via EuRouter en geef de tekst terug."""
+    """Werk één feedback-item uit via EuRouter en geef de tekst terug.
+
+    Denkende modellen (zoals kimi-k2.6) kunnen hun tokens in reasoning_content
+    stoppen en met een leeg antwoord eindigen. Daarom: ruim tokenbudget,
+    reasoning als vangnet, en één niet-streamende herkansing voordat we leeg
+    teruggeven.
+    """
     client = OpenAI(api_key=api_key, base_url=base_url)
     parts = [
         f"Categorie: {item.get('category')}",
@@ -532,17 +538,52 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
         parts.append(f"Pagina waar de feedback gegeven werd: {item['page']}")
     if item.get("org_name"):
         parts.append(f"Organisatie: {item['org_name']}")
+    messages = [
+        {"role": "system", "content": FEEDBACK_PROMPT},
+        {"role": "user", "content": "\n".join(parts)},
+    ]
+
     stream = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": FEEDBACK_PROMPT},
-            {"role": "user", "content": "\n".join(parts)},
-        ],
-        max_tokens=1500,
-        stream=True,
+        model=model, messages=messages, max_tokens=4000, stream=True,
     )
-    out = []
+    out, reasoning = [], []
     for chunk in stream:
-        if chunk.choices and getattr(chunk.choices[0].delta, "content", None):
-            out.append(chunk.choices[0].delta.content)
-    return "".join(out).strip()
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if getattr(delta, "content", None):
+            out.append(delta.content)
+        elif getattr(delta, "reasoning_content", None):
+            reasoning.append(delta.reasoning_content)
+    text = "".join(out).strip()
+    if text:
+        return text
+    log.warning(
+        "feedback-analyse leeg (model=%s, reasoning=%d tekens), herkansing zonder stream",
+        model, len("".join(reasoning)),
+    )
+
+    # Herkansing: niet-streamend, met expliciete instructie om direct de
+    # uitwerking te geven in plaats van (alleen) denkstappen.
+    retry = messages + [{
+        "role": "user",
+        "content": (
+            "Geef nu direct de volledige uitwerking als platte Markdown-tekst "
+            "met de drie gevraagde koppen, zonder verdere denkstappen."
+        ),
+    }]
+    try:
+        resp = client.chat.completions.create(
+            model=model, messages=retry, max_tokens=4000, stream=False,
+        )
+        msg = resp.choices[0].message if resp.choices else None
+        text = (getattr(msg, "content", None) or "").strip()
+        if text:
+            return text
+        if getattr(msg, "reasoning_content", None):
+            reasoning.append(msg.reasoning_content)
+    except Exception as e:  # noqa: BLE001
+        log.warning("feedback-analyse herkansing faalde: %s", e)
+
+    # Laatste redmiddel: de denkstappen bevatten vaak al de volledige analyse.
+    return "".join(reasoning).strip()

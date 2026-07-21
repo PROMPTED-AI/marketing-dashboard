@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google.api_core.exceptions import Unauthenticated
-from google.auth.exceptions import RefreshError
+from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
@@ -113,20 +113,50 @@ def _require_period(*dates: str | None) -> None:
             raise HTTPException(status_code=400, detail="Ongeldige datum (verwacht JJJJ-MM-DD)")
 
 
+def _is_grant_revoked(e: Exception) -> bool:
+    """Alleen een definitief ingetrokken of verlopen grant telt als 'revoked'.
+
+    Google's token-endpoint gooit óók een RefreshError bij tijdelijke storingen
+    (5xx, internal_failure, temporarily_unavailable). Wie dáárop de koppeling
+    ontkoppelt, verliest bij elke hapering een werkende koppeling; dat was
+    zichtbaar als "alles ontkoppeld" vlak na deploys en koude starts.
+    """
+    txt = " ".join(str(a) for a in (getattr(e, "args", None) or [])).lower()
+    return (
+        "invalid_grant" in txt
+        or "expired or revoked" in txt
+        or "invalid_rapt" in txt
+        or "deleted_client" in txt
+    )
+
+
+_GOOGLE_TRANSIENT_MSG = "Google is tijdelijk niet bereikbaar. Probeer het zo opnieuw."
+
+
 def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credentials:
-    """Load + refresh an org's credentials, flipping status to revoked on failure."""
+    """Load + refresh an org's credentials.
+
+    Alleen een écht ingetrokken grant zet de status op revoked; een tijdelijke
+    storing bij het verversen wordt een 503 zonder de koppeling aan te raken.
+    """
     conn = models.get_connection(org_id, provider=provider)
     if not conn or conn["status"] != "connected":
         raise HTTPException(status_code=409, detail="No active connection for this organization")
     try:
         creds = oauth.credentials_from_dict(conn["creds"])
     except RefreshError as e:
-        log.warning(
-            "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
-            org_id, provider, conn.get("google_email"), e,
-        )
-        models.set_connection_status(org_id, "revoked", provider=provider)
-        raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
+        if _is_grant_revoked(e):
+            log.warning(
+                "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
+                org_id, provider, conn.get("google_email"), e,
+            )
+            models.set_connection_status(org_id, "revoked", provider=provider)
+            raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
+        log.warning("refresh tijdelijk mislukt org=%s provider=%s err=%r", org_id, provider, e)
+        raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+    except TransportError as e:
+        log.warning("refresh netwerkfout org=%s provider=%s err=%r", org_id, provider, e)
+        raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
     # Persist any refreshed access token.
     models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
     return creds
@@ -137,15 +167,21 @@ def _google_data(org_id: str, provider: str, fn):
 
     Tokens can be revoked or rejected at call time (HTTP 401 UNAUTHENTICATED),
     not just at refresh time. Without this, that 401 surfaces as a raw 500 and
-    takes down Overzicht/Analytics. Here we flip the connection to 'revoked' so
-    the UI shows a reconnect prompt instead.
+    takes down Overzicht/Analytics. Alleen definitieve auth-fouten zetten de
+    status op revoked; tijdelijke storingen worden een 503 zonder statuswissel.
     """
     try:
         return fn()
     except (RefreshError, Unauthenticated) as e:
+        if isinstance(e, RefreshError) and not _is_grant_revoked(e):
+            log.warning("google-call tijdelijk mislukt org=%s provider=%s err=%r", org_id, provider, e)
+            raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
         log.warning("REVOKE org=%s provider=%s at=api-call err=%r", org_id, provider, e)
         models.set_connection_status(org_id, "revoked", provider=provider)
         raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
+    except TransportError as e:
+        log.warning("google-call netwerkfout org=%s provider=%s err=%r", org_id, provider, e)
+        raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
 
 
 def _meta_token(org_id: str) -> str:
@@ -1330,9 +1366,15 @@ def wc_report(
     try:
         data = woocommerce.run_overview(store, ck, cs, start, end, compare)
     except woocommerce.WooError as e:
-        log.warning("REVOKE org=%s provider=woocommerce at=report err=%r", target_org, e)
-        models.set_connection_status(target_org, "revoked", provider="woocommerce")
-        raise HTTPException(status_code=409, detail="WooCommerce-koppeling werkt niet meer - opnieuw koppelen")
+        # Alleen een geweigerde sleutel (401/403) is een echte 'revoked'; een
+        # onbereikbare of trage winkel is tijdelijk en mag de koppeling niet
+        # ontkoppelen (dat oogde als "alles los" na elke deploy).
+        if getattr(e, "auth", False):
+            log.warning("REVOKE org=%s provider=woocommerce at=report err=%r", target_org, e)
+            models.set_connection_status(target_org, "revoked", provider="woocommerce")
+            raise HTTPException(status_code=409, detail="WooCommerce-koppeling werkt niet meer - opnieuw koppelen")
+        log.warning("woocommerce tijdelijk niet bereikbaar org=%s err=%r", target_org, e)
+        raise HTTPException(status_code=503, detail=f"De winkel is tijdelijk niet bereikbaar: {e}")
     payload = {"org_id": target_org, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
