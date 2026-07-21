@@ -62,6 +62,14 @@ export function TabState({ loading, error, empty, onConnect }) {
         {onConnect && <a className="btn-primary" href={connectUrl(["google_analytics", "search_console"], typeof window !== "undefined" ? window.location.pathname : "/app")} style={{ height: 44, padding: "0 20px", textDecoration: "none" }}>Koppel Google</a>}
       </div>
     );
+  if (error?.status === 503)
+    return (
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div className="pill muted" style={{ marginBottom: 12 }}>tijdelijke storing</div>
+        <div style={{ color: "var(--c-muted)", marginBottom: 16 }}>{String(error.message || "De bron is tijdelijk niet bereikbaar.")}</div>
+        <button className="btn-primary" onClick={() => window.location.reload()} style={{ height: 44, padding: "0 20px" }}>Probeer opnieuw</button>
+      </div>
+    );
   if (error) return <div className="card" style={{ padding: 28, color: "var(--c-neg)" }}>Fout: {String(error.message || error)}</div>;
   if (empty) return <div className="card" style={{ padding: 28, color: "var(--c-muted)" }}>Geen data beschikbaar.</div>;
   return null;

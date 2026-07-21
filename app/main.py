@@ -22,6 +22,7 @@ GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
 import json
+import time
 import uuid
 import logging
 from datetime import date, timedelta
@@ -142,21 +143,30 @@ def _org_credentials(org_id: str, provider: str = "google_analytics") -> Credent
     conn = models.get_connection(org_id, provider=provider)
     if not conn or conn["status"] != "connected":
         raise HTTPException(status_code=409, detail="No active connection for this organization")
-    try:
-        creds = oauth.credentials_from_dict(conn["creds"])
-    except RefreshError as e:
-        if _is_grant_revoked(e):
-            log.warning(
-                "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
-                org_id, provider, conn.get("google_email"), e,
-            )
-            models.set_connection_status(org_id, "revoked", provider=provider)
-            raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
-        log.warning("refresh tijdelijk mislukt org=%s provider=%s err=%r", org_id, provider, e)
-        raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
-    except TransportError as e:
-        log.warning("refresh netwerkfout org=%s provider=%s err=%r", org_id, provider, e)
-        raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+    # Eén stille herkansing: haperingen bij Google's token-endpoint (5xx, even
+    # geen netwerk, drukte na een koude start) zijn meestal direct voorbij.
+    # Zonder herkansing zag de gebruiker daarvoor meteen een storingsmelding.
+    creds = None
+    for attempt in (1, 2):
+        try:
+            creds = oauth.credentials_from_dict(conn["creds"])
+            break
+        except RefreshError as e:
+            if _is_grant_revoked(e):
+                log.warning(
+                    "REVOKE org=%s provider=%s at=refresh email=%s err=%r",
+                    org_id, provider, conn.get("google_email"), e,
+                )
+                models.set_connection_status(org_id, "revoked", provider=provider)
+                raise HTTPException(status_code=409, detail="Connection expired - please reconnect")
+            log.warning("refresh tijdelijk mislukt (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
+            if attempt == 2:
+                raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+        except TransportError as e:
+            log.warning("refresh netwerkfout (poging %d) org=%s provider=%s err=%r", attempt, org_id, provider, e)
+            if attempt == 2:
+                raise HTTPException(status_code=503, detail=_GOOGLE_TRANSIENT_MSG)
+        time.sleep(1.0)
     # Persist any refreshed access token.
     models.save_connection(org_id, conn["google_email"], oauth.credentials_to_dict(creds), provider=provider)
     return creds
