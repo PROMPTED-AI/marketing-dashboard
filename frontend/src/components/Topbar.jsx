@@ -98,6 +98,7 @@ function NotificationBell() {
 export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true, onMenu }) {
   const { theme, toggle } = useTheme();
   const { me } = useMe();
+  const nav = useNavigate();
   const sub = me?.subscription;
   return (
     <div style={bar} className="no-print dash-topbar">
@@ -116,7 +117,12 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
       )}
       <div style={{ flex: 1 }} />
       {sub?.plan === "trial" && !sub.expired && (
-        <span className="pill accent hide-mobile" title="Neem contact op voor een betaald abonnement" style={{ fontSize: 12 }}>
+        <span
+          className="pill accent hide-mobile pill-btn"
+          title="Bekijk of beheer je proefperiode in Instellingen"
+          style={{ fontSize: 12, cursor: "pointer" }}
+          onClick={() => nav("/app/settings")}
+        >
           Proefperiode · nog {sub.days_left} {sub.days_left === 1 ? "dag" : "dagen"}
         </span>
       )}

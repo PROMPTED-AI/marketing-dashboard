@@ -4,6 +4,10 @@ import { api, LOGOUT_URL } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 import Topbar from "../components/Topbar.jsx";
 import AdminFeedback from "./AdminFeedback.jsx";
+import AdminUsers from "./admin/AdminUsers.jsx";
+import AdminConnections from "./admin/AdminConnections.jsx";
+import AdminActivity from "./admin/AdminActivity.jsx";
+import AdminBilling from "./admin/AdminBilling.jsx";
 import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus } from "../components/icons.jsx";
 
 const PROVIDERS = [
@@ -63,11 +67,19 @@ export default function Admin() {
         </div>
         <div style={menuLabel}>Platform</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
-          <div style={tab === "klanten" ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab("klanten")}><IcUsers s={18} />Klanten</div>
-          <div style={tab === "feedback" ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab("feedback")}><IcChat s={18} />Feedback</div>
-          {[["Gebruikers & rollen", IcUsers], ["Koppelingen", IcPlug], ["Pakketten & facturatie", IcDoc], ["Activiteitenlog", IcDoc], ["Instellingen", IcCog]].map(([label, Icon]) => (
-            <div key={label} style={navItem}><Icon s={18} />{label}</div>
+          {[
+            ["klanten", "Klanten", IcUsers],
+            ["feedback", "Feedback", IcChat],
+            ["gebruikers", "Gebruikers & rollen", IcUsers],
+            ["koppelingen", "Koppelingen", IcPlug],
+            ["pakketten", "Pakketten & facturatie", IcDoc],
+            ["activiteit", "Activiteitenlog", IcDoc],
+          ].map(([key, label, Icon]) => (
+            <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab(key)}>
+              <Icon s={18} />{label}
+            </div>
           ))}
+          <div style={navItem}><IcCog s={18} />Instellingen</div>
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ padding: 12 }}>
@@ -84,7 +96,12 @@ export default function Admin() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
         <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
-          {tab === "feedback" ? <AdminFeedback /> : (<>
+          {tab === "feedback" ? <AdminFeedback />
+            : tab === "gebruikers" ? <AdminUsers meEmail={me.email} />
+            : tab === "koppelingen" ? <AdminConnections />
+            : tab === "activiteit" ? <AdminActivity />
+            : tab === "pakketten" ? <AdminBilling />
+            : (<>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div className="display" style={{ fontSize: 30 }}>klanten</div>

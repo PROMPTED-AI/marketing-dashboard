@@ -56,6 +56,12 @@ def seed() -> None:
     Idempotent: safe to run on every startup. Never raises on a partial state.
     """
     org = models.create_demo_organization(DEMO_ORG_NAME, DEMO_ORG_DOMAIN)
+    # De demo draait altijd in een actieve proefperiode, zodat de trial-balk
+    # en het beheer ervan te zien en te proberen zijn. Elke start schuift de
+    # einddatum naar 14 dagen vooruit, dus de demo verloopt in de praktijk
+    # nooit vanzelf (na een tussentijdse stop herstelt hij bij de volgende
+    # deploy of herstart).
+    models.start_trial(org["id"], models.TRIAL_DAYS)
     models.upsert_user(DEMO_EMAIL, org["id"], auth.role_for(DEMO_EMAIL))
     user = models.get_user_by_email(DEMO_EMAIL)
     if user and not user.get("password_hash"):

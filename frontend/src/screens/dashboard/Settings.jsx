@@ -36,6 +36,11 @@ export default function Settings() {
           <Row label="Organisatie" value={activeOrg?.name || "—"} last />
         </SectionCard>
 
+        {/* PROEFPERIODE */}
+        {me?.subscription?.plan === "trial" && !me.subscription.expired && (
+          <TrialCard subscription={me.subscription} orgName={activeOrg?.name} email={me?.email} />
+        )}
+
         {/* VOORKEUREN */}
         <SectionCard title="voorkeuren">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--c-border-soft)" }}>
@@ -154,6 +159,34 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
           {busy ? "opslaan…" : "opslaan"}
         </button>
         {done && !dirty && <span style={{ fontSize: 13, color: "var(--c-pos)", fontWeight: 700 }}>opgeslagen ✓</span>}
+      </div>
+    </SectionCard>
+  );
+}
+
+// Proefperiode: status met resterende dagen en overstappen naar betaald.
+// Beheer van de proefperiode (stoppen, verlengen, activeren) kan alleen de
+// agency admin, via Klantenbeheer.
+function TrialCard({ subscription, orgName, email }) {
+  const ends = subscription.trial_ends_at
+    ? new Date(subscription.trial_ends_at).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+  const mailto =
+    `mailto:info@prompted-ai.nl?subject=${encodeURIComponent("Overstappen naar betaald abonnement voor " + (orgName || ""))}` +
+    `&body=${encodeURIComponent("Hallo,\n\nWij willen graag overstappen naar een betaald abonnement.\n\nOrganisatie: " + (orgName || "") + "\nContactpersoon: " + (email || ""))}`;
+
+  return (
+    <SectionCard title="proefperiode">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid var(--c-border-soft)" }}>
+        <span className="pill accent">Nog {subscription.days_left} {subscription.days_left === 1 ? "dag" : "dagen"}</span>
+        <span style={{ fontSize: 13, color: "var(--c-muted)" }}>{ends ? `De proefperiode loopt tot ${ends}.` : ""}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Overstappen naar betaald</div>
+          <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Neem contact op, dan regelen we de overstap</div>
+        </div>
+        <a className="btn-primary" href={mailto} style={{ height: 40, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>Neem contact op</a>
       </div>
     </SectionCard>
   );
