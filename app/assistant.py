@@ -526,8 +526,12 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
     stoppen en met een leeg antwoord eindigen. Daarom: ruim tokenbudget,
     reasoning als vangnet, en één niet-streamende herkansing voordat we leeg
     teruggeven.
+
+    Alles is in tijd begrensd: zonder timeout bleef de knop "AI werkt uit"
+    eindeloos hangen als het model lang doorrekent of de gateway stilvalt.
     """
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=90, max_retries=1)
+    deadline = time.monotonic() + 150
     parts = [
         f"Categorie: {item.get('category')}",
         f"Toelichting: {item.get('message')}",
@@ -548,6 +552,10 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
     )
     out, reasoning = [], []
     for chunk in stream:
+        if time.monotonic() > deadline:
+            log.warning("feedback-analyse: tijdslimiet bereikt tijdens streamen, stream afgebroken")
+            stream.close()
+            break
         if not chunk.choices:
             continue
         delta = chunk.choices[0].delta
@@ -564,7 +572,10 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
     )
 
     # Herkansing: niet-streamend, met expliciete instructie om direct de
-    # uitwerking te geven in plaats van (alleen) denkstappen.
+    # uitwerking te geven in plaats van (alleen) denkstappen. Alleen als er
+    # binnen het tijdsbudget nog ruimte voor is.
+    if time.monotonic() > deadline:
+        return "".join(reasoning).strip()
     retry = messages + [{
         "role": "user",
         "content": (
@@ -573,7 +584,7 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
         ),
     }]
     try:
-        resp = client.chat.completions.create(
+        resp = client.with_options(timeout=60, max_retries=0).chat.completions.create(
             model=model, messages=retry, max_tokens=4000, stream=False,
         )
         msg = resp.choices[0].message if resp.choices else None

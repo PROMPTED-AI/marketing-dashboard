@@ -24,6 +24,8 @@ GET  /api/analytics/report          -> sample GA4 report for a property
 import json
 import uuid
 import logging
+
+import openai
 from datetime import date, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -1009,6 +1011,9 @@ def admin_feedback_analyze(request: Request, feedback_id: str):
             item, api_key=config.EUROUTER_API_KEY,
             base_url=config.EUROUTER_BASE_URL, model=config.EUROUTER_MODEL,
         )
+    except openai.APITimeoutError:
+        log.warning("feedback-analyse timeout id=%s", feedback_id)
+        raise HTTPException(status_code=504, detail="De AI-uitwerking duurde te lang. Probeer het opnieuw.")
     except Exception:
         log.exception("feedback-analyse faalde id=%s", feedback_id)
         raise HTTPException(status_code=502, detail="De AI-uitwerking is niet gelukt. Probeer het later opnieuw.")
