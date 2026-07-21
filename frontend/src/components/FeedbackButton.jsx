@@ -99,6 +99,7 @@ export default function FeedbackButton() {
                   {CATEGORIES.map((c) => (
                     <button
                       key={c.key}
+                      className="pill-btn"
                       onClick={() => setCategory(c.key)}
                       style={{ ...catChip, ...(category === c.key ? catChipOn : {}) }}
                     >
@@ -112,7 +113,7 @@ export default function FeedbackButton() {
                     <div style={fieldLabel}>Hoe vervelend is het?</div>
                     <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
                       {SEVERITIES.map((s) => (
-                        <button key={s} onClick={() => setSeverity(s)} style={{ ...catChip, ...(severity === s ? catChipOn : {}) }}>
+                        <button key={s} className="pill-btn" onClick={() => setSeverity(s)} style={{ ...catChip, ...(severity === s ? catChipOn : {}) }}>
                           {s}
                         </button>
                       ))}

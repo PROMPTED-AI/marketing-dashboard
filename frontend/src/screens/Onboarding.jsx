@@ -109,7 +109,7 @@ export default function Onboarding() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               {PROFILES.map((p) => (
-                <div key={p.key} onClick={() => setProfile(p.key)} style={{ ...toolCard, ...(profile === p.key ? toolCardOn : {}) }}>
+                <div key={p.key} className="pill-btn" onClick={() => setProfile(p.key)} style={{ ...toolCard, ...(profile === p.key ? toolCardOn : {}) }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                     <div style={{ flex: 1 }}>
                       <span style={{ fontSize: 18, fontWeight: 700 }}>{p.name}</span>
@@ -143,7 +143,7 @@ export default function Onboarding() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               {TOOLS.map((t) => (
-                <div key={t.key} onClick={() => toggle(t.key)} style={{ ...toolCard, ...(sel[t.key] ? toolCardOn : {}) }}>
+                <div key={t.key} className="pill-btn" onClick={() => toggle(t.key)} style={{ ...toolCard, ...(sel[t.key] ? toolCardOn : {}) }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                     <div style={{ width: 52, height: 52, borderRadius: 13, background: t.bg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}><t.Glyph /></div>
                     <div style={{ flex: 1 }}>

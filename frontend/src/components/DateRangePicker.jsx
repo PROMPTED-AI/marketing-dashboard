@@ -33,7 +33,7 @@ export default function DateRangePicker() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <div style={pill} onClick={() => (open ? setOpen(false) : openMenu())}>
+      <div className="pill-btn" style={pill} onClick={() => (open ? setOpen(false) : openMenu())}>
         <IcCalendar s={16} />
         <span>{dr.label}{dr.compare ? ` · vs ${dr.compareLabel.toLowerCase()}` : ""}</span>
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><IcChevDown s={14} /></span>
@@ -42,7 +42,7 @@ export default function DateRangePicker() {
         <div style={menu}>
           <div style={section}>Periode</div>
           {PRESETS.map((p) => (
-            <div key={p.id} onClick={() => pickPreset(p.id)} style={{ ...row, ...(draft.preset === p.id ? rowActive : {}) }}>{p.label}</div>
+            <div key={p.id} className="icon-btn" onClick={() => pickPreset(p.id)} style={{ ...row, ...(draft.preset === p.id ? rowActive : {}) }}>{p.label}</div>
           ))}
           <div style={dateRow}>
             <input type="date" value={draft.start} max={draft.end} onChange={(e) => setCustom("start", e.target.value)} style={dateInput} />

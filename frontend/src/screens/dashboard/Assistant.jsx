@@ -99,7 +99,7 @@ export default function Assistant() {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {EXAMPLES.map((q) => (
-                <button key={q} onClick={() => onSend(q)} style={chip}>{q}</button>
+                <button key={q} className="pill-btn" onClick={() => onSend(q)} style={chip}>{q}</button>
               ))}
             </div>
           </div>
@@ -142,7 +142,7 @@ export default function Assistant() {
             )}
             {/* Onderbroken antwoord: één klik om het opnieuw op te halen. */}
             {m.role !== "user" && m.retry && i === messages.length - 1 && !streaming && (
-              <button className="chip-in" onClick={() => retry(m.retry)} style={{ ...followupChip, marginTop: 10 }}>
+              <button className="chip-in pill-btn" onClick={() => retry(m.retry)} style={{ ...followupChip, marginTop: 10 }}>
                 ↻ Opnieuw proberen
               </button>
             )}
@@ -150,7 +150,7 @@ export default function Assistant() {
             {m.role !== "user" && m.suggestions?.length > 0 && i === messages.length - 1 && !streaming && (
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "10px 2px 0" }}>
                 {m.suggestions.map((q) => (
-                  <button key={q} className="chip-in" onClick={() => onSend(q)} style={followupChip}>{q}</button>
+                  <button key={q} className="chip-in pill-btn" onClick={() => onSend(q)} style={followupChip}>{q}</button>
                 ))}
               </div>
             )}
@@ -206,6 +206,7 @@ export default function Assistant() {
               {insights.map((it, i) => (
                 <button
                   key={i}
+                  className="pill-btn"
                   onClick={() => onSend(it.question)}
                   disabled={streaming}
                   title={it.detail}
@@ -230,7 +231,7 @@ export default function Assistant() {
         <div className="card" style={{ padding: 16, marginTop: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ fontSize: 13.5, fontWeight: 800 }}>Historie</div>
-            <button onClick={newChat} disabled={streaming} title="Nieuw gesprek" style={{ ...histNewBtn, opacity: streaming ? 0.5 : 1 }}>＋</button>
+            <button className="icon-btn" onClick={newChat} disabled={streaming} title="Nieuw gesprek" style={{ ...histNewBtn, opacity: streaming ? 0.5 : 1 }}>＋</button>
           </div>
           {history.length === 0 ? (
             <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Nog geen gesprekken.</div>
@@ -246,7 +247,7 @@ export default function Assistant() {
                     <span style={{ display: "block", fontWeight: h.id === convId ? 800 : 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.title}</span>
                     <span style={{ display: "block", fontSize: 11, color: "var(--c-muted)", marginTop: 1 }}>{when(h.ts)} · {Math.ceil(h.count / 2)} {h.count > 2 ? "vragen" : "vraag"}</span>
                   </span>
-                  <button onClick={(e) => { e.stopPropagation(); removeConversation(h.id); }} title="Verwijderen" style={histDelBtn}>×</button>
+                  <button className="icon-btn" onClick={(e) => { e.stopPropagation(); removeConversation(h.id); }} title="Verwijderen" style={histDelBtn}>×</button>
                 </div>
               ))}
             </div>

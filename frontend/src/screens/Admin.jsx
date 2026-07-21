@@ -185,7 +185,7 @@ function AddClientModal({ onClose, onDone }) {
             <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Iedereen die met dit domein inlogt, hoort bij deze klant.</div>
             {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 12 }}>{String(err.message || err)}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-              <button type="button" onClick={onClose} style={btnGhost}>annuleren</button>
+              <button type="button" className="pill-btn" onClick={onClose} style={btnGhost}>annuleren</button>
               <button type="submit" disabled={busy || !name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
                 {busy ? "bezig…" : "aanmaken"}
               </button>

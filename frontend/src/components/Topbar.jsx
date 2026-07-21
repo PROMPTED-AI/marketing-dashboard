@@ -52,6 +52,7 @@ function NotificationBell() {
   return (
     <div ref={wrapRef} style={{ position: "relative" }} className="hide-mobile">
       <button
+        className="icon-btn"
         style={{ ...iconBtn, position: "relative" }}
         onClick={() => setOpen((o) => !o)}
         title="Signalen"
@@ -71,7 +72,7 @@ function NotificationBell() {
           {insights?.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 8px 8px" }}>
               {insights.slice(0, 6).map((it, i) => (
-                <button key={i} onClick={() => ask(it.question)} title={it.detail} style={bellRow}>
+                <button key={i} className="icon-btn" onClick={() => ask(it.question)} title={it.detail} style={bellRow}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLOR[it.severity] || "var(--c-accent)", marginTop: 5, flex: "none" }} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontWeight: 700, fontSize: 12.5, color: "var(--c-ink)" }}>{it.title}</span>
@@ -112,7 +113,7 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
       )}
       <div style={{ flex: 1 }} />
       {showDateRange && <DateRangePicker />}
-      <button style={iconBtn} onClick={toggle} title="thema wisselen">
+      <button className="icon-btn" style={iconBtn} onClick={toggle} title="thema wisselen">
         {theme === "dark" ? <IcSun s={17} /> : <IcMoon s={17} />}
       </button>
       <NotificationBell />

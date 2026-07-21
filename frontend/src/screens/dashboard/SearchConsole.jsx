@@ -122,6 +122,7 @@ export default function SearchConsole() {
           return (
             <button
               key={v.id}
+              className="pill-btn"
               onClick={() => pickView(v.id)}
               style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 999,

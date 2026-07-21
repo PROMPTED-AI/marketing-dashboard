@@ -79,6 +79,7 @@ export default function MyDashboards() {
           return (
             <button
               key={c.key}
+              className="pill-btn"
               onClick={() => pick(c.key)}
               style={{
                 padding: "8px 14px", borderRadius: 999,
