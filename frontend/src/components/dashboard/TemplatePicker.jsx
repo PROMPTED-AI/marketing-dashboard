@@ -20,6 +20,7 @@ export default function TemplatePicker({ catalog, businessType = "leadgen", onPi
         {match.map((t) => (
           <button
             key={t.id}
+            className="pill-btn"
             onClick={() => onPick(t)}
             className="card"
             style={{

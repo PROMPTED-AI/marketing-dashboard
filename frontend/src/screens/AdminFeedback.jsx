@@ -69,7 +69,7 @@ export default function AdminFeedback() {
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {[["kanban", "Kanban"], ["lijst", "Lijst"]].map(([k, lbl]) => (
-            <button key={k} onClick={() => pickView(k)} style={{ ...toggleBtn, ...(view === k ? toggleOn : {}) }}>{lbl}</button>
+            <button key={k} className="pill-btn" onClick={() => pickView(k)} style={{ ...toggleBtn, ...(view === k ? toggleOn : {}) }}>{lbl}</button>
           ))}
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function AdminFeedback() {
                       onDragStart={() => setDragId(f.id)}
                       onDragEnd={() => setDragId(null)}
                       onClick={() => setOpenItem(f)}
-                      className="card"
+                      className="card pill-btn"
                       style={{ padding: 12, cursor: "pointer", opacity: dragId === f.id ? 0.5 : 1 }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
@@ -125,7 +125,7 @@ export default function AdminFeedback() {
             <span>Datum</span><span>Categorie</span><span>Van</span><span>Status</span><span>Bericht</span>
           </div>
           {items.map((f) => (
-            <div key={f.id} onClick={() => setOpenItem(f)} style={listRow}>
+            <div key={f.id} className="icon-btn" onClick={() => setOpenItem(f)} style={listRow}>
               <span style={{ color: "var(--c-muted)", fontSize: 12.5 }}>{fmtDate(f.created_at)}</span>
               <span style={{ ...catPill, color: CAT_COLOR[f.category] }}>{CAT_LABEL[f.category] || f.category}</span>
               <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.org_name || f.user_email}</span>

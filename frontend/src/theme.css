@@ -49,14 +49,48 @@ a { color: inherit; }
   font-family: "Montserrat", sans-serif; font-weight: 700; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   box-shadow: 0 10px 24px rgba(41, 74, 245, 0.22);
+  transition: filter 0.14s ease-out, transform 0.14s ease-out, box-shadow 0.14s ease-out;
 }
-.btn-primary:hover { filter: brightness(0.94); }
 .btn-ghost {
   border: 1px solid var(--c-border); border-radius: 999px; background: var(--c-surface);
   color: var(--c-ink); font-family: "Montserrat", sans-serif; font-weight: 600; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 11px;
+  transition: background 0.14s ease-out, border-color 0.14s ease-out, transform 0.14s ease-out;
 }
-.btn-ghost:hover { background: var(--c-surface-2); }
+
+/* Pill-knoppen (tabs, chips, toggles): de inline styles bepalen maat en
+   kleur, deze klasse levert alleen hover, active en focus. Het hover-effect
+   gebruikt filter en transform, zodat het werkt bovenop elke inline-kleur
+   (gevulde én open pills). */
+.pill-btn { transition: filter 0.14s ease-out, transform 0.14s ease-out, box-shadow 0.14s ease-out; }
+
+/* Icoonknoppen (bel, thema, sluiten, widget-acties): zachte cirkel bij hover. */
+.icon-btn { transition: background 0.14s ease-out, color 0.14s ease-out, transform 0.14s ease-out; }
+
+/* Hover alleen op apparaten met een echte muisaanwijzer, zodat touch geen
+   plakkende hover-status overhoudt. Uitgeschakelde knoppen doen niet mee. */
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(41, 74, 245, 0.32); }
+  .btn-ghost:hover:not(:disabled) { background: var(--c-surface-2); border-color: var(--c-accent); }
+  .pill-btn:hover:not(:disabled) { filter: brightness(0.95); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15, 20, 60, 0.08); }
+  /* !important zodat de hover ook wint van inline-achtergronden zoals
+     background: transparent op icoonknoppen en navigatie-items. */
+  .icon-btn:hover:not(:disabled) { background: var(--c-surface-2) !important; }
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); filter: brightness(0.96); }
+.btn-ghost:active:not(:disabled),
+.pill-btn:active:not(:disabled),
+.icon-btn:active:not(:disabled) { transform: scale(0.97); }
+
+/* Toetsenbordfocus in dezelfde visuele taal als hover. */
+.btn-primary:focus-visible, .btn-ghost:focus-visible, .pill-btn:focus-visible, .icon-btn:focus-visible {
+  outline: 2px solid var(--c-accent); outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary, .btn-ghost, .pill-btn, .icon-btn { transition: none; }
+  .btn-primary:hover:not(:disabled), .pill-btn:hover:not(:disabled) { transform: none; }
+}
 .card {
   background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px;
   box-shadow: var(--sh-sm);

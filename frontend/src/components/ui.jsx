@@ -14,7 +14,9 @@ export function KpiCard({ label, value, delta, positive = true, sparkValues, spa
         )}
       </div>
       <div className="display" style={{ fontSize: 28, margin: "8px 0 6px" }}>{value}</div>
-      {sparkValues && <Sparkline values={sparkValues} labels={sparkLabels} unit={sparkUnit} color={sparkColor} />}
+      {sparkValues
+        ? <Sparkline values={sparkValues} labels={sparkLabels} unit={sparkUnit} color={sparkColor} />
+        : <div style={{ height: 34 }} aria-hidden="true" />}
     </div>
   );
 }

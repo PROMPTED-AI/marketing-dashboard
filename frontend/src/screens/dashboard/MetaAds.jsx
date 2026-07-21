@@ -112,7 +112,7 @@ export default function MetaAds() {
         {views.map((v) => {
           const on = v.id === view;
           return (
-            <button key={v.id} onClick={() => pickView(v.id)} style={{
+            <button key={v.id} className="pill-btn" onClick={() => pickView(v.id)} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 999,
               border: "1px solid " + (on ? "var(--c-accent)" : "var(--c-border)"),
               background: on ? "var(--c-accent)" : "var(--c-surface)",

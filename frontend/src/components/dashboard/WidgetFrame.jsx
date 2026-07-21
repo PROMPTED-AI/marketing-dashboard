@@ -41,6 +41,7 @@ function MultiSelect({ label, allLabel = "Alles", options, value, onChange }) {
     <div ref={ref} style={{ position: "relative" }}>
       <button
         type="button"
+        className="pill-btn"
         onClick={() => setOpen((o) => !o)}
         style={{ ...ctrlStyle, maxWidth: 180, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", overflow: "hidden" }}
         title={label}

@@ -71,7 +71,7 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
         {switchOpen && canSwitch && (
           <div style={switchMenu}>
             {orgs.map((o) => (
-              <div key={o.id} onClick={() => { setOrg(o.id); setSwitchOpen(false); }}
+              <div key={o.id} className="icon-btn" onClick={() => { setOrg(o.id); setSwitchOpen(false); }}
                 style={{ ...switchRow, ...(o.id === orgId ? switchRowActive : {}) }}>
                 <div style={{ ...orgChip, width: 22, height: 22, fontSize: 11 }}>{initials(o.name)}</div>
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
@@ -79,7 +79,7 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
             ))}
           </div>
         )}
-        <div style={{ ...switcher, margin: 0, cursor: canSwitch ? "pointer" : "default" }} onClick={() => canSwitch && setSwitchOpen((o) => !o)}>
+        <div className="pill-btn" style={{ ...switcher, margin: 0, cursor: canSwitch ? "pointer" : "default" }} onClick={() => canSwitch && setSwitchOpen((o) => !o)}>
           <div style={orgChip}>{initials(orgName)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{orgName}</div>
@@ -95,14 +95,14 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
           item.group ? (
             <NavGroup key={item.group} item={item} onNavigate={onNavigate} />
           ) : (
-            <NavLink key={item.to} to={item.to} onClick={onNavigate} style={({ isActive }) => navItem(isActive)}>
+            <NavLink key={item.to} to={item.to} className="icon-btn" onClick={onNavigate} style={({ isActive }) => navItem(isActive)}>
               <item.Icon s={18} />
               {item.label}
             </NavLink>
           )
         ))}
         {user?.role === "agency_admin" && (
-          <NavLink to="/admin" onClick={onNavigate} style={() => navItem(false)}>
+          <NavLink to="/admin" className="icon-btn" onClick={onNavigate} style={() => navItem(false)}>
             <IcUsers s={18} />
             Klantenbeheer
           </NavLink>
@@ -178,7 +178,7 @@ function NavGroup({ item, onNavigate }) {
   const show = open || hasActive;
   return (
     <div>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={groupHeader(hasActive)}>
+      <button type="button" className="icon-btn" onClick={() => setOpen((o) => !o)} style={groupHeader(hasActive)}>
         <item.Icon s={18} />
         <span style={{ flex: 1, textAlign: "left" }}>{item.group}</span>
         <span style={{ display: "flex", color: "var(--c-muted)", transform: show ? "none" : "rotate(-90deg)", transition: "transform .15s" }}>
@@ -188,7 +188,7 @@ function NavGroup({ item, onNavigate }) {
       {show && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 3 }}>
           {item.children.map((c) => (
-            <NavLink key={c.to} to={c.to} onClick={onNavigate} style={({ isActive }) => ({ ...navItem(isActive), paddingLeft: 32 })}>
+            <NavLink key={c.to} to={c.to} className="icon-btn" onClick={onNavigate} style={({ isActive }) => ({ ...navItem(isActive), paddingLeft: 32 })}>
               <c.Icon s={16} />
               {c.label}
             </NavLink>
