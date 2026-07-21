@@ -12,6 +12,27 @@ function pickAxis(all) {
 const PALETTE = ["var(--c-accent)", "var(--c-sky)", "var(--c-mint)", "var(--c-orange)", "var(--c-purple)", "var(--c-yellow)"];
 export const palette = PALETTE;
 
+// Vloeiende lijn door de punten: Catmull-Rom omgezet naar cubic beziers. De
+// y-controlepunten worden geklemd zodat pieken niet buiten het tekenvlak
+// doorschieten. Puntenlijst: [[x, y], ...].
+function smoothPath(pts, maxY = Infinity) {
+  if (!pts.length) return "";
+  const cl = (y) => Math.max(0, Math.min(maxY, y));
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = cl(p1[1] + (p2[1] - p0[1]) / 6);
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = cl(p2[1] - (p3[1] - p1[1]) / 6);
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
 // Round a max up to a "nice" axis value so the Y-axis reads cleanly.
 function niceMax(v) {
   if (!v || v <= 0) return 1;
@@ -35,7 +56,7 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
   const max = niceMax(dataMax);
   const y = (v) => H - (v / max) * H;
   const xf = (arr, i) => (i / (arr.length - 1 || 1)) * W;
-  const path = (arr) => "M" + arr.map((v, i) => `${xf(arr, i).toFixed(1)} ${y(v).toFixed(1)}`).join(" L");
+  const path = (arr) => smoothPath(arr.map((v, i) => [xf(arr, i), y(v)]), H);
   const line = path(values);
   const area = `${line} L${W} ${H} L0 ${H} Z`;
   const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => max * f);
@@ -63,11 +84,13 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
             <div key={i} style={{ position: "absolute", left: 0, right: 0, top: `${(i / (ticks.length - 1)) * 100}%`, borderTop: "1px solid var(--c-track)" }} />
           ))}
           <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ position: "relative", display: "block" }}>
+            {/* non-scaling-stroke: de viewBox wordt niet-uniform opgerekt; zonder
+                dit varieert de lijndikte mee en oogt de lijn pixelig. */}
             <path d={area} style={{ fill: "var(--c-accent-soft)" }} />
             {compareValues && compareValues.length > 0 && (
-              <path d={path(compareValues)} fill="none" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+              <path d={path(compareValues)} fill="none" vectorEffect="non-scaling-stroke" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="1.5" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
             )}
-            <path d={line} fill="none" style={{ stroke: "var(--c-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={line} fill="none" vectorEffect="non-scaling-stroke" style={{ stroke: "var(--c-accent)" }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           {hover != null && (
             <>
@@ -162,7 +185,7 @@ export function Sparkline({ values = [], labels = [], unit = "", color = "var(--
   const max = Math.max(...values, 1), min = Math.min(...values, 0), span = max - min || 1;
   const xp = (i) => (i / (n - 1 || 1)) * W;
   const yp = (v) => H - 4 - ((v - min) / span) * (H - 8);
-  const pts = values.map((v, i) => `${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(" ");
+  const d = smoothPath(values.map((v, i) => [xp(i), yp(v)]), H);
 
   const onMove = (e) => {
     const r = ref.current?.getBoundingClientRect();
@@ -176,7 +199,9 @@ export function Sparkline({ values = [], labels = [], unit = "", color = "var(--
   return (
     <div ref={ref} onMouseMove={onMove} onMouseLeave={() => setHover(null)} style={{ position: "relative", cursor: "crosshair" }}>
       <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block" }}>
-        <polyline points={pts} fill="none" style={{ stroke: color }} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* non-scaling-stroke houdt de dikte constant bij het oprekken van de
+            viewBox; de gladde curve vervangt de hoekige polyline. */}
+        <path d={d} fill="none" vectorEffect="non-scaling-stroke" style={{ stroke: color }} strokeWidth="1.5" opacity="0.9" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {hover != null && (
         <>
