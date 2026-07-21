@@ -140,6 +140,54 @@ export const SOURCES = {
     spark: (d) => seriesOf(d, "revenue"),
   },
 
+  // --- e-commerce (GA4 monetization) ---
+  transactions: {
+    label: "Bestellingen", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.transactions ?? 0, fmt: "int", delta: d?.deltas?.transactions, higherBetter: true }),
+    spark: (d) => seriesOf(d, "transactions"),
+  },
+  avgOrderValue: {
+    label: "Gem. orderwaarde", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.avgOrderValue ?? 0, display: eur(d?.kpis?.avgOrderValue), delta: d?.deltas?.avgOrderValue, higherBetter: true }),
+  },
+  addToCarts: {
+    label: "In winkelwagen", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.addToCarts ?? 0, fmt: "int", delta: d?.deltas?.addToCarts, higherBetter: true }),
+    spark: (d) => seriesOf(d, "addToCarts"),
+  },
+  checkouts: {
+    label: "Checkouts gestart", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.checkouts ?? 0, fmt: "int", delta: d?.deltas?.checkouts, higherBetter: true }),
+    spark: (d) => seriesOf(d, "checkouts"),
+  },
+  firstTimePurchasers: {
+    label: "Nieuwe kopers", group: "scalar", kinds: ["kpi"],
+    scalar: (d) => ({ value: d?.kpis?.firstTimePurchasers ?? 0, fmt: "int", delta: d?.deltas?.firstTimePurchasers, higherBetter: true }),
+  },
+  shop_funnel: {
+    label: "Winkelfunnel", group: "breakdown", kinds: ["bars", "table"], unit: "sessies",
+    // Funnel: percentages t.o.v. sessies (niet t.o.v. de som), zodat de balken
+    // de doorval van sessie naar bestelling tonen.
+    breakdown: (d) => {
+      const k = d?.kpis ?? {};
+      const base = k.sessions || 1;
+      const step = (label, value) => ({ label, value: value ?? 0, pct: Math.min(100, Math.round(((value ?? 0) / base) * 100)) });
+      return [
+        step("Sessies", k.sessions),
+        step("In winkelwagen", k.addToCarts),
+        step("Checkout gestart", k.checkouts),
+        step("Bestellingen", k.transactions),
+      ];
+    },
+  },
+  top_items: {
+    label: "Top verkochte producten", group: "table", kinds: ["table"],
+    table: (d) => ({
+      columns: ["Product", "Aantal", "Omzet"],
+      rows: (d?.top_items ?? []).map((p) => [p.name, num(p.qty), eur(p.revenue)]),
+    }),
+  },
+
   // --- over tijd ---
   sessions_by_date: area("Sessies over tijd", "sessions", "sessies", { compare: true }),
   users_by_date: area("Bezoekers over tijd", "users", "bezoekers"),
@@ -152,6 +200,7 @@ export const SOURCES = {
   engagementRate_by_date: area("Betrokkenheid over tijd", "engagementRate", "%", { pct: true }),
   bounceRate_by_date: area("Bouncepercentage over tijd", "bounceRate", "%", { pct: true }),
   revenue_by_date: area("Opbrengst over tijd", "revenue", "opbrengst"),
+  transactions_by_date: area("Bestellingen over tijd", "transactions", "bestellingen"),
 
   // --- acquisitie (verdelingen) ---
   channels: dist("Verkeersbronnen", "channels", ["donut", "bars", "table"], "sessies"),
@@ -213,7 +262,8 @@ export const SOURCES = {
 
 export const GROUPS = [
   { label: "Kerncijfers", ids: ["users", "activeUsers", "newUsers", "sessions", "engagedSessions", "conversions_total", "conversion_rate", "engagementRate", "avgEngagementTime", "avgSessionDuration", "bounceRate", "pageViews", "viewsPerSession", "sessionsPerUser", "eventCount", "revenue"] },
-  { label: "Over tijd", ids: ["sessions_by_date", "users_by_date", "activeUsers_by_date", "newUsers_by_date", "engagedSessions_by_date", "pageViews_by_date", "conversions_by_date", "eventCount_by_date", "engagementRate_by_date", "bounceRate_by_date", "revenue_by_date"] },
+  { label: "Over tijd", ids: ["sessions_by_date", "users_by_date", "activeUsers_by_date", "newUsers_by_date", "engagedSessions_by_date", "pageViews_by_date", "conversions_by_date", "eventCount_by_date", "engagementRate_by_date", "bounceRate_by_date", "revenue_by_date", "transactions_by_date"] },
+  { label: "E-commerce", ids: ["transactions", "avgOrderValue", "addToCarts", "checkouts", "firstTimePurchasers", "shop_funnel", "top_items"] },
   { label: "Acquisitie", ids: ["channels", "source_medium", "session_campaigns", "first_user_channels", "first_user_source_medium"] },
   { label: "Gebruikers & techniek", ids: ["devices", "operating_systems", "browsers", "platforms", "screen_resolutions"] },
   { label: "Geografie & demografie", ids: ["geography", "cities", "languages", "age", "gender"] },
@@ -273,18 +323,22 @@ export const TEMPLATES = [
     ],
   },
   {
-    id: "conversion", name: "Conversie & doelen", audience: "Marketeer", profile: "ecommerce",
-    description: "Sturen op resultaat: conversies, ratio, opbrengst, de doelen en de bronnen die ze opleveren.",
+    id: "conversion", name: "Conversie & verkoop", audience: "Marketeer", profile: "ecommerce",
+    description: "Sturen op verkoop: omzet, bestellingen, gemiddelde orderwaarde, de winkelfunnel en de producten en bronnen die het opleveren.",
     widgets: [
-      { source: "conversions_total", kind: "kpi", size: 3 },
-      { source: "conversion_rate", kind: "kpi", size: 3 },
       { source: "revenue", kind: "kpi", size: 3 },
+      { source: "transactions", kind: "kpi", size: 3 },
+      { source: "avgOrderValue", kind: "kpi", size: 3 },
+      { source: "conversion_rate", kind: "kpi", size: 3 },
+      { source: "addToCarts", kind: "kpi", size: 3 },
+      { source: "checkouts", kind: "kpi", size: 3 },
+      { source: "firstTimePurchasers", kind: "kpi", size: 3 },
       { source: "sessions", kind: "kpi", size: 3 },
-      { source: "conversions", kind: "table", size: 6 },
+      { source: "revenue_by_date", kind: "area", size: 12 },
+      { source: "shop_funnel", kind: "bars", size: 6 },
+      { source: "top_items", kind: "table", size: 6 },
       { source: "channels", kind: "donut", size: 6 },
-      { source: "conversions_by_date", kind: "area", size: 12 },
-      { source: "source_medium", kind: "bars", size: 6 },
-      { source: "top_pages", kind: "table", size: 6 },
+      { source: "conversions", kind: "table", size: 6 },
     ],
   },
   {
