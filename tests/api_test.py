@@ -107,6 +107,35 @@ def test_admin_pages(admin, tk_org_id):
     print("adminpagina's: gebruikers, activiteit, pakketten, facturatie en diagnose slagen")
 
 
+def test_framework(demo):
+    d = demo.get(f"{BASE}/api/framework?months=3").json()
+    assert len(d["months"]) == 3 and d["business_type"] in ("leadgen", "ecommerce"), d
+    m = d["months"][-1]
+    auto = m["auto"]
+    assert auto["ads_kosten"] and auto["bezoekers"] and auto["conversies"], auto
+    assert round(auto["ads_google"] + auto["ads_meta"], 2) == auto["ads_kosten"], auto
+
+    month = m["month"]
+    r = demo.put(f"{BASE}/api/framework/{month}",
+                 json={"values": {"budget": 2500, "inkoopwaarde": 9000, "returns": 500}})
+    assert r.status_code == 200, (r.status_code, r.text)
+    upd = r.json()
+    assert upd["manual"]["budget"] == 2500, upd["manual"]
+    der, a = upd["derived"], upd["auto"]
+    verwacht_poas = round((a["omzet_excl"] - 9000 - 500) / a["ads_kosten"], 2)
+    assert der["poas"] == verwacht_poas, (der["poas"], verwacht_poas)
+    verwacht_kpl = round(a["ads_kosten"] / a["conversies"], 2)
+    assert der["kosten_per_lead"] == verwacht_kpl, (der["kosten_per_lead"], verwacht_kpl)
+
+    r = demo.put(f"{BASE}/api/framework/{month}", json={"values": {"returns": None}})
+    assert "returns" not in r.json()["manual"]
+    assert demo.put(f"{BASE}/api/framework/{month}", json={"values": {"hack": 1}}).status_code == 400
+    assert demo.put(f"{BASE}/api/framework/2099-01", json={"values": {"budget": 1}}).status_code == 400
+    assert demo.put(f"{BASE}/api/framework/{month}", json={"values": {"budget": -5}}).status_code == 400
+    demo.put(f"{BASE}/api/framework/{month}", json={"values": {"budget": None, "inkoopwaarde": None}})
+    print("raamwerk: autowaarden, opslaan, afgeleide formules en validatie slagen")
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -125,5 +154,6 @@ if __name__ == "__main__":
     test_feedback_analysis(demo, admin)
     test_trial_management(admin, tk_org_id)
     test_admin_pages(admin, tk_org_id)
+    test_framework(demo)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

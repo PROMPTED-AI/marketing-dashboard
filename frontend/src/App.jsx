@@ -12,6 +12,7 @@ import MetaAds from "./screens/dashboard/MetaAds.jsx";
 import MetaOrganic from "./screens/dashboard/MetaOrganic.jsx";
 import WooCommerce from "./screens/dashboard/WooCommerce.jsx";
 import MyDashboards from "./screens/dashboard/MyDashboards.jsx";
+import Framework from "./screens/dashboard/Framework.jsx";
 import Integrations from "./screens/dashboard/Integrations.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="meta" element={<Navigate to="/app/meta-ads" replace />} />
         <Route path="woocommerce" element={<WooCommerce />} />
         <Route path="dashboards" element={<MyDashboards />} />
+        <Route path="framework" element={<Framework />} />
         <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Settings />} />
       </Route>

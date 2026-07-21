@@ -207,6 +207,47 @@ def save_billing_details(org_id: str, data: dict) -> dict:
     return get_billing_details(org_id)
 
 
+# -------------------------------------------------------------------- raamwerk
+
+
+def get_framework_values(org_id: str, months: list[str]) -> dict:
+    """Handmatige raamwerkwaarden per maand: {maand: {key: waarde}}."""
+    if not months:
+        return {}
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT month, key, value FROM framework_values "
+            "WHERE organization_id = %s AND month = ANY(%s)",
+            (org_id, months),
+        ).fetchall()
+    out: dict[str, dict] = {}
+    for month, key, value in rows:
+        out.setdefault(month, {})[key] = value
+    return out
+
+
+def save_framework_values(org_id: str, month: str, values: dict) -> None:
+    """Sla handmatige raamwerkwaarden op; None wist de opgeslagen waarde."""
+    with db.get_conn() as conn:
+        for key, value in values.items():
+            if value is None:
+                conn.execute(
+                    "DELETE FROM framework_values "
+                    "WHERE organization_id = %s AND month = %s AND key = %s",
+                    (org_id, month, key),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO framework_values (organization_id, month, key, value)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (organization_id, month, key)
+                    DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+                    """,
+                    (org_id, month, key, value),
+                )
+
+
 # ------------------------------------------------------------ gebruikersbeheer
 
 

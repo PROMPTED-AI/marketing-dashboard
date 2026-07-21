@@ -95,6 +95,20 @@ def init_schema() -> None:
         conn.execute(
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS package TEXT"
         )
+        # Handmatige raamwerkwaarden (budget, inkoopwaarde, retouren, kosten
+        # per klant) per organisatie per maand, voor de pagina Raamwerk.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS framework_values (
+                organization_id  TEXT NOT NULL REFERENCES organizations(id),
+                month            TEXT NOT NULL,
+                key              TEXT NOT NULL,
+                value            DOUBLE PRECISION,
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (organization_id, month, key)
+            )
+            """
+        )
         # Facturatiegegevens per organisatie, ingevuld door de agency admin op
         # de pagina Pakketten & facturatie.
         conn.execute(
