@@ -244,6 +244,12 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
          ("facebook.com / referral", 0.08), ("nieuwsbrief / email", 0.07), ("bing / organic", 0.05)],
         sessions, seed + "sm",
     )
+    # Conversies per sessiebron/medium: betaald converteert relatief beter.
+    conversions_by_source = _breakdown(
+        [("google / cpc", 0.31), ("google / organic", 0.27), ("(direct) / (none)", 0.16),
+         ("nieuwsbrief / email", 0.11), ("facebook.com / referral", 0.09), ("bing / organic", 0.04)],
+        cur["conversions"], seed + "cvsm",
+    )
     first_user_channels = _breakdown(
         [("Organic Search", 0.41), ("Direct", 0.19), ("Paid Search", 0.15),
          ("Organic Social", 0.11), ("Referral", 0.08), ("Email", 0.06)],
@@ -339,6 +345,7 @@ def overview(start: str, end: str, compare: tuple[str, str] | None = None) -> di
         "devices": devices,
         "geography": geography,
         "source_medium": source_medium,
+        "conversions_by_source": conversions_by_source,
         "first_user_channels": first_user_channels,
         "first_user_source_medium": first_user_source_medium,
         "session_campaigns": session_campaigns,

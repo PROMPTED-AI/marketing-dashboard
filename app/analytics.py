@@ -326,6 +326,8 @@ def run_ga_overview(
     devices = safe(lambda: breakdown("deviceCategory", 5), [])
     geography = safe(lambda: breakdown("country", 8), [])
     source_medium = safe(lambda: breakdown("sessionSourceMedium", 8), [])
+    # Conversies per sessiebron/medium: welke bron levert de key events op.
+    conversions_by_source = safe(lambda: breakdown("sessionSourceMedium", 8, metric="conversions"), [])
     browsers = safe(lambda: breakdown("browser", 6), [])
     new_vs_returning = safe(lambda: breakdown("newVsReturning", 3), [])
     events = safe(lambda: breakdown("eventName", 10, metric="eventCount"), [])
@@ -402,6 +404,7 @@ def run_ga_overview(
         "devices": devices,
         "geography": geography,
         "source_medium": source_medium,
+        "conversions_by_source": conversions_by_source,
         "browsers": browsers,
         "new_vs_returning": new_vs_returning,
         "events": events,

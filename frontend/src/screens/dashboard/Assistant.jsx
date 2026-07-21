@@ -4,43 +4,8 @@ import remarkGfm from "remark-gfm";
 import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
-import {
-  newChatId, loadActiveChat, saveActiveChat, listConversations,
-  loadConversation, deleteConversation, clearActiveChat, setActiveChat,
-} from "../../lib/chatStore.js";
+import { useChat } from "../../lib/ChatProvider.jsx";
 import { IcChat } from "../../components/icons.jsx";
-
-const TOOL_LABELS = {
-  list_connections: "je koppelingen",
-  get_marketing_overview: "Alle kanalen",
-  get_insights: "Signalen",
-  get_analytics_overview: "Analytics",
-  get_search_console: "Search Console",
-  get_google_ads: "Google Ads",
-  get_meta_ads: "Meta Ads",
-  get_meta_organic: "Meta organisch",
-  get_woocommerce: "WooCommerce",
-};
-
-// Vervolgvraag-suggesties per gebruikte bron: na elk antwoord maximaal drie
-// chips waarmee de gebruiker in één klik doorvraagt.
-const FOLLOWUPS = {
-  "Alle kanalen": ["Waar kan ik besparen op mijn advertenties?", "Welk kanaal groeit het hardst?"],
-  "Signalen": ["Leg het belangrijkste signaal verder uit"],
-  "Analytics": ["Welke pagina's presteren het best?", "Waar komt mijn verkeer vandaan?"],
-  "Search Console": ["Welke zoekwoorden zijn quick wins?", "Op welke zoekwoorden daal ik?"],
-  "Google Ads": ["Welke campagne presteert het slechtst?", "Wat zijn mijn kosten per conversie?"],
-  "Meta Ads": ["Wat leveren mijn Meta-campagnes op vergeleken met Google Ads?"],
-  "Meta organisch": ["Welke posts deden het het best?"],
-  "WooCommerce": ["Wat zijn mijn best verkochte producten?", "Hoe ontwikkelt mijn omzet zich?"],
-};
-
-function suggestFor(sources) {
-  const out = [];
-  for (const s of sources) for (const q of FOLLOWUPS[s] || []) if (!out.includes(q)) out.push(q);
-  out.push("Vergelijk dit met de vorige periode");
-  return out.slice(0, 3);
-}
 
 // Renders an assistant answer as Markdown (GFM tables/lists) with compact,
 // theme-aware styling. User messages stay plain text.
@@ -61,48 +26,21 @@ const EXAMPLES = [
   "Hoe presteert mijn social media?",
 ];
 
+// De chat-state (berichten, streaming, historie) leeft in de app-brede
+// ChatProvider zodat een lopend antwoord navigatie naar andere schermen
+// overleeft; dit scherm is puur de weergave plus het invoerveld.
 export default function Assistant() {
   const { orgId } = useActiveOrg();
   const { start, end, label } = useDateRange();
-  const [messages, setMessages] = useState([]);
-  const [convId, setConvId] = useState(null);
+  const {
+    messages, streaming, tool, convId,
+    send, stop, retry, newChat, openConversation, removeConversation, listHistory,
+  } = useChat();
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [tool, setTool] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [pendingAsk, setPendingAsk] = useState(null);
   const endRef = useRef(null);
-  const abortRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, tool]);
-
-  // Herstel het actieve gesprek bij openen of klantwissel, zodat de chat
-  // navigatie naar andere schermen overleeft. Een afgebroken (leeg) laatste
-  // antwoord wordt weggelaten. Een via de notificatiebel gekozen signaal
-  // (sessionStorage) wordt daarna automatisch gesteld.
-  useEffect(() => {
-    const conv = loadActiveChat(orgId);
-    let msgs = conv?.messages ?? [];
-    if (msgs.length && msgs[msgs.length - 1].role === "assistant" && !msgs[msgs.length - 1].content) {
-      msgs = msgs.slice(0, -1);
-    }
-    setMessages(msgs);
-    setConvId(conv?.id ?? null);
-    setTool(null);
-    const q = sessionStorage.getItem("kompas-ask");
-    if (q) { sessionStorage.removeItem("kompas-ask"); setPendingAsk(q); }
-  }, [orgId]);
-
-  // Bewaar het lopende gesprek bij elke wijziging (ook tijdens streamen).
-  useEffect(() => {
-    if (convId && messages.length) saveActiveChat(orgId, convId, messages);
-  }, [orgId, convId, messages]);
-
-  // Automatisch de vraag van een aangeklikt signaal stellen (na herstel-render).
-  useEffect(() => {
-    if (pendingAsk && !streaming) { const q = pendingAsk; setPendingAsk(null); send(q); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAsk, streaming]);
 
   // Proactive insights for the active client + period (rule-based, cached server-side).
   useEffect(() => {
@@ -120,125 +58,18 @@ export default function Assistant() {
     return () => { alive = false; };
   }, [orgId, start, end]);
 
-  // Merge a patch into the last (assistant) message.
-  const updateLast = (patch) =>
-    setMessages((ms) => {
-      const c = [...ms];
-      c[c.length - 1] = { ...(c[c.length - 1] || {}), role: "assistant", ...patch };
-      return c;
-    });
-
-  async function send(text) {
-    const question = (text ?? input).trim();
-    if (!question || streaming) return;
-    // Eerste bericht van een vers gesprek: maak een gesprek-id aan zodat het
-    // in de historie belandt en navigatie overleeft.
-    if (!convId) {
-      const id = newChatId();
-      setConvId(id);
-      setActiveChat(orgId, id);
-    }
-    const history = [...messages, { role: "user", content: question }];
-    setMessages([...history, { role: "assistant", content: "", sources: [] }]);
+  const onSend = (text) => {
+    const q = (text ?? input).trim();
+    if (!q || streaming) return;
     setInput("");
-    setStreaming(true);
-    setTool(null);
-
-    let answer = "";
-    const sources = []; // ordered, unique tool labels used for this answer
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    try {
-      const res = await fetch("/api/assistant/chat", {
-        method: "POST",
-        credentials: "include",
-        signal: ctrl.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
-          org_id: orgId || undefined,
-          start,
-          end,
-          property_id: localStorage.getItem("kompas-property") || undefined,
-          site: localStorage.getItem("kompas-gsc-site") || undefined,
-        }),
-      });
-      if (!res.ok || !res.body) throw new Error(res.status === 503 ? "De assistent is nog niet geconfigureerd." : "Serverfout");
-
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let i;
-        while ((i = buf.indexOf("\n\n")) >= 0) {
-          const line = buf.slice(0, i).trim();
-          buf = buf.slice(i + 2);
-          if (!line.startsWith("data:")) continue;
-          const ev = JSON.parse(line.slice(5).trim());
-          if (ev.type === "text") { answer += ev.text; setTool(null); updateLast({ content: answer }); }
-          else if (ev.type === "tool") {
-            const lbl = TOOL_LABELS[ev.name] || ev.name;
-            setTool(lbl);
-            if (lbl !== "je koppelingen" && !sources.includes(lbl)) { sources.push(lbl); updateLast({ sources: [...sources] }); }
-          }
-          else if (ev.type === "error") { answer += (answer ? "\n\n" : "") + ev.message; updateLast({ content: answer }); }
-        }
-      }
-      // Vangnet: stream klaar maar geen tekst ontvangen. Zonder dit blijft de
-      // bubbel eeuwig op "denkt na" staan (gezien bij vervolgvragen).
-      if (!answer) {
-        updateLast({ content: "Ik kreeg geen antwoord terug van het taalmodel. Stel je vraag nog een keer, eventueel iets anders geformuleerd." });
-      } else {
-        updateLast({ suggestions: suggestFor(sources) });
-      }
-    } catch (e) {
-      if (e?.name === "AbortError") {
-        updateLast({ content: answer ? answer + "\n\n*(gestopt)*" : "*(gestopt)*" });
-      } else {
-        updateLast({ content: answer || `Er ging iets mis: ${e.message}` });
-      }
-    } finally {
-      abortRef.current = null;
-      setStreaming(false);
-      setTool(null);
-    }
-  }
-
-  const stop = () => abortRef.current?.abort();
+    send(q);
+  };
 
   const onKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
   };
 
-  // Historie: kleine lijst, per render lezen is goedkoop en altijd actueel.
-  const history = listConversations(orgId);
-
-  const newChat = () => {
-    if (streaming) return;
-    clearActiveChat(orgId);
-    setMessages([]);
-    setConvId(null);
-    setInput("");
-  };
-
-  const openConversation = (id) => {
-    if (streaming || id === convId) return;
-    const msgs = loadConversation(orgId, id);
-    if (!msgs) return;
-    setMessages(msgs);
-    setConvId(id);
-    setActiveChat(orgId, id);
-  };
-
-  const removeConversation = (e, id) => {
-    e.stopPropagation();
-    deleteConversation(orgId, id);
-    if (id === convId) { setMessages([]); setConvId(null); }
-  };
-
+  const history = listHistory();
   const when = (ts) => new Date(ts).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 
   return (
@@ -268,7 +99,7 @@ export default function Assistant() {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {EXAMPLES.map((q) => (
-                <button key={q} onClick={() => send(q)} style={chip}>{q}</button>
+                <button key={q} onClick={() => onSend(q)} style={chip}>{q}</button>
               ))}
             </div>
           </div>
@@ -309,11 +140,17 @@ export default function Assistant() {
                 ))}
               </div>
             )}
+            {/* Onderbroken antwoord: één klik om het opnieuw op te halen. */}
+            {m.role !== "user" && m.retry && i === messages.length - 1 && !streaming && (
+              <button className="chip-in" onClick={() => retry(m.retry)} style={{ ...followupChip, marginTop: 10 }}>
+                ↻ Opnieuw proberen
+              </button>
+            )}
             {/* Vervolgvraag-chips: alleen onder het laatste antwoord. */}
             {m.role !== "user" && m.suggestions?.length > 0 && i === messages.length - 1 && !streaming && (
               <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "10px 2px 0" }}>
                 {m.suggestions.map((q) => (
-                  <button key={q} className="chip-in" onClick={() => send(q)} style={followupChip}>{q}</button>
+                  <button key={q} className="chip-in" onClick={() => onSend(q)} style={followupChip}>{q}</button>
                 ))}
               </div>
             )}
@@ -338,13 +175,13 @@ export default function Assistant() {
               ■ Stop
             </button>
           ) : (
-            <button onClick={() => send()} disabled={!input.trim()} className="btn-primary" style={{ height: 44, padding: "0 20px", opacity: !input.trim() ? 0.6 : 1 }}>
+            <button onClick={() => onSend()} disabled={!input.trim()} className="btn-primary" style={{ height: 44, padding: "0 20px", opacity: !input.trim() ? 0.6 : 1 }}>
               Vraag
             </button>
           )}
         </div>
         <div style={{ fontSize: 11, color: "var(--c-muted)", marginTop: 6 }}>
-          De assistent gebruikt de live data van de geselecteerde klant en periode.
+          De assistent gebruikt de live data van de geselecteerde klant en periode. Je kunt gerust naar een ander scherm; het antwoord loopt door.
         </div>
       </div>
       </div>
@@ -357,7 +194,7 @@ export default function Assistant() {
             <div style={{ fontSize: 11, color: "var(--c-muted)" }}>{label}</div>
           </div>
           {insights === null && (
-            <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>signalen laden…</div>
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Signalen laden…</div>
           )}
           {insights?.length === 0 && (
             <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>
@@ -369,7 +206,7 @@ export default function Assistant() {
               {insights.map((it, i) => (
                 <button
                   key={i}
-                  onClick={() => send(it.question)}
+                  onClick={() => onSend(it.question)}
                   disabled={streaming}
                   title={it.detail}
                   style={{ ...signalRow, opacity: streaming ? 0.6 : 1 }}
@@ -409,7 +246,7 @@ export default function Assistant() {
                     <span style={{ display: "block", fontWeight: h.id === convId ? 800 : 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.title}</span>
                     <span style={{ display: "block", fontSize: 11, color: "var(--c-muted)", marginTop: 1 }}>{when(h.ts)} · {Math.ceil(h.count / 2)} {h.count > 2 ? "vragen" : "vraag"}</span>
                   </span>
-                  <button onClick={(e) => removeConversation(e, h.id)} title="Verwijderen" style={histDelBtn}>×</button>
+                  <button onClick={(e) => { e.stopPropagation(); removeConversation(h.id); }} title="Verwijderen" style={histDelBtn}>×</button>
                 </div>
               ))}
             </div>
