@@ -124,14 +124,23 @@ def run_ga_overview(
     try:
         k = report([], kpi_metrics, ranges)
     except Exception:
-        kpi_metrics = stable_metrics
-        k = report([], kpi_metrics, ranges)
+        # Nieuwere properties kennen alleen keyEvents (de opvolger van
+        # conversions); probeer die eerst voordat de metric helemaal vervalt.
+        try:
+            kpi_metrics = stable_metrics + ["keyEvents"]
+            k = report([], kpi_metrics, ranges)
+        except Exception:
+            kpi_metrics = stable_metrics
+            k = report([], kpi_metrics, ranges)
     cur_vals, prev_vals = {}, {}
     for row in k.rows:
         which = row.dimension_values[0].value if row.dimension_values else "current"
         target = prev_vals if which == "previous" else cur_vals
         for i, m in enumerate(kpi_metrics):
             target[m] = float(row.metric_values[i].value)
+    for vals in (cur_vals, prev_vals):
+        if "keyEvents" in vals:
+            vals["conversions"] = vals["keyEvents"]
 
     kpis = {
         "users": int(cur_vals.get("totalUsers", 0)),
