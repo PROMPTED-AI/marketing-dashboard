@@ -289,6 +289,17 @@ export default function Assistant() {
                     <span className="thinking-label">{tool ? `analyseert ${tool}…` : "denkt na…"}</span>
                   </span>
                 )}
+              {/* Blijft de assistent ná een eerste stuk tekst doorwerken (tools,
+                  verder redeneren), toon dat dan onder het deelantwoord. Zonder
+                  deze regel lijkt het antwoord af en lijkt de chat te hangen. */}
+              {m.role !== "user" && m.content && streaming && i === messages.length - 1 && (
+                <span style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--c-border-soft)", color: "var(--c-muted)", fontSize: 12 }}>
+                  <span className="typing-dots" aria-hidden="true">
+                    <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+                  </span>
+                  <span className="thinking-label">{tool ? `analyseert ${tool}…` : "denkt verder…"}</span>
+                </span>
+              )}
             </div>
             {m.role !== "user" && m.sources?.length > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "6px 2px 0" }}>
