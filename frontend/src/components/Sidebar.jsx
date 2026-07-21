@@ -5,7 +5,7 @@ import { invalidateAll } from "../lib/swr.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
-  IcStar, IcPlug, IcCog, IcUsers, IcChat, IcGrid,
+  IcStar, IcPlug, IcCog, IcUsers, IcChat, IcGrid, IcDoc,
   IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
   GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph,
 } from "./icons.jsx";
@@ -32,6 +32,7 @@ const NAV = [
     ],
   },
   { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },
+  { to: "/app/framework", label: "Raamwerk", Icon: IcDoc },
   { to: "/app/integrations", label: "Integraties", Icon: IcPlug },
   { to: "/app/settings", label: "Instellingen", Icon: IcCog },
 ];

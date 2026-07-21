@@ -87,7 +87,7 @@ def healthz():
     return {"ok": True}
 
 
-from .routers import account, adminpanel, assistant_api, channels, dashboards, feedback  # noqa: E402
+from .routers import account, adminpanel, assistant_api, channels, dashboards, feedback, framework  # noqa: E402
 
 app.include_router(account.router)
 app.include_router(adminpanel.router)
@@ -95,6 +95,7 @@ app.include_router(assistant_api.router)
 app.include_router(channels.router)
 app.include_router(dashboards.router)
 app.include_router(feedback.router)
+app.include_router(framework.router)
 
 @app.get("/{full_path:path}")
 def spa(full_path: str):
