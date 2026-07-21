@@ -47,12 +47,14 @@ function titleFor(messages) {
   return q.length > 60 ? q.slice(0, 57) + "…" : q;
 }
 
-// Het actieve gesprek (of null als er geen is).
+// Het actieve gesprek (of null als er geen is). `ts` = laatst opgeslagen, zodat
+// de ChatProvider weet of een onderbroken antwoord recent genoeg is om
+// automatisch te hervatten.
 export function loadActiveChat(orgId) {
   const id = localStorage.getItem(activeKey(orgId));
   if (!id) return null;
   const conv = readHistory(orgId).find((c) => c.id === id);
-  return conv ? { id: conv.id, messages: conv.messages } : null;
+  return conv ? { id: conv.id, messages: conv.messages, ts: conv.ts } : null;
 }
 
 // Sla het actieve gesprek op (upsert in de lijst + pointer bijwerken).

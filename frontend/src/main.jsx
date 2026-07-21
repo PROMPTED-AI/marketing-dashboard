@@ -7,6 +7,7 @@ import { MeProvider } from "./lib/useMe.jsx";
 import { ActiveOrgProvider } from "./lib/ActiveOrgProvider.jsx";
 import { ConnectionsProvider } from "./lib/useConnections.jsx";
 import { DateRangeProvider } from "./lib/PeriodProvider.jsx";
+import { ChatProvider } from "./lib/ChatProvider.jsx";
 import "./theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -16,9 +17,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <ActiveOrgProvider>
           <ConnectionsProvider>
             <DateRangeProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
+              <ChatProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </ChatProvider>
             </DateRangeProvider>
           </ConnectionsProvider>
         </ActiveOrgProvider>
