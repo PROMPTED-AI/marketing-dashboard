@@ -36,6 +36,11 @@ export default function Settings() {
           <Row label="Organisatie" value={activeOrg?.name || "—"} last />
         </SectionCard>
 
+        {/* PROEFPERIODE */}
+        {me?.subscription?.plan === "trial" && !me.subscription.expired && (
+          <TrialCard subscription={me.subscription} orgName={activeOrg?.name} email={me?.email} onChanged={reloadMe} />
+        )}
+
         {/* VOORKEUREN */}
         <SectionCard title="voorkeuren">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--c-border-soft)" }}>
@@ -155,6 +160,70 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
         </button>
         {done && !dirty && <span style={{ fontSize: 13, color: "var(--c-pos)", fontWeight: 700 }}>opgeslagen ✓</span>}
       </div>
+    </SectionCard>
+  );
+}
+
+// Proefperiode: status met resterende dagen, overstappen naar betaald (mail)
+// en de mogelijkheid om de proefperiode per direct in te trekken.
+function TrialCard({ subscription, orgName, email, onChanged }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const ends = subscription.trial_ends_at
+    ? new Date(subscription.trial_ends_at).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+  const mailto =
+    `mailto:info@prompted-ai.nl?subject=${encodeURIComponent("Overstappen naar betaald abonnement voor " + (orgName || ""))}` +
+    `&body=${encodeURIComponent("Hallo,\n\nWij willen graag overstappen naar een betaald abonnement.\n\nOrganisatie: " + (orgName || "") + "\nContactpersoon: " + (email || ""))}`;
+
+  const stop = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/api/subscription/stop-trial", { method: "POST" });
+      // Statussen verversen: de app toont hierna het verloopscherm.
+      await onChanged();
+      window.location.reload();
+    } catch (e) {
+      setError(String(e?.message || e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SectionCard title="proefperiode">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid var(--c-border-soft)" }}>
+        <span className="pill accent">Nog {subscription.days_left} {subscription.days_left === 1 ? "dag" : "dagen"}</span>
+        <span style={{ fontSize: 13, color: "var(--c-muted)" }}>{ends ? `De proefperiode loopt tot ${ends}.` : ""}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--c-border-soft)", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Overstappen naar betaald</div>
+          <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Neem contact op, dan regelen we de overstap</div>
+        </div>
+        <a className="btn-primary" href={mailto} style={{ height: 40, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>Neem contact op</a>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Proefperiode intrekken</div>
+          <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Beëindig de proefperiode per direct. Je gegevens en koppelingen blijven bewaard.</div>
+        </div>
+        {confirming ? (
+          <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button className="btn-ghost" disabled={busy} style={{ height: 40, padding: "0 14px", fontSize: 13 }} onClick={() => setConfirming(false)}>Annuleren</button>
+            <button className="btn-primary" disabled={busy} style={{ height: 40, padding: "0 16px", fontSize: 13, background: "var(--c-neg)" }} onClick={stop}>
+              {busy ? "Bezig…" : "Ja, beëindig nu"}
+            </button>
+          </span>
+        ) : (
+          <button className="btn-ghost" style={{ height: 40, padding: "0 16px", fontSize: 13, color: "var(--c-neg)" }} onClick={() => setConfirming(true)}>
+            Proefperiode intrekken
+          </button>
+        )}
+      </div>
+      {error && <div style={{ fontSize: 13, color: "var(--c-neg)", fontWeight: 600, paddingTop: 8 }}>{error}</div>}
     </SectionCard>
   );
 }

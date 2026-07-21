@@ -105,8 +105,13 @@ TRIAL_DAYS = 14
 
 
 def subscription_info(org: dict | None) -> dict:
-    """Abonnementsstatus voor /api/me en de toegangscontrole."""
-    if not org or org.get("is_demo") or org.get("plan") != "trial":
+    """Abonnementsstatus voor /api/me en de toegangscontrole.
+
+    De demo-organisatie draait bewust wél in een proefperiode (de seed schuift
+    de einddatum bij elke start vooruit), zodat de trial-ervaring en het
+    beheer ervan op het demo-account te zien zijn.
+    """
+    if not org or org.get("plan") != "trial":
         return {"plan": "active", "trial_ends_at": None, "expired": False, "days_left": None}
     ends = org.get("trial_ends_at")
     ends_dt = datetime.fromisoformat(ends) if ends else None
