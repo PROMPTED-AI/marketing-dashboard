@@ -343,7 +343,7 @@ function TrialCell({ org, onChanged }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       {pill}
-      {sub.plan === "trial" && (
+      {sub.plan === "trial" ? (
         <>
           <button className="btn-ghost" disabled={busy} style={miniBtn} onClick={() => act("extend")} title="Verleng de proefperiode met 14 dagen">+14 dagen</button>
           {!sub.expired && (
@@ -351,6 +351,10 @@ function TrialCell({ org, onChanged }) {
           )}
           <button className="btn-ghost" disabled={busy} style={{ ...miniBtn, color: "var(--c-accent)" }} onClick={() => act("activate")} title="Zet deze organisatie op betaald/onbeperkt">Activeer</button>
         </>
+      ) : (
+        <button className="btn-ghost" disabled={busy} style={{ ...miniBtn, color: "var(--c-accent)" }} onClick={() => act("restart")} title="Start een nieuwe proefperiode van 14 dagen; de gebruikers zien dan de trial-balk">
+          Proef starten
+        </button>
       )}
     </span>
   );
