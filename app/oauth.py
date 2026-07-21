@@ -108,9 +108,20 @@ def credentials_to_dict(creds: Credentials) -> dict:
 
 
 def credentials_from_dict(data: dict) -> Credentials:
-    """Rebuild Credentials from storage and refresh the access token if needed."""
+    """Rebuild Credentials from storage and refresh the access token if needed.
+
+    De opgeslagen scopes gaan bewust NIET mee in het Credentials-object: bij
+    het verversen stuurt google-auth ze anders als scope-parameter naar het
+    token-endpoint, en Google weigert dat verzoek met invalid_scope zodra het
+    refresh-token die scopes niet (meer) exact draagt (bijvoorbeeld na een
+    herkoppeling met andere vinkjes in het toestemmingsscherm). Zonder
+    scope-parameter geeft Google gewoon een token met alles wat het
+    refresh-token wél heeft; mist er echt een recht, dan geeft de API-call
+    zelf een duidelijke 403 en tonen we de herkoppel-melding.
+    """
     data = dict(data)
     expiry = data.pop("expiry", None)
+    data.pop("scopes", None)
     creds = Credentials(**data)
     if expiry:
         try:
