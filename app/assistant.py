@@ -514,21 +514,25 @@ FEEDBACK_PROMPT = (
     "## Inschatting\n"
     "Prioriteit (laag, middel, hoog) met één zin motivatie, en een grove "
     "omvang (klein, middel, groot).\n"
-    "Schrijf volledige zinnen die met een hoofdletter beginnen en gebruik "
-    "nooit een gedachtestreepje."
+    "Houd het geheel beknopt, in totaal ongeveer 200 woorden. Denk kort na en "
+    "begin snel met schrijven. Schrijf volledige zinnen die met een hoofdletter "
+    "beginnen en gebruik nooit een gedachtestreepje."
 )
 
 
-def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> str:
-    """Werk één feedback-item uit via EuRouter en geef de tekst terug.
+def stream_feedback_analysis(item: dict, *, api_key: str, base_url: str, model: str, on_done=None):
+    """SSE-generator die één feedback-item uitwerkt en live doorstuurt.
+
+    Events: "thinking" (het model denkt, nog geen tekst), "text" (stukje van de
+    uitwerking), "done" (klaar en opgeslagen via on_done) en "error". Zo ziet de
+    beheerder meteen dat de AI bezig is en verschijnt de uitwerking al tijdens
+    het genereren in plaats van na een lange stilte.
 
     Denkende modellen (zoals kimi-k2.6) kunnen hun tokens in reasoning_content
-    stoppen en met een leeg antwoord eindigen. Daarom: ruim tokenbudget,
-    reasoning als vangnet, en één niet-streamende herkansing voordat we leeg
-    teruggeven.
-
-    Alles is in tijd begrensd: zonder timeout bleef de knop "AI werkt uit"
-    eindeloos hangen als het model lang doorrekent of de gateway stilvalt.
+    stoppen en met een leeg antwoord eindigen. Daarom: reasoning als vangnet en
+    één niet-streamende herkansing voordat we leeg teruggeven. Alles is in tijd
+    begrensd, anders bleef de knop eindeloos hangen bij een stilgevallen
+    gateway of een model dat blijft doorrekenen.
     """
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=90, max_retries=1)
     deadline = time.monotonic() + 150
@@ -547,54 +551,80 @@ def analyze_feedback(item: dict, *, api_key: str, base_url: str, model: str) -> 
         {"role": "user", "content": "\n".join(parts)},
     ]
 
-    stream = client.chat.completions.create(
-        model=model, messages=messages, max_tokens=4000, stream=True,
-    )
     out, reasoning = [], []
-    for chunk in stream:
-        if time.monotonic() > deadline:
-            log.warning("feedback-analyse: tijdslimiet bereikt tijdens streamen, stream afgebroken")
-            stream.close()
-            break
-        if not chunk.choices:
-            continue
-        delta = chunk.choices[0].delta
-        if getattr(delta, "content", None):
-            out.append(delta.content)
-        elif getattr(delta, "reasoning_content", None):
-            reasoning.append(delta.reasoning_content)
-    text = "".join(out).strip()
-    if text:
-        return text
-    log.warning(
-        "feedback-analyse leeg (model=%s, reasoning=%d tekens), herkansing zonder stream",
-        model, len("".join(reasoning)),
-    )
-
-    # Herkansing: niet-streamend, met expliciete instructie om direct de
-    # uitwerking te geven in plaats van (alleen) denkstappen. Alleen als er
-    # binnen het tijdsbudget nog ruimte voor is.
-    if time.monotonic() > deadline:
-        return "".join(reasoning).strip()
-    retry = messages + [{
-        "role": "user",
-        "content": (
-            "Geef nu direct de volledige uitwerking als platte Markdown-tekst "
-            "met de drie gevraagde koppen, zonder verdere denkstappen."
-        ),
-    }]
     try:
-        resp = client.with_options(timeout=60, max_retries=0).chat.completions.create(
-            model=model, messages=retry, max_tokens=4000, stream=False,
+        yield _sse("thinking")
+        stream = client.chat.completions.create(
+            model=model, messages=messages, max_tokens=2500, stream=True,
         )
-        msg = resp.choices[0].message if resp.choices else None
-        text = (getattr(msg, "content", None) or "").strip()
-        if text:
-            return text
-        if getattr(msg, "reasoning_content", None):
-            reasoning.append(msg.reasoning_content)
-    except Exception as e:  # noqa: BLE001
-        log.warning("feedback-analyse herkansing faalde: %s", e)
+        last_think = 0.0
+        for chunk in stream:
+            if time.monotonic() > deadline:
+                log.warning("feedback-analyse: tijdslimiet bereikt tijdens streamen, stream afgebroken")
+                stream.close()
+                break
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if getattr(delta, "content", None):
+                out.append(delta.content)
+                yield _sse("text", text=delta.content)
+            elif getattr(delta, "reasoning_content", None):
+                reasoning.append(delta.reasoning_content)
+                # Af en toe een levensteken zodat de indicator blijft bewegen
+                # en tussenliggende proxies de verbinding niet sluiten.
+                now = time.monotonic()
+                if now - last_think > 1.5:
+                    last_think = now
+                    yield _sse("thinking")
+        text = "".join(out).strip()
 
-    # Laatste redmiddel: de denkstappen bevatten vaak al de volledige analyse.
-    return "".join(reasoning).strip()
+        if not text:
+            log.warning(
+                "feedback-analyse leeg (model=%s, reasoning=%d tekens), herkansing zonder stream",
+                model, len("".join(reasoning)),
+            )
+            # Herkansing: niet-streamend, met expliciete instructie om direct
+            # de uitwerking te geven. Alleen als het tijdsbudget het toelaat.
+            if time.monotonic() <= deadline:
+                yield _sse("thinking")
+                retry = messages + [{
+                    "role": "user",
+                    "content": (
+                        "Geef nu direct de volledige uitwerking als platte Markdown-tekst "
+                        "met de drie gevraagde koppen, zonder verdere denkstappen."
+                    ),
+                }]
+                try:
+                    resp = client.with_options(timeout=60, max_retries=0).chat.completions.create(
+                        model=model, messages=retry, max_tokens=2500, stream=False,
+                    )
+                    msg = resp.choices[0].message if resp.choices else None
+                    text = (getattr(msg, "content", None) or "").strip()
+                    if not text and getattr(msg, "reasoning_content", None):
+                        reasoning.append(msg.reasoning_content)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("feedback-analyse herkansing faalde: %s", e)
+            # Laatste redmiddel: de denkstappen bevatten vaak al de analyse.
+            if not text:
+                text = "".join(reasoning).strip()
+            if text:
+                yield _sse("text", text=text)
+
+        if not text:
+            yield _sse("error", message="De AI-uitwerking kwam leeg terug. Probeer het opnieuw.")
+            return
+        if on_done:
+            try:
+                on_done(text)
+            except Exception:  # noqa: BLE001 - uitwerking is er al, opslaan mag niet de stream breken
+                log.exception("feedback-analyse opslaan mislukt")
+        yield _sse("done")
+    except openai.APITimeoutError:
+        log.warning("feedback-analyse timeout (model=%s)", model)
+        yield _sse("error", message="De AI-uitwerking duurde te lang. Probeer het opnieuw.")
+    except openai.AuthenticationError:
+        yield _sse("error", message="De AI-uitwerking kan niet inloggen bij de taalmodel-service. Controleer de EuRouter-sleutel.")
+    except Exception:  # noqa: BLE001
+        log.exception("feedback-analyse faalde")
+        yield _sse("error", message="De AI-uitwerking is niet gelukt. Probeer het later opnieuw.")
