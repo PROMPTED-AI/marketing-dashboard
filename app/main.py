@@ -42,6 +42,10 @@ from . import (
     meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
 )
 
+# Zonder basisconfiguratie hebben de app-loggers geen handler onder uvicorn en
+# verdwijnen INFO-regels (zoals de assistent-telemetrie) stilletjes. Uvicorns
+# eigen loggers hebben al handlers en propagate=False; die raakt dit niet.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 log = logging.getLogger("dashboard")
 
 # The React/Vite build is copied here by the Dockerfile (stage 1 -> stage 2).
@@ -716,6 +720,11 @@ def assistant_chat(request: Request, body: ChatBody):
                 return json.dumps(_connections_payload(target_org), ensure_ascii=False, default=str)
             if name == "get_marketing_overview":
                 return json.dumps(_marketing_overview(start, end, compare), ensure_ascii=False, default=str)
+            if name == "get_insights":
+                return json.dumps(
+                    _compute_insights(target_org, start, end, body.property_id, body.site),
+                    ensure_ascii=False, default=str,
+                )
             if name == "get_analytics_overview":
                 return json.dumps(_compact(_fetch_analytics(start, end, compare)), ensure_ascii=False, default=str)
             if name == "get_search_console":
@@ -788,14 +797,13 @@ def _connected(target_org: str, provider: str) -> bool:
     return bool(conn and conn["status"] == "connected")
 
 
-@app.get("/api/insights")
-def insights_endpoint(
-    request: Request, start: str, end: str,
-    org_id: str | None = None, property_id: str | None = None, site: str | None = None,
-):
-    """Proactive, rule-based insights: notable period-over-period changes per channel."""
-    user = auth.current_user(request)
-    target_org = _resolve_org_id(user, org_id)
+def _compute_insights(
+    target_org: str, start: str, end: str,
+    property_id: str | None = None, site: str | None = None,
+) -> dict:
+    """Rule-based signalen (opvallende periode-op-periode-veranderingen per
+    kanaal), gecachet. Gedeeld door het insights-endpoint (bel + zijpaneel) en
+    de `get_insights`-tool van de assistent, zodat alle drie hetzelfde tonen."""
     key = f"{target_org}|insights|{start}|{end}|{property_id}|{site}"
     cached = cache.get(key)
     if cached is not None:
@@ -807,6 +815,22 @@ def insights_endpoint(
         raise HTTPException(status_code=400, detail="Ongeldige periode")
 
     found: list[dict] = []
+
+    # Demo-organisatie: bereken de signalen op de gegenereerde voorbeelddata,
+    # zodat bel, zijpaneel en assistent ook in de demo iets laten zien.
+    if models.is_demo_org(target_org):
+        data = demo.overview(start, end, compare)
+        found += insights.from_channel("analytics", data.get("kpis", {}), data.get("deltas"))
+        g = demo.gsc_report(start, end, compare)
+        found += insights.from_channel("search_console", g.get("totals", {}), g.get("deltas"))
+        found += insights.search_opportunities(g)
+        a = demo.ads_overview(start, end, compare)
+        found += insights.from_channel("google_ads", a.get("kpis", {}), a.get("deltas"))
+        m = demo.meta_ads_overview(start, end, compare)
+        found += insights.from_channel("meta_ads", m.get("kpis", {}), m.get("deltas"))
+        payload = {"org_id": target_org, "insights": insights.rank(found)}
+        cache.set(key, payload, cache.ttl_for_range(end))
+        return payload
 
     if _connected(target_org, "google_analytics"):
         try:
@@ -860,6 +884,17 @@ def insights_endpoint(
     payload = {"org_id": target_org, "insights": insights.rank(found)}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
+
+
+@app.get("/api/insights")
+def insights_endpoint(
+    request: Request, start: str, end: str,
+    org_id: str | None = None, property_id: str | None = None, site: str | None = None,
+):
+    """Proactive, rule-based insights: notable period-over-period changes per channel."""
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    return _compute_insights(target_org, start, end, property_id, site)
 
 
 def _connections_payload(target_org: str) -> dict:

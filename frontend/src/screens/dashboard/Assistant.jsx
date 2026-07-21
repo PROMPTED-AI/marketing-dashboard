@@ -13,6 +13,7 @@ import { IcChat } from "../../components/icons.jsx";
 const TOOL_LABELS = {
   list_connections: "je koppelingen",
   get_marketing_overview: "Alle kanalen",
+  get_insights: "Signalen",
   get_analytics_overview: "Analytics",
   get_search_console: "Search Console",
   get_google_ads: "Google Ads",
@@ -20,6 +21,26 @@ const TOOL_LABELS = {
   get_meta_organic: "Meta organisch",
   get_woocommerce: "WooCommerce",
 };
+
+// Vervolgvraag-suggesties per gebruikte bron: na elk antwoord maximaal drie
+// chips waarmee de gebruiker in één klik doorvraagt.
+const FOLLOWUPS = {
+  "Alle kanalen": ["Waar kan ik besparen op mijn advertenties?", "Welk kanaal groeit het hardst?"],
+  "Signalen": ["Leg het belangrijkste signaal verder uit"],
+  "Analytics": ["Welke pagina's presteren het best?", "Waar komt mijn verkeer vandaan?"],
+  "Search Console": ["Welke zoekwoorden zijn quick wins?", "Op welke zoekwoorden daal ik?"],
+  "Google Ads": ["Welke campagne presteert het slechtst?", "Wat zijn mijn kosten per conversie?"],
+  "Meta Ads": ["Wat leveren mijn Meta-campagnes op vergeleken met Google Ads?"],
+  "Meta organisch": ["Welke posts deden het het best?"],
+  "WooCommerce": ["Wat zijn mijn best verkochte producten?", "Hoe ontwikkelt mijn omzet zich?"],
+};
+
+function suggestFor(sources) {
+  const out = [];
+  for (const s of sources) for (const q of FOLLOWUPS[s] || []) if (!out.includes(q)) out.push(q);
+  out.push("Vergelijk dit met de vorige periode");
+  return out.slice(0, 3);
+}
 
 // Renders an assistant answer as Markdown (GFM tables/lists) with compact,
 // theme-aware styling. User messages stay plain text.
@@ -51,6 +72,7 @@ export default function Assistant() {
   const [insights, setInsights] = useState(null);
   const [pendingAsk, setPendingAsk] = useState(null);
   const endRef = useRef(null);
+  const abortRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, tool]);
 
@@ -124,10 +146,13 @@ export default function Assistant() {
 
     let answer = "";
     const sources = []; // ordered, unique tool labels used for this answer
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     try {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         credentials: "include",
+        signal: ctrl.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, content: m.content })),
@@ -166,14 +191,23 @@ export default function Assistant() {
       // bubbel eeuwig op "denkt na" staan (gezien bij vervolgvragen).
       if (!answer) {
         updateLast({ content: "Ik kreeg geen antwoord terug van het taalmodel. Stel je vraag nog een keer, eventueel iets anders geformuleerd." });
+      } else {
+        updateLast({ suggestions: suggestFor(sources) });
       }
     } catch (e) {
-      updateLast({ content: answer || `Er ging iets mis: ${e.message}` });
+      if (e?.name === "AbortError") {
+        updateLast({ content: answer ? answer + "\n\n*(gestopt)*" : "*(gestopt)*" });
+      } else {
+        updateLast({ content: answer || `Er ging iets mis: ${e.message}` });
+      }
     } finally {
+      abortRef.current = null;
       setStreaming(false);
       setTool(null);
     }
   }
+
+  const stop = () => abortRef.current?.abort();
 
   const onKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -264,6 +298,14 @@ export default function Assistant() {
                 ))}
               </div>
             )}
+            {/* Vervolgvraag-chips: alleen onder het laatste antwoord. */}
+            {m.role !== "user" && m.suggestions?.length > 0 && i === messages.length - 1 && !streaming && (
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "10px 2px 0" }}>
+                {m.suggestions.map((q) => (
+                  <button key={q} className="chip-in" onClick={() => send(q)} style={followupChip}>{q}</button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         <div ref={endRef} />
@@ -280,9 +322,15 @@ export default function Assistant() {
             placeholder="Stel een vraag over je cijfers…"
             style={textareaStyle}
           />
-          <button onClick={() => send()} disabled={streaming || !input.trim()} className="btn-primary" style={{ height: 44, padding: "0 20px", opacity: streaming || !input.trim() ? 0.6 : 1 }}>
-            {streaming ? "…" : "Vraag"}
-          </button>
+          {streaming ? (
+            <button onClick={stop} className="btn-ghost" style={{ height: 44, padding: "0 20px", color: "var(--c-neg)", fontWeight: 700 }}>
+              ■ Stop
+            </button>
+          ) : (
+            <button onClick={() => send()} disabled={!input.trim()} className="btn-primary" style={{ height: 44, padding: "0 20px", opacity: !input.trim() ? 0.6 : 1 }}>
+              Vraag
+            </button>
+          )}
         </div>
         <div style={{ fontSize: 11, color: "var(--c-muted)", marginTop: 6 }}>
           De assistent gebruikt de live data van de geselecteerde klant en periode.
@@ -366,6 +414,7 @@ export default function Assistant() {
 
 const chip = { padding: "8px 13px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 const sourceChip = { padding: "2px 8px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-muted)", fontSize: 10.5, fontWeight: 700 };
+const followupChip = { padding: "7px 12px", borderRadius: 999, border: "1px solid var(--c-accent-soft)", background: "var(--c-accent-soft)", color: "var(--c-accent)", fontSize: 12.5, fontWeight: 700, cursor: "pointer" };
 const signalRow = { display: "flex", gap: 9, alignItems: "flex-start", padding: "9px 10px", textAlign: "left", cursor: "pointer", width: "100%", borderRadius: 10, border: "1px solid var(--c-border-soft)", background: "var(--c-surface-2)", color: "var(--c-ink)" };
 const histRow = { display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, border: "1px solid var(--c-border-soft)", background: "var(--c-surface-2)", cursor: "pointer" };
 const histRowActive = { border: "1px solid var(--c-accent)", background: "var(--c-accent-soft)" };

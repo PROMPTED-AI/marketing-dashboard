@@ -7,6 +7,8 @@ en de 409 "opnieuw koppelen"-afhandeling op één plek blijven.
 """
 import json
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import openai
@@ -38,6 +40,8 @@ SYSTEM_PROMPT = (
     "- Leg waar zinvol een verband tussen kanalen dat relevant is voor marketing "
     "(bijv. advertentie-uitgaven versus omzet, verkeersbron versus conversie, SEO "
     "versus betaald verkeer).\n"
+    "- Bij vragen als 'wat valt op' of 'waar moet ik op letten' roep je "
+    "`get_insights` aan en bespreek je die vooraf gedetecteerde signalen.\n"
     "- Sluit af met 1 tot 3 concrete, uitvoerbare acties.\n"
     "- Je ziet uitsluitend de gegevens van de huidige klant.\n"
     "- Als een kanaal niet gekoppeld is, leg dat rustig uit in plaats van te "
@@ -99,6 +103,21 @@ TOOLS = [
                 "rendement/ROAS over kanalen heen, 'wat leveren advertenties op', betaald "
                 "vs. organisch, of waar de omzet vandaan komt. Voor detailvragen over één "
                 "kanaal gebruik je de kanaal-specifieke tool."
+            ),
+            "parameters": _PERIOD_PARAMS,
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_insights",
+            "description": (
+                "Haalt de automatisch gedetecteerde signalen op: opvallende "
+                "veranderingen per kanaal t.o.v. de vorige periode (sterke stijgers "
+                "en dalers) en SEO-kansen, vooraf berekend door het dashboard. Roep "
+                "dit aan bij vragen als 'wat valt op', 'zijn er bijzonderheden' of "
+                "'waar moet ik op letten', en citeer de signalen in plaats van zelf "
+                "te zoeken."
             ),
             "parameters": _PERIOD_PARAMS,
         },
@@ -224,7 +243,7 @@ def _run_tool_loop(client, model, convo, execute, state):
     """
     for _ in range(MAX_TOOL_ITERATIONS):
         stream = client.chat.completions.create(
-            model=model, messages=convo, tools=TOOLS, max_tokens=1500, stream=True,
+            model=model, messages=convo, tools=TOOLS, max_tokens=2500, stream=True,
         )
         content = ""
         calls = {}  # index -> {id, name, args}
@@ -257,6 +276,12 @@ def _run_tool_loop(client, model, convo, execute, state):
                 for c in calls.values()
             ],
         })
+        state["rounds"] = state.get("rounds", 0) + 1
+        state["tools"] = state.get("tools", 0) + len(calls)
+        # Meld eerst alle tools aan de UI, voer ze daarna parallel uit: modellen
+        # als Kimi vragen meerdere kanalen tegelijk op, en de fetches zijn
+        # I/O-gebonden. Dat scheelt seconden op cross-kanaal-vragen.
+        parsed = []
         for c in calls.values():
             yield _sse("tool", name=c["name"])
             try:
@@ -265,24 +290,28 @@ def _run_tool_loop(client, model, convo, execute, state):
                     args = {}
             except ValueError:
                 args = {}
-            convo.append({
-                "role": "tool",
-                "tool_call_id": c["id"],
-                "content": execute(c["name"], args),
-            })
+            parsed.append((c["id"], c["name"], args))
+        if len(parsed) > 1:
+            with ThreadPoolExecutor(max_workers=min(6, len(parsed))) as pool:
+                results = list(pool.map(lambda p: execute(p[1], p[2]), parsed))
+        else:
+            results = [execute(parsed[0][1], parsed[0][2])]
+        for (call_id, _name, _args), result in zip(parsed, results):
+            convo.append({"role": "tool", "tool_call_id": call_id, "content": result})
 
     # Vangnet: eindigde de loop zonder één stukje antwoordtekst (het model bleef
     # tools aanroepen tot de limiet, of gaf een lege completion), forceer dan een
     # afronding zonder tools. Zonder dit vangnet eindigt de stream stil en blijft
     # de gebruiker naar "denkt na" kijken; dit trad op bij vervolgvragen.
     if not state["text"]:
+        state["fallback"] = True
         log.warning("assistant: tool-loop eindigde zonder tekst (model=%s); afronding geforceerd", model)
         closing = convo + [{
             "role": "user",
             "content": "Formuleer nu je definitieve antwoord op basis van de al opgehaalde gegevens hierboven. Roep geen tools meer aan.",
         }]
         stream = client.chat.completions.create(
-            model=model, messages=closing, max_tokens=1500, stream=True,
+            model=model, messages=closing, max_tokens=2500, stream=True,
         )
         for chunk in stream:
             if not chunk.choices:
@@ -308,7 +337,7 @@ def _run_context_mode(client, model, system, messages, gather_context):
     )
     convo = [{"role": "system", "content": sys2}] + list(messages)
     stream = client.chat.completions.create(
-        model=model, messages=convo, max_tokens=1500, stream=True,
+        model=model, messages=convo, max_tokens=2500, stream=True,
     )
     for chunk in stream:
         if not chunk.choices:
@@ -334,7 +363,8 @@ def stream_chat(messages: list, execute, gather_context=None, *, api_key: str,
     if period:
         system += f" De dashboardperiode is {period[0]} t/m {period[1]}."
     convo = [{"role": "system", "content": system}] + list(messages)
-    state = {"text": False}
+    state = {"text": False, "rounds": 0, "tools": 0, "fallback": False}
+    t0 = time.monotonic()
     try:
         yield from _run_tool_loop(client, model, convo, execute, state)
     except openai.BadRequestError as e:
@@ -377,6 +407,14 @@ def stream_chat(messages: list, execute, gather_context=None, *, api_key: str,
     except Exception:  # onbekende fout; log server-side, generieke melding
         log.exception("assistant stream failed (model=%s)", model)
         yield _sse("error", message="Er ging iets mis met de assistent. Probeer het later opnieuw.")
+    # Telemetrie per beurt: hiermee is in de logs te volgen hoe het model zich
+    # gedraagt (aantal tool-rondes, duur, of het afrondingsvangnet nodig was).
+    log.info(
+        "assistant turn: model=%s rounds=%s tools=%s fallback=%s text=%s dur=%.1fs",
+        model, state.get("rounds", 0), state.get("tools", 0),
+        state.get("fallback", False), state.get("text", False),
+        time.monotonic() - t0,
+    )
     yield _sse("done")
 
 
