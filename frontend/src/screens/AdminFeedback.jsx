@@ -121,6 +121,7 @@ export default function AdminFeedback() {
         </div>
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
           <div style={listHead}>
             <span>Datum</span><span>Categorie</span><span>Van</span><span>Status</span><span>Bericht</span>
           </div>
@@ -137,6 +138,7 @@ export default function AdminFeedback() {
             </div>
           ))}
           {items.length === 0 && <div style={{ padding: 24, color: "var(--c-muted)" }}>Nog geen feedback ontvangen.</div>}
+          </div>
         </div>
       )}
 
@@ -271,6 +273,6 @@ function FeedbackDetail({ item, onClose, onStatus, onAnalyzed }) {
 const toggleBtn = { padding: "8px 16px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 700, cursor: "pointer" };
 const toggleOn = { border: "1px solid var(--c-accent)", background: "var(--c-accent)", color: "#fff" };
 const catPill = { fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".03em" };
-const listHead = { display: "grid", gridTemplateColumns: "90px 90px 180px 120px 1fr", gap: 12, padding: "12px 16px", fontSize: 11.5, fontWeight: 700, color: "var(--c-muted)", textTransform: "uppercase", letterSpacing: ".04em", borderBottom: "1px solid var(--c-border)" };
-const listRow = { display: "grid", gridTemplateColumns: "90px 90px 180px 120px 1fr", gap: 12, padding: "12px 16px", alignItems: "center", borderBottom: "1px solid var(--c-border-soft)", cursor: "pointer" };
+const listHead = { display: "grid", gridTemplateColumns: "90px 90px 180px 120px 1fr", minWidth: 720, gap: 12, padding: "12px 16px", fontSize: 11.5, fontWeight: 700, color: "var(--c-muted)", textTransform: "uppercase", letterSpacing: ".04em", borderBottom: "1px solid var(--c-border)" };
+const listRow = { display: "grid", gridTemplateColumns: "90px 90px 180px 120px 1fr", minWidth: 720, gap: 12, padding: "12px 16px", alignItems: "center", borderBottom: "1px solid var(--c-border-soft)", cursor: "pointer" };
 const statusSelect = { height: 36, padding: "0 10px", borderRadius: 9, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13, fontWeight: 600, fontFamily: "inherit" };

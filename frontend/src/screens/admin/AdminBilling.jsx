@@ -152,7 +152,7 @@ export default function AdminBilling() {
           <div style={{ display: "grid", placeItems: "center", padding: 30 }}><div className="spin" /></div>
         ) : (
           <form onSubmit={save}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="split-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {FIELDS.map(([key, label, ph]) => (
                 <label key={key} style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 12.5, fontWeight: 700, gridColumn: key === "address" || key === "company_name" ? "1 / -1" : "auto" }}>
                   {label}

@@ -45,6 +45,8 @@ export default function Admin() {
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
   const [tab, setTab] = useState("klanten"); // 'klanten' | 'feedback'
+  const [drawer, setDrawer] = useState(false);
+  const pick = (key) => { setTab(key); setDrawer(false); };
 
   const reload = () => api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
 
@@ -59,8 +61,9 @@ export default function Admin() {
 
   return (
     <div style={{ height: "100vh", display: "flex", background: "var(--c-page)", color: "var(--c-ink)" }}>
-      {/* admin sidebar */}
-      <div style={sidebar}>
+      <div className={`app-scrim no-print${drawer ? " show" : ""}`} onClick={() => setDrawer(false)} />
+      {/* admin sidebar: op mobiel een inschuifbare drawer (zelfde patroon als het dashboard) */}
+      <div className={`app-sidebar no-print${drawer ? " open" : ""}`} style={{ background: "var(--c-sidebar)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
           <div className="display" style={{ fontSize: 20 }}>kompas</div>
@@ -76,7 +79,7 @@ export default function Admin() {
             ["pakketten", "Pakketten & facturatie", IcDoc],
             ["activiteit", "Activiteitenlog", IcDoc],
           ].map(([key, label, Icon]) => (
-            <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => setTab(key)}>
+            <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => pick(key)}>
               <Icon s={18} />{label}
             </div>
           ))}
@@ -95,8 +98,8 @@ export default function Admin() {
 
       {/* main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
-        <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
+        <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} onMenu={() => setDrawer(true)} />
+        <div className="dash-content" style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
           {tab === "feedback" ? <AdminFeedback />
             : tab === "gebruikers" ? <AdminUsers meEmail={me.email} />
             : tab === "koppelingen" ? <AdminConnections />
@@ -123,6 +126,7 @@ export default function Admin() {
           </div>
 
           <div className="card" style={{ overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
             <div style={{ ...headRow }}>
               <span>Klant</span><span>Gekoppelde tools</span><span>Status</span><span>Laatste sync</span><span>Proefperiode</span>
             </div>
@@ -147,6 +151,7 @@ export default function Admin() {
               );
             })}
             {orgs && orgs.length === 0 && <div style={{ padding: 24, color: "var(--c-muted)" }}>Nog geen organisaties.</div>}
+            </div>
           </div>
 
           <ModelDiagnostics />
@@ -361,13 +366,12 @@ function TrialCell({ org, onChanged }) {
   );
 }
 
-const sidebar = { width: 240, background: "var(--c-sidebar)", borderRight: "1px solid var(--c-border)", display: "flex", flexDirection: "column", flex: "none" };
 const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "var(--c-muted)", textTransform: "uppercase", margin: "8px 0 6px 8px" };
 const navActive = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
-const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", margin: "12px 0 6px" };
 const inp = { width: "100%", height: 44, padding: "0 14px", fontSize: 14, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", boxSizing: "border-box" };
