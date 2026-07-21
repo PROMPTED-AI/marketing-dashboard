@@ -518,3 +518,57 @@ def delete_dashboard(
                     "UPDATE dashboards SET is_default = true WHERE id = %s", (nxt[0],)
                 )
     return True
+
+
+# ------------------------------------------------------------------ feedback
+
+def create_feedback(
+    organization_id: str | None, user_email: str, category: str,
+    message: str, page: str | None = None, severity: str | None = None,
+) -> dict:
+    fid = str(uuid.uuid4())
+    with db.get_conn() as conn:
+        conn.execute(
+            "INSERT INTO feedback (id, organization_id, user_email, category, "
+            "message, page, severity) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (fid, organization_id, user_email, category, message, page, severity),
+        )
+    return {"id": fid}
+
+
+def _feedback_row(row) -> dict:
+    return {
+        "id": row[0], "organization_id": row[1], "org_name": row[2],
+        "user_email": row[3], "category": row[4], "message": row[5],
+        "page": row[6], "severity": row[7], "status": row[8],
+        "ai_analysis": row[9], "created_at": row[10],
+    }
+
+
+_FEEDBACK_SELECT = (
+    "SELECT f.id, f.organization_id, o.name, f.user_email, f.category, "
+    "f.message, f.page, f.severity, f.status, f.ai_analysis, f.created_at "
+    "FROM feedback f LEFT JOIN organizations o ON o.id = f.organization_id "
+)
+
+
+def list_feedback() -> list[dict]:
+    with db.get_conn() as conn:
+        rows = conn.execute(_FEEDBACK_SELECT + "ORDER BY f.created_at DESC").fetchall()
+    return [_feedback_row(r) for r in rows]
+
+
+def get_feedback(feedback_id: str) -> dict | None:
+    with db.get_conn() as conn:
+        row = conn.execute(_FEEDBACK_SELECT + "WHERE f.id = %s", (feedback_id,)).fetchone()
+    return _feedback_row(row) if row else None
+
+
+def set_feedback_status(feedback_id: str, status: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE feedback SET status = %s WHERE id = %s", (status, feedback_id))
+
+
+def set_feedback_analysis(feedback_id: str, analysis: str) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE feedback SET ai_analysis = %s WHERE id = %s", (analysis, feedback_id))

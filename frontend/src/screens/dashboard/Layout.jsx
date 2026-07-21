@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import Sidebar from "../../components/Sidebar.jsx";
 import Topbar from "../../components/Topbar.jsx";
+import FeedbackButton from "../../components/FeedbackButton.jsx";
 import { useMe } from "../../lib/useMe.jsx";
 import { useConnections } from "../../lib/useConnections.jsx";
 
@@ -33,6 +34,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </div>
+      <FeedbackButton />
     </div>
   );
 }
