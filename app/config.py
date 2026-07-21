@@ -30,6 +30,10 @@ PLACEHOLDER_PROVIDERS = []
 # een 400. De Qwen3-serie ondersteunt dit; default is "qwen3-32b" (meertalig,
 # goede prijs/kwaliteit). Groter kan met "qwen3.5-122b-a10b".
 EUROUTER_API_KEY = os.environ.get("EUROUTER_API_KEY", "")
+
+# Foutbewaking (optioneel): zet SENTRY_DSN om onafgevangen fouten naar Sentry
+# te sturen. Zonder DSN gebeurt er niets en blijft alles zoals het was.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 EUROUTER_MODEL = os.environ.get("EUROUTER_MODEL", "qwen3-32b")
 EUROUTER_BASE_URL = os.environ.get("EUROUTER_BASE_URL", "https://api.eurouter.ai/api/v1")
 
