@@ -283,24 +283,6 @@ def me(request: Request):
     }
 
 
-@app.post("/api/subscription/stop-trial")
-def stop_own_trial(request: Request):
-    """De gebruiker trekt de proefperiode van de eigen organisatie per direct in.
-
-    Daarna toont de app het verloopscherm; heractiveren kan alleen via de
-    agency admin. Werkt alleen zolang er echt een lopende proefperiode is.
-    """
-    user = auth.current_user(request)
-    org = models.get_organization(user["organization_id"])
-    sub = models.subscription_info(org)
-    if sub["plan"] != "trial":
-        raise HTTPException(status_code=400, detail="Deze organisatie heeft geen lopende proefperiode.")
-    if sub["expired"]:
-        raise HTTPException(status_code=400, detail="De proefperiode is al verlopen.")
-    models.stop_trial(org["id"])
-    return {"subscription": models.subscription_info(models.get_organization(org["id"]))}
-
-
 class PasswordLoginIn(BaseModel):
     email: str
     password: str
