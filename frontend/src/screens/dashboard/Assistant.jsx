@@ -162,6 +162,11 @@ export default function Assistant() {
           else if (ev.type === "error") { answer += (answer ? "\n\n" : "") + ev.message; updateLast({ content: answer }); }
         }
       }
+      // Vangnet: stream klaar maar geen tekst ontvangen. Zonder dit blijft de
+      // bubbel eeuwig op "denkt na" staan (gezien bij vervolgvragen).
+      if (!answer) {
+        updateLast({ content: "Ik kreeg geen antwoord terug van het taalmodel. Stel je vraag nog een keer, eventueel iets anders geformuleerd." });
+      }
     } catch (e) {
       updateLast({ content: answer || `Er ging iets mis: ${e.message}` });
     } finally {

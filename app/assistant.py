@@ -271,6 +271,27 @@ def _run_tool_loop(client, model, convo, execute, state):
                 "content": execute(c["name"], args),
             })
 
+    # Vangnet: eindigde de loop zonder één stukje antwoordtekst (het model bleef
+    # tools aanroepen tot de limiet, of gaf een lege completion), forceer dan een
+    # afronding zonder tools. Zonder dit vangnet eindigt de stream stil en blijft
+    # de gebruiker naar "denkt na" kijken; dit trad op bij vervolgvragen.
+    if not state["text"]:
+        log.warning("assistant: tool-loop eindigde zonder tekst (model=%s); afronding geforceerd", model)
+        closing = convo + [{
+            "role": "user",
+            "content": "Formuleer nu je definitieve antwoord op basis van de al opgehaalde gegevens hierboven. Roep geen tools meer aan.",
+        }]
+        stream = client.chat.completions.create(
+            model=model, messages=closing, max_tokens=1500, stream=True,
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if getattr(delta, "content", None):
+                state["text"] = True
+                yield _sse("text", text=delta.content)
+
 
 def _run_context_mode(client, model, system, messages, gather_context):
     """Tool-loze modus voor modellen zonder function-calling.
