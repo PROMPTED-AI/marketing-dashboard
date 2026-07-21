@@ -73,6 +73,24 @@ def init_schema() -> None:
             "ALTER TABLE organizations "
             "ADD COLUMN IF NOT EXISTS business_type TEXT NOT NULL DEFAULT 'leadgen'"
         )
+        # Abonnement: nieuwe organisaties starten met een proefperiode van 14
+        # dagen ('trial' + trial_ends_at); 'active' is betaald/onbeperkt. De
+        # kolommen krijgen default 'trial', maar organisaties die vóór deze
+        # migratie bestonden (trial_ends_at IS NULL) worden actief gezet zodat
+        # bestaande klanten nooit opeens buitengesloten raken. Idempotent:
+        # elke echte trial-org heeft altijd een einddatum.
+        conn.execute(
+            "ALTER TABLE organizations "
+            "ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'trial'"
+        )
+        conn.execute(
+            "ALTER TABLE organizations "
+            "ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ"
+        )
+        conn.execute(
+            "UPDATE organizations SET plan = 'active' "
+            "WHERE plan = 'trial' AND trial_ends_at IS NULL"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/ThemeProvider.jsx";
+import { useMe } from "../lib/useMe.jsx";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../lib/PeriodProvider.jsx";
 import { api } from "../lib/api.js";
@@ -96,6 +97,8 @@ function NotificationBell() {
 // `onMenu` opens the mobile navigation drawer (button only shows on mobile).
 export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true, onMenu }) {
   const { theme, toggle } = useTheme();
+  const { me } = useMe();
+  const sub = me?.subscription;
   return (
     <div style={bar} className="no-print dash-topbar">
       {onMenu && (
@@ -112,6 +115,11 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
         </div>
       )}
       <div style={{ flex: 1 }} />
+      {sub?.plan === "trial" && !sub.expired && (
+        <span className="pill accent hide-mobile" title="Neem contact op voor een betaald abonnement" style={{ fontSize: 12 }}>
+          Proefperiode · nog {sub.days_left} {sub.days_left === 1 ? "dag" : "dagen"}
+        </span>
+      )}
       {showDateRange && <DateRangePicker />}
       <button className="icon-btn" style={iconBtn} onClick={toggle} title="thema wisselen">
         {theme === "dark" ? <IcSun s={17} /> : <IcMoon s={17} />}

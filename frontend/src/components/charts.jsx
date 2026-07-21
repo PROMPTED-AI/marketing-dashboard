@@ -123,27 +123,46 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
 // kier of een overlappend hapje bij 12 uur geeft. Alleen labels tonen `pct`.
 export function Donut({ segments = [], centerTop, centerSub, size = 160 }) {
   const [active, setActive] = useState(null);
-  const r = 70, C = 2 * Math.PI * r;
+  const r = 70;
   const weight = (s) => Math.max(0, s.value ?? s.sessions ?? s.pct ?? 0);
   const total = segments.reduce((a, s) => a + weight(s), 0) || 1;
-  let offset = 0;
   const seg = active != null ? segments[active] : null;
+
+  // Elke boog is een expliciet pad tussen exact berekende hoeken. De eerdere
+  // stroke-dasharray-truc rondde per browser nét anders af (vooral Safari met
+  // dashoffset op een geroteerde groep), waardoor het laatste segment soms
+  // over 12 uur heen stak. Paden hebben die afronding niet.
+  const pt = (frac) => {
+    const a = 2 * Math.PI * frac - Math.PI / 2; // start bovenaan, met de klok mee
+    return [90 + r * Math.cos(a), 90 + r * Math.sin(a)];
+  };
+  let acc = 0;
+  const arcs = segments.map((s) => {
+    const f0 = acc / total;
+    acc += weight(s);
+    return { f0, f1: acc / total };
+  });
+
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
       <svg width={size} height={size} viewBox="0 0 180 180">
-        <g transform="rotate(-90 90 90)">
-          {segments.map((s, i) => {
-            const dash = (weight(s) / total) * C;
-            const el = (
-              <circle key={i} cx="90" cy="90" r={r} fill="none"
-                style={{ stroke: PALETTE[i % PALETTE.length], cursor: "pointer", opacity: active == null || active === i ? 1 : 0.35, transition: "opacity .12s" }}
-                strokeWidth={active === i ? 26 : 22} strokeDasharray={`${dash} ${Math.max(0, C - dash)}`} strokeDashoffset={-offset}
-                onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)} />
-            );
-            offset += dash;
-            return el;
-          })}
-        </g>
+        {segments.map((s, i) => {
+          const { f0, f1 } = arcs[i];
+          if (f1 - f0 <= 0) return null; // leeg segment: niets tekenen
+          const common = {
+            fill: "none",
+            style: { stroke: PALETTE[i % PALETTE.length], cursor: "pointer", opacity: active == null || active === i ? 1 : 0.35, transition: "opacity .12s" },
+            strokeWidth: active === i ? 26 : 22,
+            onMouseEnter: () => setActive(i),
+            onMouseLeave: () => setActive(null),
+          };
+          // Een (vrijwel) volledige cirkel kan niet als één boogpad; teken die als cirkel.
+          if (f1 - f0 >= 0.9999) return <circle key={i} cx="90" cy="90" r={r} {...common} />;
+          const [x0, y0] = pt(f0);
+          const [x1, y1] = pt(f1);
+          const large = f1 - f0 > 0.5 ? 1 : 0;
+          return <path key={i} d={`M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`} {...common} />;
+        })}
       </svg>
       <div style={{ position: "absolute", textAlign: "center", maxWidth: size - 44, pointerEvents: "none" }}>
         {seg ? (
