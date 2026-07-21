@@ -81,6 +81,7 @@ export default function AdminConnections() {
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
         <div style={head}>
           <span>Klant</span><span>Kanaal</span><span>Account</span><span>Status</span><span>Laatste sync</span><span />
         </div>
@@ -119,11 +120,12 @@ export default function AdminConnections() {
           );
         })}
         {shown.length === 0 && <div style={{ padding: 24, color: "var(--c-muted)" }}>Geen koppelingen in deze selectie.</div>}
+        </div>
       </div>
     </div>
   );
 }
 
 const cols = "1.5fr 1.1fr 1.5fr 0.9fr 0.9fr 0.6fr";
-const head = { display: "grid", gridTemplateColumns: cols, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const row = { display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const head = { display: "grid", gridTemplateColumns: cols, minWidth: 820, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const row = { display: "grid", gridTemplateColumns: cols, minWidth: 820, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };

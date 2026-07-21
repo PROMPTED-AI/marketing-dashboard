@@ -37,6 +37,7 @@ export default function AdminUsers({ meEmail }) {
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
         <div style={head}>
           <span>Gebruiker</span><span>Organisatie</span><span>Aangemaakt</span><span>Login</span><span>Rol</span>
         </div>
@@ -64,12 +65,13 @@ export default function AdminUsers({ meEmail }) {
           </div>
         ))}
         {users.length === 0 && <div style={{ padding: 24, color: "var(--c-muted)" }}>Nog geen gebruikers.</div>}
+        </div>
       </div>
     </div>
   );
 }
 
 const cols = "2fr 1.6fr 0.9fr 0.8fr 1fr";
-const head = { display: "grid", gridTemplateColumns: cols, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const row = { display: "grid", gridTemplateColumns: cols, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const head = { display: "grid", gridTemplateColumns: cols, minWidth: 760, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const row = { display: "grid", gridTemplateColumns: cols, minWidth: 760, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
 const roleSelect = { height: 34, padding: "0 10px", borderRadius: 9, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit" };
