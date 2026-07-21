@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { LOGOUT_URL } from "../lib/api.js";
+import { invalidateAll } from "../lib/swr.js";
 import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
@@ -127,7 +128,7 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
             <a
               href={LOGOUT_URL}
               style={menuItem}
-              onClick={() => ["kompas-onboarded", "kompas-property", "kompas-gsc-site"].forEach((k) => localStorage.removeItem(k))}
+              onClick={() => { invalidateAll(); ["kompas-onboarded", "kompas-property", "kompas-gsc-site"].forEach((k) => localStorage.removeItem(k)); }}
             >
               Uitloggen
             </a>
