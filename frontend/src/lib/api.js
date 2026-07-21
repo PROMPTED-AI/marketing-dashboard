@@ -8,7 +8,11 @@ export async function api(path, opts = {}) {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    const err = new Error(text || `HTTP ${res.status}`);
+    // FastAPI stuurt fouten als {"detail": "..."}; toon de leesbare boodschap
+    // in plaats van de rauwe JSON.
+    let msg = text || `HTTP ${res.status}`;
+    try { msg = JSON.parse(msg).detail || msg; } catch { /* platte tekst */ }
+    const err = new Error(msg);
     err.status = res.status;
     throw err;
   }
