@@ -65,6 +65,8 @@ jobs:
         run: |
           npm ci
           npm run build
+          # static_spa staat in .gitignore en ontbreekt in een verse checkout.
+          mkdir -p ../app/static_spa
           rm -rf ../app/static_spa/assets
           cp -r dist/* ../app/static_spa/
 
