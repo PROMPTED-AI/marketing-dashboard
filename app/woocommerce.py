@@ -35,7 +35,17 @@ _REVENUE_STATUSES = {"completed", "processing"}
 
 
 class WooError(Exception):
-    """Nette foutmelding voor de UI (ongeldige URL, auth mislukt, ...)."""
+    """Nette foutmelding voor de UI (ongeldige URL, auth mislukt, ...).
+
+    `auth=True` betekent: de winkel heeft de sleutel echt geweigerd (401/403).
+    Alleen dan mag de koppeling op 'revoked' worden gezet; alle andere fouten
+    (onbereikbaar, redirect, onverwacht antwoord) kunnen tijdelijk zijn en
+    mogen een werkende koppeling niet 'ontkoppelen'.
+    """
+
+    def __init__(self, message: str, auth: bool = False):
+        super().__init__(message)
+        self.auth = auth
 
 
 # ------------------------------------------------------------------ SSRF-guard
@@ -122,7 +132,7 @@ def _fetch_orders(store_url: str, ck: str, cs: str, start: str, end: str) -> lis
             },
         )
         if resp.status_code in (401, 403):
-            raise WooError("WooCommerce weigert de sleutel - controleer key/secret en leesrechten.")
+            raise WooError("WooCommerce weigert de sleutel - controleer key/secret en leesrechten.", auth=True)
         resp.raise_for_status()
         batch = resp.json()
         if not isinstance(batch, list):
@@ -142,7 +152,7 @@ def test_connection(store_url: str, ck: str, cs: str) -> None:
     except requests.RequestException as exc:
         raise WooError("Kan de winkel niet bereiken - controleer de URL.") from exc
     if resp.status_code in (401, 403):
-        raise WooError("WooCommerce weigert de sleutel - controleer key/secret en leesrechten.")
+        raise WooError("WooCommerce weigert de sleutel - controleer key/secret en leesrechten.", auth=True)
     if resp.status_code == 404:
         raise WooError("Geen WooCommerce REST API gevonden op dit adres.")
     resp.raise_for_status()
