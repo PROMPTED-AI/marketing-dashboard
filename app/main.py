@@ -656,9 +656,19 @@ def organizations(request: Request):
     user = auth.current_user(request)
     if user["role"] == "agency_admin":
         orgs = models.list_organizations_with_connections()
-        return {"organizations": [{"id": o["id"], "name": o["name"], "domain": o["domain"], "business_type": o.get("business_type")} for o in orgs]}
+        # subscription gaat mee zodat de app bij het wisselen naar een klant
+        # met een verlopen proefperiode hetzelfde verloopscherm kan tonen dat
+        # de klant zelf ziet.
+        return {"organizations": [
+            {"id": o["id"], "name": o["name"], "domain": o["domain"],
+             "business_type": o.get("business_type"), "subscription": o.get("subscription")}
+            for o in orgs
+        ]}
     org = models.get_organization(user["organization_id"])
-    return {"organizations": [{"id": org["id"], "name": org["name"], "domain": org["domain"], "business_type": org.get("business_type")}] if org else []}
+    return {"organizations": [
+        {"id": org["id"], "name": org["name"], "domain": org["domain"],
+         "business_type": org.get("business_type"), "subscription": models.subscription_info(org)}
+    ] if org else []}
 
 
 @app.get("/api/analytics/properties")

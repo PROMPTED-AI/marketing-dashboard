@@ -5,10 +5,12 @@ const CONTACT_EMAIL = "info@prompted-ai.nl";
 
 // Volledig scherm dat het dashboard vervangt zodra de proefperiode van de
 // organisatie is verlopen. De gebruiker kan alleen nog contact opnemen voor
-// een betaalde verlenging of uitloggen; de agency admin ziet dit scherm nooit
-// en beheert de proefperiodes via Klantenbeheer.
-export default function TrialExpired({ me }) {
-  const orgName = me?.organization?.name || "je organisatie";
+// een betaalde verlenging of uitloggen. De agency admin die naar zo'n
+// organisatie overschakelt ziet hetzelfde scherm (zodat duidelijk is wat de
+// klant ervaart), met extra knoppen om als beheerder door te gaan of terug
+// te gaan naar Klantenbeheer.
+export default function TrialExpired({ me, orgName: orgNameProp, isAdmin = false, onContinue }) {
+  const orgName = orgNameProp || me?.organization?.name || "je organisatie";
   const mailto =
     `mailto:${CONTACT_EMAIL}` +
     `?subject=${encodeURIComponent("Verlenging Kompas voor " + orgName)}` +
@@ -26,17 +28,33 @@ export default function TrialExpired({ me }) {
           afgelopen. Je gegevens en koppelingen blijven veilig bewaard. Neem contact met ons op voor een
           betaalde verlenging, dan zetten we je account direct weer aan.
         </div>
-        <a className="btn-primary" href={mailto} style={{ height: 46, padding: "0 24px", textDecoration: "none", width: "100%", boxSizing: "border-box" }}>
-          Neem contact op
-        </a>
-        <div style={{ marginTop: 12 }}>
-          <a className="btn-ghost" href={LOGOUT_URL} style={{ height: 42, padding: "0 20px", textDecoration: "none", width: "100%", boxSizing: "border-box" }}>
-            Uitloggen
-          </a>
-        </div>
-        <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginTop: 18 }}>
-          Of mail ons direct via {CONTACT_EMAIL}
-        </div>
+        {isAdmin ? (
+          <>
+            <div className="pill accent" style={{ marginBottom: 14 }}>Dit is wat de klant nu ziet</div>
+            <button className="btn-primary" onClick={onContinue} style={{ height: 46, padding: "0 24px", width: "100%", boxSizing: "border-box" }}>
+              Doorgaan als beheerder
+            </button>
+            <div style={{ marginTop: 12 }}>
+              <a className="btn-ghost" href="/admin" style={{ height: 42, padding: "0 20px", textDecoration: "none", width: "100%", boxSizing: "border-box" }}>
+                Naar Klantenbeheer
+              </a>
+            </div>
+          </>
+        ) : (
+          <>
+            <a className="btn-primary" href={mailto} style={{ height: 46, padding: "0 24px", textDecoration: "none", width: "100%", boxSizing: "border-box" }}>
+              Neem contact op
+            </a>
+            <div style={{ marginTop: 12 }}>
+              <a className="btn-ghost" href={LOGOUT_URL} style={{ height: 42, padding: "0 20px", textDecoration: "none", width: "100%", boxSizing: "border-box" }}>
+                Uitloggen
+              </a>
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginTop: 18 }}>
+              Of mail ons direct via {CONTACT_EMAIL}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
