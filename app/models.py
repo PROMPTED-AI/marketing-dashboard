@@ -80,7 +80,7 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed "
+            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed, website, industry "
             "FROM organizations WHERE id = %s",
             (org_id,),
         ).fetchone()
@@ -89,11 +89,40 @@ def get_organization(org_id: str) -> dict | None:
             "id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3],
             "business_type": row[4], "plan": row[5],
             "trial_ends_at": row[6].isoformat() if row[6] else None,
-            "managed": row[7],
+            "managed": row[7], "website": row[8], "industry": row[9],
         }
         if row
         else None
     )
+
+
+def set_org_profile(org_id: str, name: str | None = None,
+                    website: str | None = None, industry: str | None = None) -> dict | None:
+    """Werk het bedrijfsprofiel bij (alleen meegegeven velden). Lege naam wordt genegeerd."""
+    sets, params = [], []
+    if name is not None and name.strip():
+        sets.append("name = %s"); params.append(name.strip()[:200])
+    if website is not None:
+        sets.append("website = %s"); params.append(website.strip()[:300] or None)
+    if industry is not None:
+        sets.append("industry = %s"); params.append(industry.strip()[:120] or None)
+    if sets:
+        with db.get_conn() as conn:
+            conn.execute(f"UPDATE organizations SET {', '.join(sets)} WHERE id = %s", (*params, org_id))
+    return get_organization(org_id)
+
+
+def delete_organization(org_id: str) -> None:
+    """Verwijder een organisatie en alles wat eraan hangt (onomkeerbaar).
+
+    Bedoeld om een per ongeluk aangemaakte of overbodige organisatie op te
+    ruimen. De aanroeper controleert de rechten en de vangrails (geen demo,
+    niet de eigen organisatie)."""
+    with db.get_conn() as conn:
+        for table in ("framework_values", "org_assets", "billing_details",
+                      "connections", "dashboards", "feedback", "access_tokens", "users"):
+            conn.execute(f"DELETE FROM {table} WHERE organization_id = %s", (org_id,))
+        conn.execute("DELETE FROM organizations WHERE id = %s", (org_id,))
 
 
 # ------------------------------------------------------------------ abonnement
@@ -646,7 +675,7 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed "
+            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed, website, industry "
             "FROM organizations WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
@@ -666,7 +695,7 @@ def list_organizations_with_connections() -> list[dict]:
     assets_by_org = {r[0]: dict(zip(_ASSET_FIELDS, r[1:])) for r in assets}
 
     out = []
-    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed in orgs:
+    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed, website, industry in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -678,6 +707,8 @@ def list_organizations_with_connections() -> list[dict]:
                 "name": name,
                 "domain": domain,
                 "business_type": business_type,
+                "website": website,
+                "industry": industry,
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,

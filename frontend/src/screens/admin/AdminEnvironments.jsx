@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, linkAgency, availableAssets, getOrgAssets, setOrgAssets } from "../../lib/api.js";
+import { api, linkAgency, availableAssets, getOrgAssets, setOrgAssets, deleteOrganization } from "../../lib/api.js";
 
 // Omgevingen: het bureau-model. Het bureau logt in met één manageraccount en
 // richt per bedrijf een omgeving in — de bureau-koppeling wordt hergebruikt en
@@ -10,8 +10,17 @@ export default function AdminEnvironments() {
   const [error, setError] = useState(null);
   const [edit, setEdit] = useState(null); // org waarvan de omgeving wordt ingericht
 
+  const [busyDel, setBusyDel] = useState(null);
   const reload = () => api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
   useEffect(() => { reload(); }, []);
+
+  const remove = async (o) => {
+    if (!window.confirm(`Organisatie "${o.name}" definitief verwijderen? Alle koppelingen, dashboards en gebruikers ervan gaan verloren.`)) return;
+    setBusyDel(o.id);
+    try { await deleteOrganization(o.id); reload(); }
+    catch (e) { setError(e); }
+    finally { setBusyDel(null); }
+  };
 
   if (error) return <div className="card" style={{ padding: 20, color: "var(--c-neg)" }}>Fout: {String(error.message || error)}</div>;
   if (orgs === null) return <div style={{ display: "grid", placeItems: "center", padding: 60 }}><div className="spin" /></div>;
@@ -39,8 +48,12 @@ export default function AdminEnvironments() {
                 <div><div style={{ fontWeight: 700 }}>{o.name}</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>{o.domain}</div></div>
                 <span>{o.managed ? <span className="pill accent">bureau-omgeving</span> : <span className="pill muted">eigen koppeling</span>}</span>
                 <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{assigned.length ? assigned.join(" · ") : "—"}</span>
-                <span style={{ textAlign: "right" }}>
+                <span style={{ textAlign: "right", display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button className="btn-ghost" style={{ height: 32, padding: "0 13px", fontSize: 12.5 }} onClick={() => setEdit(o)}>Inrichten</button>
+                  <button className="btn-ghost" disabled={busyDel === o.id} onClick={() => remove(o)}
+                    title="Verwijder deze organisatie definitief" style={{ height: 32, padding: "0 11px", fontSize: 12.5, color: "var(--c-neg)" }}>
+                    {busyDel === o.id ? "…" : "Verwijderen"}
+                  </button>
                 </span>
               </div>
             );

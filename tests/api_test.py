@@ -271,6 +271,29 @@ def test_agency_environments(admin):
     print("bureau-omgevingen: hergebruik, toewijzen, afdwinging en autorisatie slagen")
 
 
+def test_org_profile_and_delete(admin, tk_org_id, demo_org_id):
+    """Bedrijfsprofiel instellen/bewerken, publiek-domein-blokkade en verwijderen."""
+    # Klant stelt eigen bedrijfsprofiel in (naam los van e-mailadres).
+    tk = login("test@testklant.nl", "test123")
+    r = tk.patch(f"{BASE}/api/organizations/me/profile",
+                 json={"name": "Testklant B.V.", "website": "https://testklant.nl", "industry": "mode"})
+    assert r.status_code == 200 and r.json()["organization"]["website"] == "https://testklant.nl", r.text
+    assert tk.get(f"{BASE}/api/me").json()["organization"]["name"] == "Testklant B.V."
+    # Admin bewerkt profiel van een klant-org.
+    assert admin.patch(f"{BASE}/api/organizations/{tk_org_id}",
+                       json={"name": "Testklant", "industry": "horeca"}).status_code == 200
+    # Publiek e-maildomein kan niet als klant worden toegevoegd.
+    assert admin.post(f"{BASE}/api/admin/organizations", json={"name": "X", "domain": "gmail.com"}).status_code == 400
+    # Verwijderen met cascade: maak een losse org, hang er data aan, verwijder.
+    stray = admin.post(f"{BASE}/api/admin/organizations", json={"name": "Stray", "domain": "stray-test.nl"}).json()["organization"]
+    assert admin.delete(f"{BASE}/api/admin/organizations/{stray['id']}").status_code == 200
+    assert admin.get(f"{BASE}/api/admin/organizations/{stray['id']}/assets").json()["managed"] is False
+    # Vangrails: demo en klant-403.
+    assert admin.delete(f"{BASE}/api/admin/organizations/{demo_org_id}").status_code == 400
+    assert tk.delete(f"{BASE}/api/admin/organizations/{tk_org_id}").status_code == 403
+    print("bedrijfsprofiel + verwijderen: eigen/admin-profiel, publiek-domein-blokkade en vangrails slagen")
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -284,6 +307,7 @@ if __name__ == "__main__":
     admin = login("admin@prompted-ai.nl", "admin123")
     orgs = admin.get(f"{BASE}/api/admin/organizations").json()["organizations"]
     tk_org_id = next(o["id"] for o in orgs if o["domain"] == "testklant.nl")
+    demo_org_id = next(o["id"] for o in orgs if o["domain"] == "janssen.nl")
 
     test_demo_basics(demo)
     test_feedback_analysis(demo, admin)
@@ -296,5 +320,6 @@ if __name__ == "__main__":
     test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
     test_agency_environments(admin)
+    test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

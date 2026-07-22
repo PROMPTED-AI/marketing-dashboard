@@ -53,6 +53,27 @@ def admin_add_organization(request: Request, payload: OrgIn):
     return {"organization": org}
 
 
+@router.delete("/api/admin/organizations/{org_id}")
+def admin_delete_organization(request: Request, org_id: str):
+    """Verwijder een organisatie en alles wat eraan hangt (alleen agency admin).
+
+    Vangrails: niet het demo-account en niet je eigen organisatie. Bedoeld om
+    een per ongeluk aangemaakte of overbodige organisatie (zoals een verkeerd
+    toegevoegd publiek domein) op te ruimen.
+    """
+    admin = auth.require_admin(request)
+    org = models.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    if org.get("is_demo"):
+        raise HTTPException(status_code=400, detail="Het demo-account kan niet verwijderd worden.")
+    if org_id == admin["organization_id"]:
+        raise HTTPException(status_code=400, detail="Je kunt je eigen organisatie niet verwijderen.")
+    cache.invalidate_org(org_id)
+    models.delete_organization(org_id)
+    return {"ok": True}
+
+
 class TrialIn(BaseModel):
     action: str  # extend | stop | activate | restart
     days: int = models.TRIAL_DAYS

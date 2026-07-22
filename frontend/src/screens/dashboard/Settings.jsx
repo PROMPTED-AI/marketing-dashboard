@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, setBusinessType } from "../../lib/api.js";
+import { api, setOwnProfile } from "../../lib/api.js";
 import { useMe } from "../../lib/useMe.jsx";
 import { useTheme } from "../../lib/ThemeProvider.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
@@ -90,6 +90,8 @@ const BIZ_TYPES = [
 
 function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
   const [name, setName] = useState(org?.name || "");
+  const [website, setWebsite] = useState(org?.website || "");
+  const [industry, setIndustry] = useState(org?.industry || "");
   const [bizType, setBizType] = useState(org?.business_type || "leadgen");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -99,27 +101,29 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
   const orgKey = org?.id;
   const [seenKey, setSeenKey] = useState(orgKey);
   if (orgKey !== seenKey) {
-    setSeenKey(orgKey); setName(org?.name || ""); setBizType(org?.business_type || "leadgen");
+    setSeenKey(orgKey); setName(org?.name || ""); setWebsite(org?.website || "");
+    setIndustry(org?.industry || ""); setBizType(org?.business_type || "leadgen");
     setDone(false); setErr(null);
   }
 
-  const nameDirty = isAdmin && name.trim() && name.trim() !== (org?.name || "");
-  const bizDirty = bizType !== (org?.business_type || "leadgen");
-  const dirty = nameDirty || bizDirty;
+  const dirty =
+    (name.trim() && name.trim() !== (org?.name || "")) ||
+    website !== (org?.website || "") ||
+    industry !== (org?.industry || "") ||
+    bizType !== (org?.business_type || "leadgen");
 
   const save = async () => {
     setBusy(true); setErr(null); setDone(false);
+    const payload = { name: name.trim() || org?.name, website: website.trim(), industry: industry.trim(), business_type: bizType };
     try {
+      // Admin bewerkt de actieve (mogelijk andere) organisatie via het
+      // admin-endpoint; een klant bewerkt uitsluitend de eigen organisatie.
       if (isAdmin) {
-        // Admins may edit any client org: name + type via the admin endpoint.
         await api(`/api/organizations/${orgId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim() || org?.name, business_type: bizType }),
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });
-      } else if (bizDirty) {
-        // A client may set its own organization's profile (least-privilege).
-        await setBusinessType(bizType);
+      } else {
+        await setOwnProfile(payload);
       }
       setDone(true);
       onSaved();
@@ -132,13 +136,12 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
 
   return (
     <SectionCard title="organisatie">
-      <label style={lbl}>Naam</label>
-      <input
-        value={name}
-        onChange={(e) => { setName(e.target.value); setDone(false); }}
-        disabled={!isAdmin}
-        style={{ ...inp, opacity: isAdmin ? 1 : 0.7 }}
-      />
+      <label style={lbl}>Bedrijfsnaam</label>
+      <input value={name} onChange={(e) => { setName(e.target.value); setDone(false); }} placeholder="Bedrijfsnaam" style={inp} />
+      <label style={lbl}>Website</label>
+      <input value={website} onChange={(e) => { setWebsite(e.target.value); setDone(false); }} placeholder="https://jouwbedrijf.nl" style={inp} />
+      <label style={lbl}>Branche</label>
+      <input value={industry} onChange={(e) => { setIndustry(e.target.value); setDone(false); }} placeholder="Bijvoorbeeld: mode, horeca, dienstverlening" style={inp} />
       <label style={lbl}>E-maildomein</label>
       <input value={org?.domain || ""} disabled style={{ ...inp, opacity: 0.7 }} />
       <label style={lbl}>Bedrijfstype</label>
@@ -152,7 +155,6 @@ function OrganisationCard({ isAdmin, org, orgId, onSaved }) {
       <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8 }}>
         Bepaalt welke dashboards en KPI's standaard vooraan staan (leadgeneratie of e-commerce).
       </div>
-      {!isAdmin && <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8 }}>Alleen een bureau-admin kan de organisatienaam wijzigen.</div>}
       {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 10 }}>{String(err.message || err)}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
         <button className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: dirty && !busy ? 1 : 0.6 }} disabled={!dirty || busy} onClick={save}>
