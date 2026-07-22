@@ -38,6 +38,25 @@ def _get(path: str, token: str, params: dict | None = None) -> dict:
     return resp.json()
 
 
+def _paged(path: str, token: str, params: dict, cap_pages: int = 20) -> list:
+    """Volg de Graph-paginatie (paging.next) tot een plafond en geef alle rijen.
+
+    Zonder paginatie zag je alleen de eerste 100 accounts/pagina's; een groot
+    partner-account (Business Manager) heeft er vaak meer.
+    """
+    items: list = []
+    data = _get(path, token, params)
+    for _ in range(cap_pages):
+        items.extend(data.get("data", []))
+        nxt = (data.get("paging") or {}).get("next")
+        if not nxt:
+            break
+        resp = requests.get(nxt, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+    return items
+
+
 def _num(v) -> float:
     try:
         return float(v)
@@ -67,38 +86,77 @@ def _daily_series(ins_data: list, mapping: dict) -> list:
 # ----------------------------------------------------------------- assets
 
 
+_ACC_FIELDS = "account_id,name,currency"
+_PAGE_FIELDS = "id,name,instagram_business_account{id,username}"
+
+
 def list_assets(user_token: str) -> dict:
-    """Ad accounts + pages (with linked Instagram) the user can access.
+    """Alle advertentie-accounts + pagina's die de gebruiker kan beheren.
+
+    Naast de direct aan de gebruiker toegewezen assets (me/adaccounts,
+    me/accounts) doorlopen we ook de businesses (Business Manager /
+    partner-account) waar de gebruiker lid van is, en halen daar zowel de
+    eigen als de via partners gedeelde advertentie-accounts en pagina's op.
+    Zo zie je alles onder het partner-account, niet alleen wat rechtstreeks
+    aan jouw persoon is gekoppeld. Alles wordt ontdubbeld op id.
 
     No access tokens are returned to the caller; page tokens are fetched
     server-side at report time.
     """
-    ad_accounts, pages = [], []
+    ad_accounts: dict[str, dict] = {}
+    pages: dict[str, dict] = {}
+
+    def add_account(a: dict) -> None:
+        acc_id = a.get("account_id") or (a.get("id") or "").removeprefix("act_")
+        if not acc_id:
+            return
+        ad_accounts["act_" + acc_id] = {
+            "id": "act_" + acc_id,
+            "account_id": acc_id,
+            "name": a.get("name") or acc_id,
+            "currency": a.get("currency"),
+        }
+
+    def add_page(p: dict) -> None:
+        if not p.get("id"):
+            return
+        ig = p.get("instagram_business_account") or None
+        pages[p["id"]] = {
+            "id": p["id"],
+            "name": p.get("name"),
+            "instagram": ({"id": ig.get("id"), "username": ig.get("username")} if ig else None),
+        }
+
+    def gather(path: str, params: dict, add, label: str) -> None:
+        try:
+            for row in _paged(path, user_token, params):
+                add(row)
+        except Exception as exc:  # noqa: BLE001 - één bron mag de rest niet blokkeren
+            log.info("meta assets %s overslaan: %s", label, exc)
+
+    # 1. Direct aan de gebruiker toegewezen.
+    gather("me/adaccounts", {"fields": _ACC_FIELDS, "limit": 100}, add_account, "me/adaccounts")
+    gather("me/accounts", {"fields": _PAGE_FIELDS, "limit": 100}, add_page, "me/accounts")
+
+    # 2. Via de businesses (partner-account) waar de gebruiker beheerder is.
     try:
-        data = _get("me/adaccounts", user_token,
-                    {"fields": "account_id,name,currency", "limit": 100})
-        for a in data.get("data", []):
-            ad_accounts.append({
-                "id": "act_" + a.get("account_id", ""),
-                "account_id": a.get("account_id"),
-                "name": a.get("name") or a.get("account_id"),
-                "currency": a.get("currency"),
-            })
+        businesses = _paged("me/businesses", user_token, {"fields": "id,name", "limit": 50})
     except Exception as exc:  # noqa: BLE001
-        log.warning("meta list ad accounts failed: %s", exc)
-    try:
-        data = _get("me/accounts", user_token,
-                    {"fields": "id,name,instagram_business_account{id,username}", "limit": 100})
-        for p in data.get("data", []):
-            ig = p.get("instagram_business_account") or None
-            pages.append({
-                "id": p.get("id"),
-                "name": p.get("name"),
-                "instagram": ({"id": ig.get("id"), "username": ig.get("username")} if ig else None),
-            })
-    except Exception as exc:  # noqa: BLE001
-        log.warning("meta list pages failed: %s", exc)
-    return {"ad_accounts": ad_accounts, "pages": pages}
+        log.info("meta list businesses overslaan: %s", exc)
+        businesses = []
+    for biz in businesses:
+        bid = biz.get("id")
+        if not bid:
+            continue
+        for edge in ("owned_ad_accounts", "client_ad_accounts"):
+            gather(f"{bid}/{edge}", {"fields": _ACC_FIELDS, "limit": 100}, add_account, f"{edge}")
+        for edge in ("owned_pages", "client_pages"):
+            gather(f"{bid}/{edge}", {"fields": _PAGE_FIELDS, "limit": 100}, add_page, f"{edge}")
+
+    return {
+        "ad_accounts": sorted(ad_accounts.values(), key=lambda a: (a.get("name") or "").lower()),
+        "pages": sorted(pages.values(), key=lambda p: (p.get("name") or "").lower()),
+    }
 
 
 def _page_token(user_token: str, page_id: str) -> str | None:
