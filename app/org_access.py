@@ -193,6 +193,15 @@ def _wc_creds(org_id: str) -> tuple[str, str, str]:
     return c.get("store_url", ""), c.get("consumer_key", ""), c.get("consumer_secret", "")
 
 
+def _shopify_creds(org_id: str) -> tuple[str, str]:
+    """Load an org's Shopify credentials (shop domain, access token)."""
+    conn = models.get_connection(org_id, provider="shopify")
+    if not conn or conn["status"] != "connected":
+        raise HTTPException(status_code=409, detail="Geen actieve Shopify-koppeling voor deze organisatie")
+    c = conn["creds"]
+    return c.get("shop", ""), c.get("access_token", "")
+
+
 
 def _compact(value, cap: int = 12):
     """Shrink a data payload for the LLM: cap lists, keep it token-cheap."""

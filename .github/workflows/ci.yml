@@ -46,6 +46,10 @@ jobs:
       META_APP_ID: "1234567890"
       META_APP_SECRET: dummy-meta-secret
       META_REDIRECT_URI: http://localhost:8000/api/auth/meta/callback
+      # Dummy Shopify-config zodat de installatieroute zijn echte pad doorloopt.
+      SHOPIFY_API_KEY: dummy-shopify-key
+      SHOPIFY_API_SECRET: dummy-shopify-secret
+      SHOPIFY_REDIRECT_URI: http://localhost:8000/api/auth/shopify/callback
       BASE_URL: http://127.0.0.1:8000
 
     steps:

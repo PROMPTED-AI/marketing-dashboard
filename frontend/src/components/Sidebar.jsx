@@ -7,7 +7,7 @@ import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
   IcStar, IcPlug, IcCog, IcUsers, IcChat, IcGrid, IcDoc,
   IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
-  GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph,
+  GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph, ShopifyGlyph,
 } from "./icons.jsx";
 
 // De sidebar is gegroepeerd: losse items + uitklapbare groepen (Marketing met
@@ -29,6 +29,7 @@ const NAV = [
   {
     group: "Verkoop", Icon: IcCart, children: [
       { to: "/app/woocommerce", label: "WooCommerce", Icon: WooGlyph, provider: "woocommerce" },
+      { to: "/app/shopify", label: "Shopify", Icon: ShopifyGlyph, provider: "shopify" },
     ],
   },
   { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },

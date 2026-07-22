@@ -120,6 +120,14 @@ export function metaLoginUrl(orgId, returnTo = "/app/integrations") {
   return "/api/auth/meta/login?return_to=" + encodeURIComponent(returnTo) + q;
 }
 
+// Shopify koppelt via zijn eigen OAuth-installatieflow; de klant vult zijn
+// shopdomein in en wordt naar het autorisatiescherm van zijn shop gestuurd.
+export function shopifyLoginUrl(shop, orgId, returnTo = "/app/integrations") {
+  const q = orgId ? "&org_id=" + encodeURIComponent(orgId) : "";
+  return "/api/auth/shopify/login?shop=" + encodeURIComponent(shop) +
+    "&return_to=" + encodeURIComponent(returnTo) + q;
+}
+
 // Incremental authorization: connect specific tools for the signed-in user.
 export function connectUrl(providers, returnTo = "/app/integrations") {
   const list = Array.isArray(providers) ? providers : [providers];
