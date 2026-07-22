@@ -6,8 +6,13 @@ als taalmodel, en een database die met tests/seed.py geseed is. De demo-org
 """
 import json
 import os
+import sys
 
 import requests
+
+# Repo-root op het pad zodat losse unit-checks `from app import ...` kunnen doen
+# (bij `python tests/api_test.py` staat alleen tests/ op sys.path).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE = os.environ.get("BASE_URL", "http://127.0.0.1:8000")
 
@@ -164,6 +169,32 @@ def test_meta_data_no_crash():
     print("meta-data: geen 500 bij een falende Graph-call")
 
 
+def test_shopify_flow(demo):
+    """Shopify-installatieroute, strikte domeinvalidatie en 409 zonder koppeling."""
+    r = demo.get(f"{BASE}/api/auth/shopify/login?shop=demoshop.myshopify.com", allow_redirects=False)
+    assert r.status_code in (302, 307), (r.status_code, r.text[:150])
+    assert "demoshop.myshopify.com/admin/oauth/authorize" in r.headers.get("location", ""), r.headers.get("location")
+    # Alleen *.myshopify.com is toegestaan; alles anders wordt geweigerd.
+    assert demo.get(f"{BASE}/api/auth/shopify/login?shop=kwaad.nl", allow_redirects=False).status_code == 400
+    # Rapport zonder koppeling -> 409 (opnieuw koppelen), nooit 500.
+    tk = login("test@testklant.nl", "test123")
+    assert tk.get(f"{BASE}/api/shopify/report?start=2026-06-01&end=2026-06-30").status_code == 409
+    print("shopify: login-redirect, domeinvalidatie en 409 zonder koppeling")
+
+
+def test_shopify_aggregate():
+    """Alleen betaalde orders tellen mee in de Shopify-omzetberekening."""
+    from app import shopify
+    orders = [
+        {"financial_status": "paid", "total_price": "100.00", "created_at": "2026-06-02T10:00:00",
+         "customer": {"id": 1}, "line_items": [{"name": "A", "quantity": 2, "price": "50.00"}]},
+        {"financial_status": "pending", "total_price": "999.00", "created_at": "2026-06-02T10:00:00"},
+    ]
+    k = shopify._aggregate(orders)["kpis"]
+    assert k["revenue"] == 100.0 and k["orders"] == 1 and k["avgOrderValue"] == 100.0 and k["itemsSold"] == 2, k
+    print("shopify-aggregatie: alleen betaalde orders tellen mee")
+
+
 def test_account_flow(admin, tk_org_id):
     invitee = "nieuw@testklant.nl"
     # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
@@ -225,6 +256,8 @@ if __name__ == "__main__":
     test_framework(demo)
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
+    test_shopify_flow(demo)
+    test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

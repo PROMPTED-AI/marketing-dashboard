@@ -53,9 +53,19 @@ META_SCOPES = [
     "instagram_basic", "instagram_manage_insights",
 ]
 
-# WooCommerce koppelt met een consumer key/secret (geen OAuth); de gegevens
-# worden per organisatie versleuteld opgeslagen zoals de andere providers.
-SHOP_PROVIDERS = ["woocommerce"]
+# WooCommerce koppelt met een consumer key/secret (geen OAuth); Shopify koppelt
+# via OAuth (eigen app). De gegevens worden per organisatie versleuteld
+# opgeslagen zoals de andere providers.
+SHOP_PROVIDERS = ["woocommerce", "shopify"]
+
+# Shopify: eigen app (Client ID + secret op de Cloud Run-service, nooit in de
+# repo). De klant koppelt zijn eigen webshop via de OAuth-installatieflow.
+SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
+SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET", "")
+SHOPIFY_REDIRECT_URI = os.environ.get("SHOPIFY_REDIRECT_URI", "")
+# Alleen leesrechten voor de dashboards.
+SHOPIFY_SCOPES = os.environ.get("SHOPIFY_SCOPES", "read_orders,read_products")
+SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10")
 
 # Google Ads needs an approved developer token (set on the Cloud Run service,
 # never in the repo). Optional login_customer_id is the manager (MCC) account id

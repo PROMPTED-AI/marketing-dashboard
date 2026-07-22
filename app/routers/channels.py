@@ -5,6 +5,7 @@ import time
 import uuid
 from datetime import date, timedelta
 
+import requests
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from google.auth.exceptions import RefreshError
@@ -12,12 +13,13 @@ from pydantic import BaseModel
 
 from .. import (
     analytics, assistant, auth, cache, config, demo, google_ads, insights, meta,
-    meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
+    meta_oauth, models, oauth, ratelimit, search_console, shopify, shopify_oauth,
+    woocommerce,
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
     _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _safe_return, _wc_creds,
+    _resolve_org_id, _safe_return, _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -231,6 +233,104 @@ def meta_callback(request: Request):
     models.save_connection(org_id, name, creds, provider="meta_ads")
     cache.invalidate_org(org_id)
     return RedirectResponse(return_to)
+
+
+# --------------------------------------------------------------- shopify
+#
+# Shopify koppelt via de OAuth-installatieflow van de eigen app. De klant vult
+# zijn shopdomein in, wij sturen hem naar het autorisatiescherm van zijn shop,
+# en de callback (met geverifieerde HMAC + state) levert een permanent token.
+
+
+@router.get("/api/auth/shopify/login")
+def shopify_login(request: Request, shop: str, org_id: str | None = None,
+                  return_to: str = "/app/integrations"):
+    if not request.session.get("user_id"):
+        return RedirectResponse("/login")
+    if not shopify_oauth.is_configured():
+        raise HTTPException(status_code=503, detail="Shopify is nog niet geconfigureerd op de server")
+    user = auth.current_user(request)
+    target_org = _resolve_org_id(user, org_id)
+    try:
+        shop = shopify_oauth.normalize_shop(shop)
+    except shopify_oauth.ShopifyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    state = uuid.uuid4().hex
+    request.session["shopify_oauth_state"] = state
+    request.session["shopify_oauth_org"] = target_org
+    request.session["shopify_oauth_shop"] = shop
+    request.session["shopify_oauth_return"] = _safe_return(return_to, "/app/integrations")
+    return RedirectResponse(shopify_oauth.build_install_url(shop, state))
+
+
+@router.get("/api/auth/shopify/callback")
+def shopify_callback(request: Request):
+    params = dict(request.query_params)
+    stored_state = request.session.get("shopify_oauth_state")
+    if not stored_state or stored_state != params.get("state"):
+        raise HTTPException(status_code=400, detail="Ongeldige Shopify OAuth-state")
+    if not shopify_oauth.verify_hmac(params):
+        raise HTTPException(status_code=400, detail="Ongeldige Shopify-handtekening")
+    org_id = request.session.pop("shopify_oauth_org", None)
+    stored_shop = request.session.pop("shopify_oauth_shop", None)
+    return_to = request.session.pop("shopify_oauth_return", "/app/integrations")
+    request.session.pop("shopify_oauth_state", None)
+
+    code = params.get("code")
+    shop = params.get("shop")
+    if not code or not org_id or not shop:
+        return RedirectResponse(return_to)
+    try:
+        shop = shopify_oauth.normalize_shop(shop)
+    except shopify_oauth.ShopifyError:
+        raise HTTPException(status_code=400, detail="Ongeldig Shopify-adres")
+    # De shop in de callback moet dezelfde zijn als waar we naartoe stuurden.
+    if stored_shop and shop != stored_shop:
+        raise HTTPException(status_code=400, detail="Shopify-adres komt niet overeen")
+
+    try:
+        creds = shopify_oauth.exchange_code(shop, code)
+    except (shopify_oauth.ShopifyError, requests.RequestException):
+        log.exception("shopify token exchange faalde org=%s", org_id)
+        raise HTTPException(status_code=502, detail="Koppelen met Shopify is mislukt - probeer het opnieuw.")
+    models.save_connection(org_id, shop, creds, provider="shopify")
+    cache.invalidate_org(org_id)
+    return RedirectResponse(return_to)
+
+
+@router.get("/api/shopify/report")
+def shopify_report(
+    request: Request,
+    start: str,
+    end: str,
+    compare_start: str | None = None,
+    compare_end: str | None = None,
+    org_id: str | None = None,
+):
+    user = auth.current_user(request)
+    _require_period(start, end, compare_start, compare_end)
+    target_org = _resolve_org_id(user, org_id)
+    key = f"{target_org}|shopify|{start}|{end}|{compare_start}|{compare_end}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    shop, token = _shopify_creds(target_org)
+    compare = (compare_start, compare_end) if compare_start and compare_end else None
+    try:
+        data = shopify.run_overview(shop, token, start, end, compare)
+    except shopify.ShopifyError as e:
+        # Een geweigerd token is een echte 'revoked'; andere fouten zijn tijdelijk.
+        if "opnieuw koppelen" in str(e) or "weigert" in str(e):
+            log.warning("REVOKE org=%s provider=shopify err=%r", target_org, e)
+            models.set_connection_status(target_org, "revoked", provider="shopify")
+            raise HTTPException(status_code=409, detail="Shopify-koppeling werkt niet meer - opnieuw koppelen")
+        raise HTTPException(status_code=503, detail=f"Shopify is tijdelijk niet bereikbaar: {e}")
+    except requests.RequestException as e:
+        log.warning("shopify tijdelijk niet bereikbaar org=%s err=%r", target_org, e)
+        raise HTTPException(status_code=503, detail="Shopify is tijdelijk niet bereikbaar.")
+    payload = {"org_id": target_org, "shop": shop, **data}
+    cache.set(key, payload, cache.ttl_for_range(end))
+    return payload
 
 
 @router.get("/api/meta/accounts")

@@ -12,6 +12,7 @@ import GoogleAds from "./screens/dashboard/GoogleAds.jsx";
 import MetaAds from "./screens/dashboard/MetaAds.jsx";
 import MetaOrganic from "./screens/dashboard/MetaOrganic.jsx";
 import WooCommerce from "./screens/dashboard/WooCommerce.jsx";
+import Shopify from "./screens/dashboard/Shopify.jsx";
 import MyDashboards from "./screens/dashboard/MyDashboards.jsx";
 import Framework from "./screens/dashboard/Framework.jsx";
 import Integrations from "./screens/dashboard/Integrations.jsx";
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="meta-organic" element={<MetaOrganic />} />
         <Route path="meta" element={<Navigate to="/app/meta-ads" replace />} />
         <Route path="woocommerce" element={<WooCommerce />} />
+        <Route path="shopify" element={<Shopify />} />
         <Route path="dashboards" element={<MyDashboards />} />
         <Route path="framework" element={<Framework />} />
         <Route path="integrations" element={<Integrations />} />

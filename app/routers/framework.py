@@ -13,9 +13,10 @@ from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from .. import analytics, auth, cache, demo, google_ads, meta, models, woocommerce
+from .. import analytics, auth, cache, demo, google_ads, meta, models, shopify, woocommerce
 from ..org_access import (
-    _connected, _google_data, _meta_token, _org_credentials, _resolve_org_id, _wc_creds,
+    _connected, _google_data, _meta_token, _org_credentials, _resolve_org_id,
+    _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -108,9 +109,15 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
             return None
         return _wc_creds(org_id)
 
+    def shopify_ctx():
+        if not _connected(org_id, "shopify"):
+            return None
+        return _shopify_creds(org_id)
+
     ctxs = {
         "analytics": once(ga_ctx), "google_ads": once(ads_ctx),
         "meta_ads": once(meta_ctx), "woocommerce": once(woo_ctx),
+        "shopify": once(shopify_ctx),
     }
 
     def guarded(name, fetch):
@@ -134,6 +141,7 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         "ads": guarded("google_ads", lambda c, s, e: google_ads.run_overview(c[0], c[1], s, e, None)),
         "meta": guarded("meta_ads", lambda c, s, e: meta.ads_overview(c[0], c[1], s, e, None)),
         "woo": guarded("woocommerce", lambda c, s, e: woocommerce.run_overview(c[0], c[1], c[2], s, e, None)),
+        "shopify": guarded("shopify", lambda c, s, e: shopify.run_overview(c[0], c[1], s, e, None)),
         "errors": errors,
     }
 
@@ -154,6 +162,7 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         ads = demo.ads_overview(start, end, None)
         mads = demo.meta_ads_overview(start, end, None)
         woo = None
+        shop = None
     else:
         # v2 in de sleutel: entries van vóór de 0-euro-telling voor
         # niet-gekoppelde advertentiekanalen worden zo genegeerd, anders
@@ -166,6 +175,7 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         ads = fetchers["ads"](start, end)
         mads = fetchers["meta"](start, end)
         woo = fetchers["woo"](start, end)
+        shop = fetchers["shopify"](start, end)
 
     def r2(v):
         return round(v, 2) if isinstance(v, (int, float)) else v
@@ -209,14 +219,17 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         if paid:
             conversies = round(sum(paid), 1)
 
+    # Omzet en orders komen uit de webshop (WooCommerce of Shopify); zonder
+    # webshop valt het terug op de e-commercecijfers van Analytics.
     woo_kpis = (woo or {}).get("kpis", {})
-    omzet = woo_kpis.get("revenue")
-    omzet_bron = "woocommerce" if omzet is not None else None
-    if omzet is None and ga_kpis.get("revenue"):
-        omzet, omzet_bron = ga_kpis.get("revenue"), "google_analytics"
-    orders = woo_kpis.get("orders")
-    if orders is None:
-        orders = ga_kpis.get("transactions")
+    shop_kpis = (shop or {}).get("kpis", {})
+    omzet, omzet_bron, orders = None, None, None
+    if woo_kpis.get("revenue") is not None:
+        omzet, omzet_bron, orders = woo_kpis.get("revenue"), "woocommerce", woo_kpis.get("orders")
+    elif shop_kpis.get("revenue") is not None:
+        omzet, omzet_bron, orders = shop_kpis.get("revenue"), "shopify", shop_kpis.get("orders")
+    elif ga_kpis.get("revenue"):
+        omzet, omzet_bron, orders = ga_kpis.get("revenue"), "google_analytics", ga_kpis.get("transactions")
 
     auto = {
         "ads_google": ads_google,

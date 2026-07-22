@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useConnections } from "../../lib/useConnections.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
-import { api, connectUrl, metaLoginUrl, disconnectProvider } from "../../lib/api.js";
+import { api, connectUrl, metaLoginUrl, shopifyLoginUrl, disconnectProvider } from "../../lib/api.js";
 import { invalidateOrg } from "../../lib/swr.js";
-import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph } from "../../components/icons.jsx";
+import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph, ShopifyGlyph } from "../../components/icons.jsx";
 import { TabState } from "../../components/ui.jsx";
 import Modal from "../../components/dashboard/Modal.jsx";
 
@@ -13,6 +13,7 @@ const META = {
   google_ads: { name: "Google Ads", desc: "Campagnes, kosten, klikken en ROAS", Glyph: AdsGlyph, bg: "#E8F0FE" },
   meta_ads: { name: "META Ads", desc: "Campagnes op Facebook en Instagram", Glyph: MetaGlyph, bg: "#E7F0FF" },
   woocommerce: { name: "WooCommerce", desc: "Webshop: omzet, bestellingen en producten", Glyph: WooGlyph, bg: "#F3EDFA" },
+  shopify: { name: "Shopify", desc: "Webshop: omzet, bestellingen en producten", Glyph: ShopifyGlyph, bg: "#EAF5E1" },
 };
 
 function StatusPill({ status }) {
@@ -108,10 +109,38 @@ function WooConnectDialog({ orgId, onDone, onClose }) {
   );
 }
 
+// Shopify koppelen: alleen het shopdomein invullen; de OAuth-flow doet de rest.
+function ShopifyConnectDialog({ orgId, onClose }) {
+  const [shop, setShop] = useState("");
+  const go = (e) => {
+    e.preventDefault();
+    const s = shop.trim();
+    if (s) window.location.href = shopifyLoginUrl(s, orgId);
+  };
+  return (
+    <Modal title="Shopify koppelen" onClose={onClose} width={460}>
+      <form onSubmit={go} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontSize: 13, color: "var(--c-muted)" }}>
+          Vul het adres van je Shopify-winkel in. Je wordt doorgestuurd naar Shopify om de koppeling goed te keuren.
+        </div>
+        <div>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-muted)" }}>Shopify-adres</label>
+          <input value={shop} onChange={(e) => setShop(e.target.value)} placeholder="jouwwinkel.myshopify.com" style={{ ...inputStyle, marginTop: 6 }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+          <button type="button" className="btn-ghost" onClick={onClose} style={{ height: 40, padding: "0 14px" }}>Annuleren</button>
+          <button type="submit" className="btn-primary" disabled={!shop.trim()} style={{ height: 40, padding: "0 18px", opacity: shop.trim() ? 1 : 0.5 }}>Naar Shopify</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function Integrations() {
   const { data, loading, reload } = useConnections();
   const { orgId } = useActiveOrg();
   const [wooOpen, setWooOpen] = useState(false);
+  const [shopifyOpen, setShopifyOpen] = useState(false);
   if (loading) return <TabState loading />;
   const items = data?.connections || [];
 
@@ -148,6 +177,8 @@ export default function Integrations() {
               <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                 {canConnect && (c.provider === "woocommerce" ? (
                   <button className="btn-primary" onClick={() => setWooOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>Koppelen</button>
+                ) : c.provider === "shopify" ? (
+                  <button className="btn-primary" onClick={() => setShopifyOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>Koppelen</button>
                 ) : (
                   <a className="btn-primary" href={c.provider === "meta_ads" ? metaLoginUrl(orgId) : connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>Koppelen</a>
                 ))}
@@ -170,6 +201,7 @@ export default function Integrations() {
           onClose={() => setWooOpen(false)}
         />
       )}
+      {shopifyOpen && <ShopifyConnectDialog orgId={orgId} onClose={() => setShopifyOpen(false)} />}
     </div>
   );
 }
