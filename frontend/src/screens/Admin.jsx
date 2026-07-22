@@ -7,9 +7,10 @@ import Topbar from "../components/Topbar.jsx";
 import AdminFeedback from "./AdminFeedback.jsx";
 import AdminUsers from "./admin/AdminUsers.jsx";
 import AdminConnections from "./admin/AdminConnections.jsx";
+import AdminEnvironments from "./admin/AdminEnvironments.jsx";
 import AdminActivity from "./admin/AdminActivity.jsx";
 import AdminBilling from "./admin/AdminBilling.jsx";
-import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus } from "../components/icons.jsx";
+import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid } from "../components/icons.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -76,6 +77,7 @@ export default function Admin() {
             ["feedback", "Feedback", IcChat],
             ["gebruikers", "Gebruikers & rollen", IcUsers],
             ["koppelingen", "Koppelingen", IcPlug],
+            ["omgevingen", "Omgevingen", IcGrid],
             ["pakketten", "Pakketten & facturatie", IcDoc],
             ["activiteit", "Activiteitenlog", IcDoc],
           ].map(([key, label, Icon]) => (
@@ -103,6 +105,7 @@ export default function Admin() {
           {tab === "feedback" ? <AdminFeedback />
             : tab === "gebruikers" ? <AdminUsers meEmail={me.email} />
             : tab === "koppelingen" ? <AdminConnections />
+            : tab === "omgevingen" ? <AdminEnvironments />
             : tab === "activiteit" ? <AdminActivity />
             : tab === "pakketten" ? <AdminBilling />
             : (<>

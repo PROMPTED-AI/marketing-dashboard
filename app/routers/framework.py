@@ -70,6 +70,8 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
     koppelingen; maanden met zo'n fout worden maar kort gecachet.
     """
     errors: set[str] = set()
+    # Bureau-omgeving: gebruik de aan dit bedrijf toegewezen property/Ads-klant.
+    assigned = models.get_org_assets(org_id)
 
     def once(setup):
         memo: dict = {}
@@ -84,7 +86,7 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         if not _connected(org_id, "google_analytics"):
             return None
         creds = _org_credentials(org_id)
-        prop = property_id
+        prop = assigned.get("ga_property_id") or property_id
         if not prop:
             props = _google_data(org_id, "google_analytics", lambda: analytics.list_properties(creds))
             prop = props[0]["property_id"] if props else None
@@ -94,6 +96,9 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         if not _connected(org_id, "google_ads"):
             return None
         creds = _org_credentials(org_id, provider="google_ads")
+        cust = assigned.get("ads_customer_id")
+        if cust:
+            return (creds, cust)
         accounts = google_ads.list_accounts(creds)
         return (creds, accounts[0]["customer_id"]) if accounts else None
 

@@ -141,6 +141,24 @@ def init_schema() -> None:
         conn.execute(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
         )
+        # Bureau-model: een 'managed' organisatie krijgt zijn data via de
+        # bureau-koppeling (het manageraccount), en de admin wijst per bedrijf
+        # toe welke property/site/Ads-klant erbij hoort. De toewijzing wordt
+        # server-side afgedwongen, zodat een klant nooit een ander bedrijf ziet.
+        conn.execute(
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS managed BOOLEAN NOT NULL DEFAULT false"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS org_assets (
+                organization_id  TEXT PRIMARY KEY REFERENCES organizations(id),
+                ga_property_id   TEXT,
+                gsc_site_url     TEXT,
+                ads_customer_id  TEXT,
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
         # Eenmalige tokens voor uitnodigingen en wachtwoord-reset. Alleen de
         # hash van de token wordt bewaard; de link bevat de ruwe token. `kind`
         # is 'invite' of 'reset'. `used_at`/`expires_at` maken de token

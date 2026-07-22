@@ -139,6 +139,81 @@ def admin_activity(request: Request):
     return {"activity": models.activity_feed()}
 
 
+# ------------------------------------------------ bureau-model: omgeving inrichten
+#
+# Een bureau logt in met één manageraccount en richt per bedrijf een omgeving
+# in: de bureau-koppeling (het manager-token) wordt naar het bedrijf gekopieerd
+# en de admin wijst toe welke property/site/Ads-klant erbij hoort. De data wordt
+# server-side op die toewijzing vastgezet, zodat een klant alleen zijn eigen
+# bedrijf ziet.
+
+
+@router.post("/api/admin/organizations/{org_id}/link-agency")
+def admin_link_agency(request: Request, org_id: str):
+    """Hergebruik de Google-koppeling van het bureau-account voor dit bedrijf."""
+    admin = auth.require_admin(request)
+    if not models.get_organization(org_id):
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    copied = models.copy_google_connections(admin["organization_id"], org_id)
+    if not copied:
+        raise HTTPException(
+            status_code=409,
+            detail="Koppel eerst Google op je eigen bureau-account (via Integraties); die koppeling hergebruik je hier.",
+        )
+    models.set_org_managed(org_id, True)
+    cache.invalidate_org(org_id)
+    return {"ok": True, "copied": copied}
+
+
+@router.get("/api/admin/organizations/{org_id}/available-assets")
+def admin_available_assets(request: Request, org_id: str):
+    """De property's, sites en Ads-klanten die via de koppeling van dit bedrijf
+    beschikbaar zijn, voor de toewijzing (alleen admin, ongefilterd)."""
+    auth.require_admin(request)
+    if models.is_demo_org(org_id):
+        return {"properties": demo.DEMO_PROPERTIES, "sites": demo.DEMO_SITES, "ads_accounts": demo.DEMO_ADS_ACCOUNTS}
+    out = {"properties": [], "sites": [], "ads_accounts": []}
+    try:
+        creds = _org_credentials(org_id)
+        out["properties"] = _google_data(org_id, "google_analytics", lambda: analytics.list_properties(creds))
+    except Exception as e:  # noqa: BLE001 - degradeer per kanaal
+        log.info("available-assets properties org=%s err=%r", org_id, e)
+    try:
+        creds = _org_credentials(org_id, provider="search_console")
+        out["sites"] = _google_data(org_id, "search_console", lambda: search_console.list_sites(creds))
+    except Exception as e:  # noqa: BLE001
+        log.info("available-assets sites org=%s err=%r", org_id, e)
+    try:
+        creds = _org_credentials(org_id, provider="google_ads")
+        out["ads_accounts"] = google_ads.list_accounts(creds)
+    except Exception as e:  # noqa: BLE001
+        log.info("available-assets ads org=%s err=%r", org_id, e)
+    return out
+
+
+class AssetsIn(BaseModel):
+    ga_property_id: str | None = None
+    gsc_site_url: str | None = None
+    ads_customer_id: str | None = None
+
+
+@router.get("/api/admin/organizations/{org_id}/assets")
+def admin_get_assets(request: Request, org_id: str):
+    auth.require_admin(request)
+    org = models.get_organization(org_id) or {}
+    return {"assets": models.get_org_assets(org_id), "managed": bool(org.get("managed"))}
+
+
+@router.put("/api/admin/organizations/{org_id}/assets")
+def admin_set_assets(request: Request, org_id: str, payload: AssetsIn):
+    auth.require_admin(request)
+    if not models.get_organization(org_id):
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    assets = models.set_org_assets(org_id, payload.model_dump())
+    cache.invalidate_org(org_id)
+    return {"assets": assets}
+
+
 @router.get("/api/admin/diagnose/google")
 def admin_diagnose_google(request: Request, org_id: str, provider: str = "google_analytics"):
     """Test een Google-koppeling en geef de exacte foutreden terug (admin).

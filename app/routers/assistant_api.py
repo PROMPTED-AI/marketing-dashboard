@@ -69,12 +69,15 @@ def assistant_chat(request: Request, body: ChatBody):
     # the org-scoping and property/site/account selection live in one place. Demo
     # orgs serve generated sample data, mirroring the dashboard endpoints.
     demo_org = models.is_demo_org(target_org)
+    # Bureau-omgeving: de assistent gebruikt de aan dit bedrijf toegewezen bron,
+    # zodat een klant nooit cijfers van een ander bedrijf te zien krijgt.
+    assigned = models.get_org_assets(target_org)
 
     def _fetch_analytics(start, end, compare):
         if demo_org:
             return demo.overview(start, end, compare)
         creds = _org_credentials(target_org)
-        prop = body.property_id
+        prop = assigned.get("ga_property_id") or body.property_id
         if not prop:
             props = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
             if not props:
@@ -87,7 +90,7 @@ def assistant_chat(request: Request, body: ChatBody):
         if demo_org:
             return demo.gsc_report(start, end, compare)
         creds = _org_credentials(target_org, provider="search_console")
-        site = body.site
+        site = assigned.get("gsc_site_url") or body.site
         if not site:
             sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
             if not sites:
@@ -100,10 +103,13 @@ def assistant_chat(request: Request, body: ChatBody):
         if demo_org:
             return demo.ads_overview(start, end, compare)
         creds = _org_credentials(target_org, provider="google_ads")
-        accounts = google_ads.list_accounts(creds)
-        if not accounts:
-            raise HTTPException(status_code=409, detail="Geen Google Ads-account gekoppeld.")
-        return google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, compare)
+        cust = assigned.get("ads_customer_id")
+        if not cust:
+            accounts = google_ads.list_accounts(creds)
+            if not accounts:
+                raise HTTPException(status_code=409, detail="Geen Google Ads-account gekoppeld.")
+            cust = accounts[0]["customer_id"]
+        return google_ads.run_overview(creds, cust, start, end, compare)
 
     def _fetch_meta_ads(start, end, compare):
         if demo_org:
@@ -318,6 +324,8 @@ def _compute_insights(
         raise HTTPException(status_code=400, detail="Ongeldige periode")
 
     found: list[dict] = []
+    # Bureau-omgeving: signalen alleen op de aan dit bedrijf toegewezen bron.
+    assigned = models.get_org_assets(target_org)
 
     # Demo-organisatie: bereken de signalen op de gegenereerde voorbeelddata,
     # zodat bel, zijpaneel en assistent ook in de demo iets laten zien.
@@ -338,7 +346,7 @@ def _compute_insights(
     if _connected(target_org, "google_analytics"):
         try:
             creds = _org_credentials(target_org)
-            prop = property_id
+            prop = assigned.get("ga_property_id") or property_id
             if not prop:
                 props = analytics.list_properties(creds)
                 prop = props[0]["property_id"] if props else None
@@ -351,7 +359,7 @@ def _compute_insights(
     if _connected(target_org, "search_console"):
         try:
             creds = _org_credentials(target_org, provider="search_console")
-            s = site
+            s = assigned.get("gsc_site_url") or site
             if not s:
                 sites = search_console.list_sites(creds)
                 s = sites[0]["site_url"] if sites else None
@@ -365,9 +373,12 @@ def _compute_insights(
     if _connected(target_org, "google_ads"):
         try:
             creds = _org_credentials(target_org, provider="google_ads")
-            accounts = google_ads.list_accounts(creds)
-            if accounts:
-                data = google_ads.run_overview(creds, accounts[0]["customer_id"], start, end, compare)
+            cust = assigned.get("ads_customer_id")
+            if not cust:
+                accounts = google_ads.list_accounts(creds)
+                cust = accounts[0]["customer_id"] if accounts else None
+            if cust:
+                data = google_ads.run_overview(creds, cust, start, end, compare)
                 found += insights.from_channel("google_ads", data.get("kpis", {}), data.get("deltas"))
         except google_ads.AdsNotConfigured:
             pass

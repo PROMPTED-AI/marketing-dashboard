@@ -80,7 +80,7 @@ def create_or_rename_organization(name: str, domain: str) -> dict:
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at "
+            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed "
             "FROM organizations WHERE id = %s",
             (org_id,),
         ).fetchone()
@@ -89,6 +89,7 @@ def get_organization(org_id: str) -> dict | None:
             "id": row[0], "name": row[1], "domain": row[2], "is_demo": row[3],
             "business_type": row[4], "plan": row[5],
             "trial_ends_at": row[6].isoformat() if row[6] else None,
+            "managed": row[7],
         }
         if row
         else None
@@ -276,6 +277,62 @@ def list_users() -> list[dict]:
 def set_user_role(user_id: str, role: str) -> None:
     with db.get_conn() as conn:
         conn.execute("UPDATE users SET role = %s WHERE id = %s", (role, user_id))
+
+
+# --------------------------------------------------- bureau-model: toegewezen assets
+
+_ASSET_FIELDS = ("ga_property_id", "gsc_site_url", "ads_customer_id")
+
+
+def set_org_managed(org_id: str, managed: bool) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE organizations SET managed = %s WHERE id = %s", (managed, org_id))
+
+
+def get_org_assets(org_id: str) -> dict:
+    """De aan een bedrijf toegewezen property/site/Ads-klant (of lege waarden)."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            f"SELECT {', '.join(_ASSET_FIELDS)} FROM org_assets WHERE organization_id = %s",
+            (org_id,),
+        ).fetchone()
+    if not row:
+        return {f: None for f in _ASSET_FIELDS}
+    return dict(zip(_ASSET_FIELDS, row))
+
+
+def set_org_assets(org_id: str, values: dict) -> dict:
+    """Sla de toegewezen assets op (alleen de bekende velden; None = wissen)."""
+    data = {f: (values.get(f) or None) for f in _ASSET_FIELDS}
+    with db.get_conn() as conn:
+        conn.execute(
+            f"""
+            INSERT INTO org_assets (organization_id, {', '.join(_ASSET_FIELDS)}, updated_at)
+            VALUES (%s, {', '.join(['%s'] * len(_ASSET_FIELDS))}, now())
+            ON CONFLICT (organization_id) DO UPDATE SET
+              {', '.join(f'{f} = EXCLUDED.{f}' for f in _ASSET_FIELDS)},
+              updated_at = now()
+            """,
+            (org_id, *[data[f] for f in _ASSET_FIELDS]),
+        )
+    return get_org_assets(org_id)
+
+
+def copy_google_connections(from_org: str, to_org: str) -> int:
+    """Kopieer de Google-koppelingen (het manager-token) naar een klant-org.
+
+    Zo hoeft het bureau niet per klant opnieuw toestemming te geven: het
+    manager-token wordt hergebruikt. De toewijzing (welke property/site hoort
+    bij dit bedrijf) wordt apart afgedwongen, zodat de klant nooit meer ziet
+    dan zijn eigen bedrijf.
+    """
+    copied = 0
+    for provider in config.GOOGLE_PROVIDERS:
+        conn = get_connection(from_org, provider=provider)
+        if conn and conn["status"] == "connected":
+            save_connection(to_org, conn["google_email"], conn["creds"], provider=provider)
+            copied += 1
+    return copied
 
 
 # ---------------------------------------------- uitnodigingen + wachtwoord-reset
@@ -589,11 +646,14 @@ def list_organizations_with_connections() -> list[dict]:
     """Admin client table: every org with its per-provider status + last sync."""
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package "
+            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed "
             "FROM organizations WHERE is_personal = false ORDER BY name"
         ).fetchall()
         conns = conn.execute(
             "SELECT organization_id, provider, status, google_email, updated_at FROM connections"
+        ).fetchall()
+        assets = conn.execute(
+            f"SELECT organization_id, {', '.join(_ASSET_FIELDS)} FROM org_assets"
         ).fetchall()
 
     by_org: dict[str, dict] = {}
@@ -603,9 +663,10 @@ def list_organizations_with_connections() -> list[dict]:
             "google_email": email,
             "updated_at": updated.isoformat() if updated else None,
         }
+    assets_by_org = {r[0]: dict(zip(_ASSET_FIELDS, r[1:])) for r in assets}
 
     out = []
-    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package in orgs:
+    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -621,6 +682,8 @@ def list_organizations_with_connections() -> list[dict]:
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,
                 "package": package,
+                "managed": managed,
+                "assets": assets_by_org.get(org_id, {f: None for f in _ASSET_FIELDS}),
                 "subscription": subscription_info({
                     "is_demo": is_demo, "plan": plan,
                     "trial_ends_at": trial_ends_at.isoformat() if trial_ends_at else None,
