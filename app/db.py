@@ -148,6 +148,11 @@ def init_schema() -> None:
         conn.execute(
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS managed BOOLEAN NOT NULL DEFAULT false"
         )
+        # Bedrijfsprofiel: naam (bestaat al), website en branche, zodat de
+        # identiteit expliciet wordt vastgelegd in plaats van afgeleid uit het
+        # e-mailadres (belangrijk voor accounts op een publiek domein zoals gmail).
+        conn.execute("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS website TEXT")
+        conn.execute("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS industry TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS org_assets (

@@ -161,63 +161,9 @@ def assistant_chat(request: Request, body: ChatBody):
         def r2(v):
             return round(v, 2) if isinstance(v, (int, float)) else v
 
-        ads_cost = (ads or {}).get("kpis", {}).get("cost")
-        meta_spend = (mads or {}).get("kpis", {}).get("spend")
-        spend_parts = {k: v for k, v in (("google_ads", ads_cost), ("meta_ads", meta_spend)) if v}
-        ad_spend_total = round(sum(spend_parts.values()), 2) if spend_parts else None
-
-        woo_revenue = (woo or {}).get("kpis", {}).get("revenue")
-        ga_revenue = (ga or {}).get("kpis", {}).get("revenue")
-        if woo_revenue:
-            revenue_total, revenue_source = round(woo_revenue, 2), "woocommerce"
-        elif ga_revenue:
-            revenue_total, revenue_source = round(ga_revenue, 2), "google_analytics"
-        else:
-            revenue_total, revenue_source = None, None
-
-        blended_roas = (
-            round(revenue_total / ad_spend_total, 2)
-            if revenue_total and ad_spend_total else None
-        )
-        ads_conv = (ads or {}).get("kpis", {}).get("conversions") or 0
-        meta_results = sum((r.get("count") or 0) for r in (mads or {}).get("results", []) or [])
-        paid_conversions = round(ads_conv + meta_results, 1) or None
-        blended_cpa = (
-            round(ad_spend_total / paid_conversions, 2)
-            if ad_spend_total and paid_conversions else None
-        )
-
-        # Traffic mix from GA channel groups (share of sessions).
-        traffic_mix = None
-        if ga and ga.get("channels"):
-            buckets = {"organisch": 0, "betaald": 0, "direct": 0, "social": 0, "overig": 0}
-            for c in ga["channels"]:
-                label = (c.get("label") or "").lower()
-                v = c.get("value") or c.get("sessions") or 0
-                if "paid" in label or "cpc" in label:
-                    buckets["betaald"] += v
-                elif "organic search" in label:
-                    buckets["organisch"] += v
-                elif "social" in label:
-                    buckets["social"] += v
-                elif "direct" in label:
-                    buckets["direct"] += v
-                else:
-                    buckets["overig"] += v
-            tot = sum(buckets.values()) or 1
-            traffic_mix = {k: round(v * 100 / tot) for k, v in buckets.items() if v}
-
-        combined = {
-            "advertentie_uitgaven_totaal": ad_spend_total,
-            "advertentie_uitgaven_per_kanaal": {k: r2(v) for k, v in spend_parts.items()} or None,
-            "omzet_totaal": revenue_total,
-            "omzet_bron": revenue_source,
-            "blended_roas": blended_roas,  # omzet / advertentie-uitgaven
-            "betaalde_conversies": paid_conversions,
-            "kosten_per_conversie": blended_cpa,
-            "verkeersverdeling_pct": traffic_mix,
-            "organische_zoekklikken": (gsc or {}).get("totals", {}).get("clicks"),
-        }
+        # De combinatiecijfers komen uit één gedeelde, pure functie (insights.combine),
+        # zodat de assistent en de cross-kanaal-signalen exact dezelfde getallen tonen.
+        combined = insights.combine(ga, gsc, ads, mads, woo)
         per_channel = {}
         if ga: per_channel["google_analytics"] = {"kpis": ga.get("kpis"), "deltas": ga.get("deltas"), "channels": _compact(ga.get("channels", []), 6)}
         if gsc: per_channel["search_console"] = {"totals": gsc.get("totals"), "deltas": gsc.get("deltas")}
@@ -339,9 +285,16 @@ def _compute_insights(
         found += insights.from_channel("google_ads", a.get("kpis", {}), a.get("deltas"))
         m = demo.meta_ads_overview(start, end, compare)
         found += insights.from_channel("meta_ads", m.get("kpis", {}), m.get("deltas"))
-        payload = {"org_id": target_org, "insights": insights.rank(found)}
+        # De demo-omzet komt uit Analytics (kpis.revenue); dat volstaat voor de
+        # blended ROAS in de cross-kanaal-signalen.
+        found += insights.cross_channel(insights.combine(data, g, a, m, None), a)
+        payload = {"org_id": target_org, "insights": insights.rank(found, limit=30)}
         cache.set(key, payload, cache.ttl_for_range(end))
         return payload
+
+    # Bewaar de per-kanaal-overzichten zodat we na afloop de cross-kanaal-signalen
+    # (blended ROAS, uitgaven vs. conversies, verkeersverdeling) kunnen berekenen.
+    ga_d = gsc_d = ads_d = meta_d = woo_d = None
 
     if _connected(target_org, "google_analytics"):
         try:
@@ -351,8 +304,8 @@ def _compute_insights(
                 props = analytics.list_properties(creds)
                 prop = props[0]["property_id"] if props else None
             if prop:
-                data = analytics.run_ga_overview(creds, prop, start, end, compare)
-                found += insights.from_channel("analytics", data.get("kpis", {}), data.get("deltas"))
+                ga_d = analytics.run_ga_overview(creds, prop, start, end, compare)
+                found += insights.from_channel("analytics", ga_d.get("kpis", {}), ga_d.get("deltas"))
         except Exception:
             log.exception("insights: analytics failed org=%s", target_org)
 
@@ -364,9 +317,9 @@ def _compute_insights(
                 sites = search_console.list_sites(creds)
                 s = sites[0]["site_url"] if sites else None
             if s:
-                data = search_console.run_search_analytics(creds, s, start, end, compare)
-                found += insights.from_channel("search_console", data.get("totals", {}), data.get("deltas"))
-                found += insights.search_opportunities(data)
+                gsc_d = search_console.run_search_analytics(creds, s, start, end, compare)
+                found += insights.from_channel("search_console", gsc_d.get("totals", {}), gsc_d.get("deltas"))
+                found += insights.search_opportunities(gsc_d)
         except Exception:
             log.exception("insights: search console failed org=%s", target_org)
 
@@ -378,8 +331,8 @@ def _compute_insights(
                 accounts = google_ads.list_accounts(creds)
                 cust = accounts[0]["customer_id"] if accounts else None
             if cust:
-                data = google_ads.run_overview(creds, cust, start, end, compare)
-                found += insights.from_channel("google_ads", data.get("kpis", {}), data.get("deltas"))
+                ads_d = google_ads.run_overview(creds, cust, start, end, compare)
+                found += insights.from_channel("google_ads", ads_d.get("kpis", {}), ads_d.get("deltas"))
         except google_ads.AdsNotConfigured:
             pass
         except Exception:
@@ -390,12 +343,22 @@ def _compute_insights(
             token = _meta_token(target_org)
             accounts = meta.list_assets(token).get("ad_accounts") or []
             if accounts:
-                data = meta.ads_overview(token, accounts[0]["id"], start, end, compare)
-                found += insights.from_channel("meta_ads", data.get("kpis", {}), data.get("deltas"))
+                meta_d = meta.ads_overview(token, accounts[0]["id"], start, end, compare)
+                found += insights.from_channel("meta_ads", meta_d.get("kpis", {}), meta_d.get("deltas"))
         except Exception:
             log.exception("insights: meta failed org=%s", target_org)
 
-    payload = {"org_id": target_org, "insights": insights.rank(found)}
+    # WooCommerce alleen voor de blended ROAS (omzet); geen eigen delta-signalen.
+    if _connected(target_org, "woocommerce"):
+        try:
+            store, ck, cs = _wc_creds(target_org)
+            woo_d = woocommerce.run_overview(store, ck, cs, start, end, compare)
+        except Exception:
+            log.exception("insights: woocommerce failed org=%s", target_org)
+
+    found += insights.cross_channel(insights.combine(ga_d, gsc_d, ads_d, meta_d, woo_d), ads_d)
+
+    payload = {"org_id": target_org, "insights": insights.rank(found, limit=30)}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
 

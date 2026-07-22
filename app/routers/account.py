@@ -289,11 +289,13 @@ def reset_password(request: Request, token: str, payload: SetPasswordIn):
 class OrgRename(BaseModel):
     name: str
     business_type: str | None = None
+    website: str | None = None
+    industry: str | None = None
 
 
 @router.patch("/api/organizations/{org_id}")
 def rename_organization(request: Request, org_id: str, payload: OrgRename):
-    """Rename an organization and/or set its business type (agency admins only)."""
+    """Rename an organization and/or set its profile (agency admins only)."""
     auth.require_admin(request)
     name = payload.name.strip()
     if not name:
@@ -304,7 +306,37 @@ def rename_organization(request: Request, org_id: str, payload: OrgRename):
     if payload.business_type is not None:
         if payload.business_type not in models.BUSINESS_TYPES:
             raise HTTPException(status_code=400, detail="Ongeldig bedrijfstype")
-        org = models.set_business_type(org_id, payload.business_type)
+        models.set_business_type(org_id, payload.business_type)
+    if payload.website is not None or payload.industry is not None:
+        models.set_org_profile(org_id, website=payload.website, industry=payload.industry)
+    cache.invalidate_org(org_id)
+    return {"organization": models.get_organization(org_id)}
+
+
+class OrgProfileIn(BaseModel):
+    name: str | None = None
+    website: str | None = None
+    industry: str | None = None
+    business_type: str | None = None
+
+
+@router.patch("/api/organizations/me/profile")
+def set_own_profile(request: Request, payload: OrgProfileIn):
+    """Bedrijfsprofiel van de eigen organisatie instellen (elke ingelogde gebruiker).
+
+    Least-privilege: de organisatie komt uit de sessie, nooit uit de request.
+    Zo legt ook een gebruiker op een publiek e-maildomein (gmail) een echte
+    bedrijfsnaam vast in plaats van de van het e-mailadres afgeleide naam.
+    """
+    user = auth.current_user(request)
+    org_id = user["organization_id"]
+    if payload.business_type is not None:
+        if payload.business_type not in models.BUSINESS_TYPES:
+            raise HTTPException(status_code=400, detail="Ongeldig bedrijfstype")
+        models.set_business_type(org_id, payload.business_type)
+    org = models.set_org_profile(org_id, name=payload.name, website=payload.website, industry=payload.industry)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organisatie niet gevonden")
     cache.invalidate_org(org_id)
     return {"organization": org}
 
@@ -343,12 +375,14 @@ def organizations(request: Request):
         # de klant zelf ziet.
         return {"organizations": [
             {"id": o["id"], "name": o["name"], "domain": o["domain"],
-             "business_type": o.get("business_type"), "subscription": o.get("subscription")}
+             "business_type": o.get("business_type"), "website": o.get("website"),
+             "industry": o.get("industry"), "subscription": o.get("subscription")}
             for o in orgs
         ]}
     org = models.get_organization(user["organization_id"])
     return {"organizations": [
         {"id": org["id"], "name": org["name"], "domain": org["domain"],
-         "business_type": org.get("business_type"), "subscription": models.subscription_info(org)}
+         "business_type": org.get("business_type"), "website": org.get("website"),
+         "industry": org.get("industry"), "subscription": models.subscription_info(org)}
     ] if org else []}
 

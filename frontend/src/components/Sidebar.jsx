@@ -6,7 +6,7 @@ import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useConnections, connectedProviders } from "../lib/useConnections.jsx";
 import {
   IcStar, IcPlug, IcCog, IcUsers, IcChat, IcGrid, IcDoc,
-  IcMegaphone, IcCart, IcChevUpDown, IcChevDown,
+  IcMegaphone, IcCart, IcChevUpDown, IcChevDown, IcBell,
   GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph, ShopifyGlyph,
 } from "./icons.jsx";
 
@@ -17,6 +17,7 @@ import {
 // META-koppeling). Items zonder `provider` zijn altijd zichtbaar.
 const NAV = [
   { to: "/app/assistant", label: "Assistent", Icon: IcChat },
+  { to: "/app/signalen", label: "Signalen", Icon: IcBell },
   {
     group: "Marketing", Icon: IcMegaphone, children: [
       { to: "/app/analytics", label: "Analytics", Icon: GaGlyph, provider: "google_analytics" },

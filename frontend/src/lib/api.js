@@ -108,6 +108,20 @@ export function setBusinessType(businessType) {
   });
 }
 
+// Stel het bedrijfsprofiel van de eigen organisatie in (naam, website, branche).
+export function setOwnProfile(profile) {
+  return api("/api/organizations/me/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
+}
+
+// Verwijder een organisatie (alleen agency admin).
+export function deleteOrganization(orgId) {
+  return api(`/api/admin/organizations/${orgId}`, { method: "DELETE" });
+}
+
 // Disconnect a source (revokes the Google grant when it's the last one).
 export function disconnectProvider(provider, orgId) {
   const q = orgId ? "?org_id=" + encodeURIComponent(orgId) : "";

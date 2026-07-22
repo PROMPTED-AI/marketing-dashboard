@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { connectUrl, metaLoginUrl, setBusinessType } from "../lib/api.js";
+import { connectUrl, metaLoginUrl, setOwnProfile } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
@@ -20,9 +20,14 @@ const PROFILES = [
 
 export default function Onboarding() {
   const nav = useNavigate();
-  const { reload } = useMe();
+  const { me, reload } = useMe();
   const [step, setStep] = useState("profile"); // 'profile' | 'tools'
   const [profile, setProfile] = useState(null);
+  // Bedrijfsnaam voorvullen als die al een echte naam is (niet het e-mailadres).
+  const initialName = me?.organization?.name && !me.organization.name.includes("@") ? me.organization.name : "";
+  const [companyName, setCompanyName] = useState(initialName);
+  const [website, setWebsite] = useState(me?.organization?.website || "");
+  const [industry, setIndustry] = useState(me?.organization?.industry || "");
   const [savingProfile, setSavingProfile] = useState(false);
   const [sel, setSel] = useState({ ga: true, gsc: true, ads: false, meta: false });
   const count = Object.values(sel).filter(Boolean).length;
@@ -34,15 +39,15 @@ export default function Onboarding() {
     setSel({ ga: v, gsc: v, ads: v, meta: v });
   };
 
-  // Save the chosen profile org-wide, then move on to connecting tools.
+  // Save the company profile + chosen type org-wide, then connect tools.
   const confirmProfile = async () => {
-    if (!profile || savingProfile) return;
+    if (!profile || !companyName.trim() || savingProfile) return;
     setSavingProfile(true);
     try {
-      await setBusinessType(profile);
-      reload(); // refresh me.organization.business_type so dashboards default correctly
+      await setOwnProfile({ name: companyName.trim(), website: website.trim(), industry: industry.trim(), business_type: profile });
+      reload(); // refresh me.organization so name + business_type are correct everywhere
     } catch {
-      /* niet-blokkerend: type is later in Instellingen te wijzigen */
+      /* niet-blokkerend: later te wijzigen in Instellingen */
     } finally {
       setSavingProfile(false);
       setStep("tools");
@@ -102,11 +107,27 @@ export default function Onboarding() {
         {step === "profile" ? (
           <div style={{ padding: "36px 48px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 1 van 2</div>
-            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>wat voor bedrijf ben je?</div>
+            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>vertel iets over je bedrijf.</div>
             <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 620, marginBottom: 24 }}>
-              Hiermee richten we je dashboards meteen goed in. Je kunt dit later altijd wijzigen in Instellingen.
+              Zo tonen we overal je bedrijfsnaam en richten we je dashboards meteen goed in. Je kunt dit later altijd wijzigen in Instellingen.
             </div>
 
+            <div className="split-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+              <label style={{ gridColumn: "1 / -1" }}>
+                <span style={obLbl}>Bedrijfsnaam</span>
+                <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Bijvoorbeeld: Janssen B.V." style={obInp} />
+              </label>
+              <label>
+                <span style={obLbl}>Website <span style={{ color: "var(--c-muted)", fontWeight: 500 }}>(optioneel)</span></span>
+                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://jouwbedrijf.nl" style={obInp} />
+              </label>
+              <label>
+                <span style={obLbl}>Branche <span style={{ color: "var(--c-muted)", fontWeight: 500 }}>(optioneel)</span></span>
+                <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Bijvoorbeeld: mode, horeca, zakelijke dienstverlening" style={obInp} />
+              </label>
+            </div>
+
+            <div className="display" style={{ fontSize: 20, marginBottom: 12 }}>wat voor bedrijf ben je?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               {PROFILES.map((p) => (
                 <div key={p.key} className="pill-btn" onClick={() => setProfile(p.key)} style={{ ...toolCard, ...(profile === p.key ? toolCardOn : {}) }}>
@@ -122,7 +143,7 @@ export default function Onboarding() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 28 }}>
-              <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: profile && !savingProfile ? 1 : 0.5, cursor: profile ? "pointer" : "not-allowed" }} disabled={!profile || savingProfile} onClick={confirmProfile}>
+              <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: profile && companyName.trim() && !savingProfile ? 1 : 0.5, cursor: profile && companyName.trim() ? "pointer" : "not-allowed" }} disabled={!profile || !companyName.trim() || savingProfile} onClick={confirmProfile}>
                 {savingProfile ? "bezig…" : "verder"} <IcArrow />
               </button>
             </div>
@@ -178,6 +199,8 @@ export default function Onboarding() {
   );
 }
 
+const obLbl = { display: "block", fontSize: 13, fontWeight: 700, color: "var(--c-ink-soft)", marginBottom: 7 };
+const obInp = { width: "100%", height: 48, padding: "0 15px", boxSizing: "border-box", border: "1px solid var(--c-border)", borderRadius: 12, background: "var(--c-surface)", fontFamily: "inherit", fontSize: 15, color: "var(--c-ink)", outline: "none" };
 const stepDot = { width: 26, height: 26, borderRadius: "50%", border: "2px solid var(--c-border-strong)", color: "var(--c-muted)", background: "var(--c-surface)", fontSize: 12.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 const stepDotActive = { border: "2px solid var(--c-accent)", background: "var(--c-accent)", color: "var(--c-accent-ink)" };
 const stepDotDone = { border: "2px solid var(--c-pos)", background: "var(--c-pos)", color: "#fff" };
