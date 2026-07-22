@@ -36,6 +36,17 @@ def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
     return org_id
 
 
+def _safe_return(path: str | None, default: str) -> str:
+    """Allow only same-site absolute paths as a post-OAuth redirect target.
+
+    Blocks protocol-relative (`//host`) and backslash (`/\\host`) forms that
+    browsers resolve to an external origin — otherwise an open redirect.
+    """
+    if path and path.startswith("/") and not path.startswith(("//", "/\\")):
+        return path
+    return default
+
+
 def _require_period(*dates: str | None) -> None:
     """Reject non-ISO dates before they reach any downstream query.
 

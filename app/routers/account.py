@@ -17,22 +17,11 @@ from .. import (
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
     _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _wc_creds,
+    _resolve_org_id, _safe_return, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
 router = APIRouter()
-
-def _safe_return(path: str | None, default: str) -> str:
-    """Allow only same-site absolute paths as a post-OAuth redirect target.
-
-    Blocks protocol-relative (`//host`) and backslash (`/\\host`) forms that
-    browsers resolve to an external origin — otherwise an open redirect.
-    """
-    if path and path.startswith("/") and not path.startswith(("//", "/\\")):
-        return path
-    return default
-
 
 
 @router.get("/api/me")

@@ -136,6 +136,19 @@ def test_framework(demo):
     print("raamwerk: autowaarden, opslaan, afgeleide formules en validatie slagen")
 
 
+def test_meta_login_redirect(demo):
+    """De META-koppelknop moet naar Facebook doorsturen, nooit een 500 geven.
+
+    Regressietest: na de router-opsplitsing ontbrak _safe_return in channels.py,
+    wat in productie (met META geconfigureerd) elke koppelpoging liet crashen.
+    CI zet daarom een dummy META-config zodat dit pad echt doorlopen wordt.
+    """
+    r = demo.get(f"{BASE}/api/auth/meta/login?return_to=/app/integrations", allow_redirects=False)
+    assert r.status_code in (302, 307), (r.status_code, r.text[:200])
+    assert "facebook.com" in r.headers.get("location", ""), r.headers.get("location")
+    print("meta-login: nette redirect naar Facebook")
+
+
 def test_account_flow(admin, tk_org_id):
     invitee = "nieuw@testklant.nl"
     # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
@@ -195,6 +208,7 @@ if __name__ == "__main__":
     test_trial_management(admin, tk_org_id)
     test_admin_pages(admin, tk_org_id)
     test_framework(demo)
+    test_meta_login_redirect(demo)
     test_account_flow(admin, tk_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

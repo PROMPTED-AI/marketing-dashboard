@@ -155,7 +155,10 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         mads = demo.meta_ads_overview(start, end, None)
         woo = None
     else:
-        key = f"{org_id}|framework|{month}|{property_id or '-'}"
+        # v2 in de sleutel: entries van vóór de 0-euro-telling voor
+        # niet-gekoppelde advertentiekanalen worden zo genegeerd, anders
+        # bleven afgesloten maanden nog tot 24 uur een leeg veld tonen.
+        key = f"{org_id}|framework:v2|{month}|{property_id or '-'}"
         cached = cache.get(key)
         if cached is not None:
             return cached
@@ -227,7 +230,7 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
     }
     if not models.is_demo_org(org_id):
         ttl = 300 if fetchers["errors"] else cache.ttl_for_range(end)
-        cache.set(f"{org_id}|framework|{month}|{property_id or '-'}", auto, ttl)
+        cache.set(f"{org_id}|framework:v2|{month}|{property_id or '-'}", auto, ttl)
     return auto
 
 

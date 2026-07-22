@@ -41,6 +41,11 @@ jobs:
       EUROUTER_API_KEY: fake-ci-key
       EUROUTER_MODEL: fake
       EUROUTER_BASE_URL: http://127.0.0.1:9099/v1
+      # Dummy META-config zodat de META-loginroute zijn echte pad doorloopt
+      # (zonder config stopt hij op een vroege 503 en blijft de rest ongetest).
+      META_APP_ID: "1234567890"
+      META_APP_SECRET: dummy-meta-secret
+      META_REDIRECT_URI: http://localhost:8000/api/auth/meta/callback
       BASE_URL: http://127.0.0.1:8000
 
     steps:
