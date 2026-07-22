@@ -168,10 +168,30 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         return round(v, 2) if isinstance(v, (int, float)) else v
 
     ga_kpis = (ga or {}).get("kpis", {})
-    ads_google = r2((ads or {}).get("kpis", {}).get("cost"))
-    ads_meta = r2((mads or {}).get("kpis", {}).get("spend"))
-    spend_parts = [v for v in (ads_google, ads_meta) if v is not None]
-    ads_kosten = r2(sum(spend_parts)) if spend_parts else None
+
+    # Advertentiekosten per platform. Een advertentiekanaal dat niet gekoppeld
+    # is, telt als 0 euro (er wordt immers niets aan uitgegeven), zodat kosten
+    # per lead toch berekend kan worden. Is een kanaal wél gekoppeld maar geeft
+    # het (tijdelijk) geen data, dan blijft het leeg: dat is onbekend, geen 0,
+    # en anders zou een storing als nul-uitgave worden verhuld.
+    demo_org = models.is_demo_org(org_id)
+    google_connected = demo_org or _connected(org_id, "google_ads")
+    meta_connected = demo_org or _connected(org_id, "meta_ads")
+
+    def _spend(value, connected):
+        value = r2(value)
+        if value is not None:
+            return value
+        return 0.0 if not connected else None
+
+    ads_google = _spend((ads or {}).get("kpis", {}).get("cost"), google_connected)
+    ads_meta = _spend((mads or {}).get("kpis", {}).get("spend"), meta_connected)
+    # Totaal alleen berekenen als geen enkel gekoppeld kanaal onbekend is; anders
+    # is het totaal zelf onbekend.
+    if ads_google is None or ads_meta is None:
+        ads_kosten = None
+    else:
+        ads_kosten = r2(ads_google + ads_meta)
 
     # Conversies komen uit Analytics (key events). Heeft de property geen key
     # events, dan tellen de advertentieplatformen zelf: Google Ads-conversies
