@@ -226,3 +226,42 @@ def _connected(target_org: str, provider: str) -> bool:
     conn = models.get_connection(target_org, provider=provider)
     return bool(conn and conn["status"] == "connected")
 
+
+def _managed(target_org: str) -> bool:
+    """True als dit een bureau-omgeving is (data via het manageraccount, bron
+    per bedrijf toegewezen door de admin)."""
+    org = models.get_organization(target_org)
+    return bool(org and org.get("managed"))
+
+
+def _effective_asset(target_org: str, kind: str, supplied):
+    """De bron (property/site/Ads-klant) die voor dit bedrijf gebruikt mag worden.
+
+    Voor een bureau-omgeving telt uitsluitend de toegewezen bron, zodat een
+    klant nooit een ander bedrijf kan opvragen dan aan zijn omgeving is
+    toegewezen. Buiten het bureau-model geldt gewoon de meegegeven waarde.
+    ``kind`` is een veld uit org_assets (ga_property_id/gsc_site_url/ads_customer_id).
+    """
+    if not _managed(target_org):
+        return supplied
+    val = models.get_org_assets(target_org).get(kind)
+    if not val:
+        raise HTTPException(
+            status_code=409,
+            detail="Deze omgeving is nog niet ingericht. De beheerder wijst eerst de juiste bron toe.",
+        )
+    return val
+
+
+def _limit_assets(target_org: str, items: list, id_key: str, kind: str) -> list:
+    """Beperk een lijst met bronnen tot de toegewezen bron voor een
+    bureau-omgeving (zodat de keuzelijst van een klant alleen zijn eigen bedrijf
+    toont). Buiten het bureau-model blijft de volledige lijst staan."""
+    if not _managed(target_org):
+        return items
+    val = models.get_org_assets(target_org).get(kind)
+    if not val:
+        return []
+    picked = [i for i in items if i.get(id_key) == val]
+    return picked or [{id_key: val}]
+

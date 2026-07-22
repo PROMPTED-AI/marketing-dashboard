@@ -14,6 +14,9 @@ org = models.create_or_rename_organization("Prompted", "prompted-ai.nl")
 models.upsert_user("admin@prompted-ai.nl", org["id"], "agency_admin")
 models.set_user_password("admin@prompted-ai.nl", auth.hash_password("admin123"))
 models.activate_org(org["id"])
+# Neppe Google-koppeling op het bureau-account, zodat de test het bureau-model
+# (koppeling hergebruiken voor een klant-omgeving) kan uitvoeren.
+models.save_connection(org["id"], "manager@prompted-ai.nl", {"token": "seed-fake"}, provider="google_analytics")
 
 tk = models.create_or_rename_organization("Testklant", "testklant.nl")
 models.upsert_user("test@testklant.nl", tk["id"], "client")

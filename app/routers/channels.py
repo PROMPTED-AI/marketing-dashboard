@@ -17,9 +17,10 @@ from .. import (
     woocommerce,
 )
 from ..org_access import (
-    _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _safe_return, _shopify_creds, _wc_creds,
+    _compact, _connected, _effective_asset, _google_data, _GOOGLE_TRANSIENT_MSG,
+    _is_grant_revoked, _limit_assets, _meta_token, _org_credentials,
+    _previous_period, _require_period, _resolve_org_id, _safe_return,
+    _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -33,19 +34,20 @@ def properties(request: Request, org_id: str | None = None):
         return {"org_id": target_org, "properties": demo.DEMO_PROPERTIES}
     key = f"{target_org}|props"
     cached = cache.get(key)
-    if cached is not None:
-        return cached
-    creds = _org_credentials(target_org)
-    properties_list = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
-    payload = {"org_id": target_org, "properties": properties_list}
-    cache.set(key, payload, cache.LIST_TTL)
-    return payload
+    if cached is None:
+        creds = _org_credentials(target_org)
+        properties_list = _google_data(target_org, "google_analytics", lambda: analytics.list_properties(creds))
+        cached = {"org_id": target_org, "properties": properties_list}
+        cache.set(key, cached, cache.LIST_TTL)
+    # Bureau-omgeving: toon alleen de aan dit bedrijf toegewezen property.
+    return {**cached, "properties": _limit_assets(target_org, cached["properties"], "property_id", "ga_property_id")}
 
 
 @router.get("/api/analytics/report")
 def report(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    property_id = _effective_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "property_id": property_id, "rows": demo.basic_report()}
     creds = _org_credentials(target_org)
@@ -66,6 +68,7 @@ def analytics_overview(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    property_id = _effective_asset(target_org, "ga_property_id", property_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.overview(start, end, compare)
@@ -85,6 +88,7 @@ def analytics_overview(
 def analytics_realtime(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    property_id = _effective_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"property_id": property_id, **demo.realtime()}
     creds = _org_credentials(target_org)
@@ -152,13 +156,12 @@ def gsc_sites(request: Request, org_id: str | None = None):
         return {"org_id": target_org, "sites": demo.DEMO_SITES}
     key = f"{target_org}|gscsites"
     cached = cache.get(key)
-    if cached is not None:
-        return cached
-    creds = _org_credentials(target_org, provider="search_console")
-    sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
-    payload = {"org_id": target_org, "sites": sites}
-    cache.set(key, payload, cache.LIST_TTL)
-    return payload
+    if cached is None:
+        creds = _org_credentials(target_org, provider="search_console")
+        sites = _google_data(target_org, "search_console", lambda: search_console.list_sites(creds))
+        cached = {"org_id": target_org, "sites": sites}
+        cache.set(key, cached, cache.LIST_TTL)
+    return {**cached, "sites": _limit_assets(target_org, cached["sites"], "site_url", "gsc_site_url")}
 
 
 @router.get("/api/search-console/report")
@@ -174,6 +177,7 @@ def gsc_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    site = _effective_asset(target_org, "gsc_site_url", site)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.gsc_report(start, end, compare)
@@ -414,16 +418,15 @@ def ads_accounts(request: Request, org_id: str | None = None):
         return {"org_id": target_org, "accounts": demo.DEMO_ADS_ACCOUNTS}
     key = f"{target_org}|adsaccounts"
     cached = cache.get(key)
-    if cached is not None:
-        return cached
-    creds = _org_credentials(target_org, provider="google_ads")
-    try:
-        accounts = google_ads.list_accounts(creds)
-    except google_ads.AdsNotConfigured:
-        raise HTTPException(status_code=409, detail="Google Ads is nog niet geconfigureerd op de server")
-    payload = {"org_id": target_org, "accounts": accounts}
-    cache.set(key, payload, cache.LIST_TTL)
-    return payload
+    if cached is None:
+        creds = _org_credentials(target_org, provider="google_ads")
+        try:
+            accounts = google_ads.list_accounts(creds)
+        except google_ads.AdsNotConfigured:
+            raise HTTPException(status_code=409, detail="Google Ads is nog niet geconfigureerd op de server")
+        cached = {"org_id": target_org, "accounts": accounts}
+        cache.set(key, cached, cache.LIST_TTL)
+    return {**cached, "accounts": _limit_assets(target_org, cached["accounts"], "customer_id", "ads_customer_id")}
 
 
 @router.get("/api/google-ads/report")
@@ -439,6 +442,7 @@ def ads_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    customer_id = _effective_asset(target_org, "ads_customer_id", customer_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.ads_overview(start, end, compare)

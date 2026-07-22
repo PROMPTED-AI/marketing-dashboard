@@ -235,6 +235,42 @@ def test_account_flow(admin, tk_org_id):
     print("accountflow: uitnodigen, wachtwoord instellen, reset en autorisatie slagen")
 
 
+def test_agency_environments(admin):
+    """Bureau-model: koppeling hergebruiken, bron toewijzen en afdwinging."""
+    # Verse klant-org om als bureau-omgeving in te richten.
+    org = admin.post(f"{BASE}/api/admin/organizations",
+                     json={"name": "AgencyKlant", "domain": "agencyklant.nl"}).json()["organization"]
+    oid = org["id"]
+    # Hergebruik de (geseede) bureau-koppeling voor dit bedrijf.
+    r = admin.post(f"{BASE}/api/admin/organizations/{oid}/link-agency")
+    assert r.status_code == 200 and r.json()["copied"] >= 1, (r.status_code, r.text)
+    assert admin.put(f"{BASE}/api/admin/organizations/{oid}/assets",
+                     json={"ga_property_id": "properties/111"}).status_code == 200
+    got = admin.get(f"{BASE}/api/admin/organizations/{oid}/assets").json()
+    assert got["managed"] is True and got["assets"]["ga_property_id"] == "properties/111", got
+
+    # Afdwinging (deterministisch, zonder Google): een managed bedrijf gebruikt
+    # uitsluitend de toegewezen bron, en de keuzelijst wordt daartoe beperkt.
+    from app import org_access
+    assert org_access._effective_asset(oid, "ga_property_id", "properties/999") == "properties/111"
+    assert org_access._limit_assets(
+        oid, [{"property_id": "properties/111"}, {"property_id": "properties/222"}],
+        "property_id", "ga_property_id") == [{"property_id": "properties/111"}]
+    # Managed zonder toewijzing voor een kanaal -> 409.
+    try:
+        org_access._effective_asset(oid, "gsc_site_url", None)
+        assert False, "verwachtte 409"
+    except Exception as e:
+        assert getattr(e, "status_code", None) == 409, e
+
+    # Autorisatie: een klant kan geen omgeving inrichten.
+    client = login("test@testklant.nl", "test123")
+    assert client.post(f"{BASE}/api/admin/organizations/{oid}/link-agency").status_code == 403
+    assert client.get(f"{BASE}/api/admin/organizations/{oid}/available-assets").status_code == 403
+    assert client.put(f"{BASE}/api/admin/organizations/{oid}/assets", json={"ga_property_id": "x"}).status_code == 403
+    print("bureau-omgevingen: hergebruik, toewijzen, afdwinging en autorisatie slagen")
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -259,5 +295,6 @@ if __name__ == "__main__":
     test_shopify_flow(demo)
     test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
+    test_agency_environments(admin)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

@@ -120,6 +120,32 @@ export function metaLoginUrl(orgId, returnTo = "/app/integrations") {
   return "/api/auth/meta/login?return_to=" + encodeURIComponent(returnTo) + q;
 }
 
+// --- bureau-model: per bedrijf een omgeving inrichten ---
+
+// Hergebruik de Google-koppeling van het bureau-account voor dit bedrijf.
+export function linkAgency(orgId) {
+  return api(`/api/admin/organizations/${orgId}/link-agency`, { method: "POST" });
+}
+
+// De beschikbare property's, sites en Ads-klanten voor de toewijzing.
+export function availableAssets(orgId) {
+  return api(`/api/admin/organizations/${orgId}/available-assets`);
+}
+
+// De huidige toewijzing + of dit een bureau-omgeving is.
+export function getOrgAssets(orgId) {
+  return api(`/api/admin/organizations/${orgId}/assets`);
+}
+
+// Wijs de property/site/Ads-klant toe aan dit bedrijf.
+export function setOrgAssets(orgId, assets) {
+  return api(`/api/admin/organizations/${orgId}/assets`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(assets),
+  });
+}
+
 // Shopify koppelt via zijn eigen OAuth-installatieflow; de klant vult zijn
 // shopdomein in en wordt naar het autorisatiescherm van zijn shop gestuurd.
 export function shopifyLoginUrl(shop, orgId, returnTo = "/app/integrations") {
