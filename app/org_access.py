@@ -12,7 +12,7 @@ from google.api_core.exceptions import PermissionDenied, Unauthenticated
 from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 
-from . import config, models, oauth
+from . import config, meta_oauth, models, oauth
 
 log = logging.getLogger("dashboard")
 

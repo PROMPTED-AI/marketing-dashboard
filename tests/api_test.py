@@ -149,6 +149,21 @@ def test_meta_login_redirect(demo):
     print("meta-login: nette redirect naar Facebook")
 
 
+def test_meta_data_no_crash():
+    """De META-databronnen mogen nooit 500'en, ook niet als de Graph-call faalt.
+
+    Regressie: _meta_token in org_access.py gebruikte meta_oauth zonder import,
+    waardoor elke META Ads-pagina (met een echte koppeling) crashte. De org
+    metatest.nl heeft een neppe META-koppeling; de Graph-call mislukt en de
+    endpoints horen netjes naar lege data te degraderen.
+    """
+    s = login("meta@metatest.nl", "metatest123")
+    assert s.get(f"{BASE}/api/meta/accounts").status_code == 200
+    r = s.get(f"{BASE}/api/meta/ads-report?ad_account_id=act_123&start=2026-06-01&end=2026-06-30")
+    assert r.status_code == 200, (r.status_code, r.text)
+    print("meta-data: geen 500 bij een falende Graph-call")
+
+
 def test_account_flow(admin, tk_org_id):
     invitee = "nieuw@testklant.nl"
     # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
@@ -209,6 +224,7 @@ if __name__ == "__main__":
     test_admin_pages(admin, tk_org_id)
     test_framework(demo)
     test_meta_login_redirect(demo)
+    test_meta_data_no_crash()
     test_account_flow(admin, tk_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")
