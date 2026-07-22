@@ -6,6 +6,7 @@ import { Invite, ResetPassword } from "./screens/PasswordFlow.jsx";
 import Onboarding from "./screens/Onboarding.jsx";
 import Dashboard from "./screens/dashboard/Layout.jsx";
 import Assistant from "./screens/dashboard/Assistant.jsx";
+import Signalen from "./screens/dashboard/Signalen.jsx";
 import Analytics from "./screens/dashboard/Analytics.jsx";
 import SearchConsole from "./screens/dashboard/SearchConsole.jsx";
 import GoogleAds from "./screens/dashboard/GoogleAds.jsx";
@@ -70,6 +71,7 @@ export default function App() {
       <Route path="/app" element={<RequireAuth><Dashboard /></RequireAuth>}>
         <Route index element={<DashIndex />} />
         <Route path="assistant" element={<Assistant />} />
+        <Route path="signalen" element={<Signalen />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<SearchConsole />} />
         <Route path="google-ads" element={<GoogleAds />} />

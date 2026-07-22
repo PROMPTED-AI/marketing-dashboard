@@ -72,7 +72,7 @@ function NotificationBell() {
           {insights?.length === 0 && <div style={bellEmpty}>Geen opvallende veranderingen deze periode.</div>}
           {insights?.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 8px 8px" }}>
-              {insights.slice(0, 6).map((it, i) => (
+              {insights.slice(0, 3).map((it, i) => (
                 <button key={i} className="icon-btn" onClick={() => ask(it.question)} title={it.detail} style={bellRow}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_COLOR[it.severity] || "var(--c-accent)", marginTop: 5, flex: "none" }} />
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -84,9 +84,14 @@ function NotificationBell() {
               ))}
             </div>
           )}
-          <div style={{ padding: "8px 14px 12px", borderTop: "1px solid var(--c-border-soft)", fontSize: 11, color: "var(--c-muted)" }}>
-            Klik op een signaal en de assistent zoekt het uit.
-          </div>
+          <button
+            className="icon-btn"
+            onClick={() => { setOpen(false); nav("/app/signalen"); }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "auto", margin: 0, padding: "10px 14px 12px", borderTop: "1px solid var(--c-border-soft)", fontSize: 12, fontWeight: 700, color: "var(--c-accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            <span>Alle signalen en advies</span>
+            <span>→</span>
+          </button>
         </div>
       )}
     </div>

@@ -195,6 +195,43 @@ def test_shopify_aggregate():
     print("shopify-aggregatie: alleen betaalde orders tellen mee")
 
 
+def test_signalen(demo):
+    """De signalen (insights) op de demo: het endpoint geeft een nette lijst met
+    per signaal een kanaal, ernst, titel en vervolgvraag. Voedt de bel en de
+    Signalen-pagina."""
+    r = demo.get(f"{BASE}/api/insights?start=2026-06-01&end=2026-06-30")
+    assert r.status_code == 200, (r.status_code, r.text)
+    items = r.json()["insights"]
+    assert isinstance(items, list), items
+    for it in items:
+        assert it.get("channel") and it.get("channel_label"), it
+        assert it.get("severity") in ("positive", "negative", "neutral"), it
+        assert it.get("title") and it.get("question"), it
+    print(f"signalen: {len(items)} nette signalen op de demo")
+
+
+def test_cross_channel_signals():
+    """De cross-kanaal-regels vuren deterministisch en storten niet in op lege
+    invoer. Puur, zonder server (net als de Shopify-aggregatietest)."""
+    from app import insights
+    base = {"advertentie_uitgaven_totaal": 1000, "blended_roas": 3.0, "verkeersverdeling_pct": {"betaald": 20}}
+    # Uitgaven stijgen fors, conversies blijven achter -> 'let op'.
+    r1 = insights.cross_channel(base, {"deltas": {"cost": 25, "conversions": 2}})
+    assert any(s["severity"] == "negative" and "conversies" in s["detail"] for s in r1), r1
+    # ROAS stijgt sterk -> opschaalkans.
+    r2 = insights.cross_channel(base, {"deltas": {"roas": 30}})
+    assert any(s["severity"] == "positive" for s in r2), r2
+    # Lage blended ROAS -> staande waarschuwing.
+    r3 = insights.cross_channel({**base, "blended_roas": 1.4}, {"deltas": {}})
+    assert any(s["severity"] == "negative" and s["delta"] is None for s in r3), r3
+    # Veel betaald verkeer -> informatief.
+    r4 = insights.cross_channel({**base, "verkeersverdeling_pct": {"betaald": 62}}, {"deltas": {}})
+    assert any(s["severity"] == "neutral" for s in r4), r4
+    # Lege invoer mag nooit crashen.
+    assert insights.cross_channel({"advertentie_uitgaven_totaal": None, "blended_roas": None, "verkeersverdeling_pct": None}, None) == []
+    print("cross-kanaal-signalen: rendement, opschalen, lage ROAS en verkeersmix vuren correct")
+
+
 def test_account_flow(admin, tk_org_id):
     invitee = "nieuw@testklant.nl"
     # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
@@ -314,6 +351,8 @@ if __name__ == "__main__":
     test_trial_management(admin, tk_org_id)
     test_admin_pages(admin, tk_org_id)
     test_framework(demo)
+    test_signalen(demo)
+    test_cross_channel_signals()
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
     test_shopify_flow(demo)
