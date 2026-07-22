@@ -6,8 +6,13 @@ als taalmodel, en een database die met tests/seed.py geseed is. De demo-org
 """
 import json
 import os
+import sys
 
 import requests
+
+# Repo-root op het pad zodat losse unit-checks `from app import ...` kunnen doen
+# (bij `python tests/api_test.py` staat alleen tests/ op sys.path).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE = os.environ.get("BASE_URL", "http://127.0.0.1:8000")
 
