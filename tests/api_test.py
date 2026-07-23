@@ -182,6 +182,19 @@ def test_shopify_flow(demo):
     print("shopify: login-redirect, domeinvalidatie en 409 zonder koppeling")
 
 
+def test_shopify_demo(demo):
+    """De demo-organisatie heeft een ingebouwde Shopify-demowinkel met
+    deterministische voorbeelddata (omzet, orders, topproducten, delta's)."""
+    r = demo.get(f"{BASE}/api/shopify/report?start=2026-06-01&end=2026-06-30"
+                 "&compare_start=2026-05-01&compare_end=2026-05-31")
+    assert r.status_code == 200, (r.status_code, r.text)
+    body = r.json()
+    assert body["kpis"]["revenue"] > 0 and body["kpis"]["orders"] > 0, body
+    assert body["by_date"] and body["top_products"], body
+    assert "deltas" in body and body.get("recent_orders"), body
+    print(f"shopify-demo: voorbeeldwinkel geeft {body['kpis']['orders']} orders en omzet")
+
+
 def test_shopify_aggregate():
     """Alleen betaalde orders tellen mee in de Shopify-omzetberekening."""
     from app import shopify
@@ -459,6 +472,7 @@ if __name__ == "__main__":
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
     test_shopify_flow(demo)
+    test_shopify_demo(demo)
     test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
     test_agency_environments(admin)

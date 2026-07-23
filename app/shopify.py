@@ -6,7 +6,9 @@ topproducten teruggeven. Alle calls gaan alleen naar het gekoppelde
 ``*.myshopify.com``-domein (afgedwongen bij het koppelen).
 """
 import logging
+import random
 import re
+from datetime import date, timedelta
 
 import requests
 
@@ -17,6 +19,12 @@ log = logging.getLogger(__name__)
 
 _TIMEOUT = 20
 _MAX_PAGES = 10  # 10 × 250 orders per periode
+
+# Ingebouwde demowinkel: net als bij WooCommerce (``woocommerce.DEMO_STORE``)
+# krijgt de demo-organisatie een Shopify-koppeling naar dit domein, waarna
+# `run_overview` deterministische voorbeeldorders genereert in plaats van de
+# echte Admin API aan te roepen.
+DEMO_SHOP = "demo.myshopify.com"
 
 # Financiele statussen die als omzet tellen (betaald of deels terugbetaald).
 _REVENUE_FINANCIAL = {"paid", "partially_refunded", "partially_paid"}
@@ -62,6 +70,64 @@ def _fetch_orders(shop: str, token: str, start: str, end: str) -> list[dict]:
             break
         url, params = m.group(1), None
     return out
+
+
+# ------------------------------------------------------------------ demowinkel
+
+_DEMO_PRODUCTS = [
+    ("Linnen dekbedovertrek", 79.95), ("Geurkaars Amber", 24.50),
+    ("Keramische mok (set van 4)", 29.95), ("Wollen plaid", 89.00),
+    ("Bamboe snijplank", 34.95), ("Handdoekenset", 39.95),
+    ("Glazen karaf 1L", 22.50), ("Katoenen badjas", 59.95),
+    ("Serviesset 4-persoons", 119.00), ("Gietijzeren theepot", 44.95),
+]
+
+
+def _demo_orders(start: str, end: str) -> list[dict]:
+    """Deterministische demo-orders in de vorm van de Shopify Admin API.
+
+    Per dag geseed op de datum, dus dezelfde periode geeft altijd dezelfde
+    cijfers (belangrijk voor caching en vergelijkbare periodes). Weekenddagen
+    zijn wat drukker en er zit een licht trendje in."""
+    s, e = date.fromisoformat(start), date.fromisoformat(end)
+    orders, oid = [], 5000
+    day = s
+    while day <= e:
+        rng = random.Random(f"kompas-shopify-demo|{day.isoformat()}")
+        base = 5 + (2 if day.weekday() >= 5 else 0) + (day.toordinal() % 7) // 3
+        for _ in range(rng.randint(max(base - 2, 1), base + 3)):
+            oid += 1
+            items, subtotal = [], 0.0
+            for name, price in rng.sample(_DEMO_PRODUCTS, rng.randint(1, 3)):
+                qty = rng.randint(1, 2)
+                subtotal += price * qty
+                items.append({"name": name, "quantity": qty, "price": f"{price:.2f}"})
+            roll = rng.random()
+            fin = ("paid" if roll < 0.82 else
+                   "pending" if roll < 0.92 else
+                   "partially_refunded" if roll < 0.97 else "refunded")
+            total = round(subtotal, 2)
+            order = {
+                "id": oid,
+                "financial_status": fin,
+                "created_at": f"{day.isoformat()}T{rng.randint(8, 21):02d}:{rng.randint(0, 59):02d}:00Z",
+                "total_price": f"{total:.2f}",
+                "customer": {"id": rng.randint(1, 60)} if rng.random() < 0.7 else None,
+                "line_items": items,
+            }
+            if fin in ("partially_refunded", "refunded"):
+                refund = round(total * (1.0 if fin == "refunded" else 0.3), 2)
+                order["refunds"] = [{"transactions": [{"amount": f"{refund:.2f}"}]}]
+            orders.append(order)
+        day += timedelta(days=1)
+    return orders
+
+
+def _orders_for(shop: str, token: str, start: str, end: str) -> list[dict]:
+    """Demowinkel levert gegenereerde orders; anders de echte Admin API."""
+    if shop == DEMO_SHOP:
+        return _demo_orders(start, end)
+    return _fetch_orders(shop, token, start, end)
 
 
 def _aggregate(orders: list[dict]) -> dict:
@@ -139,12 +205,12 @@ def _aggregate(orders: list[dict]) -> dict:
 def run_overview(shop: str, token: str, start: str, end: str,
                  compare: tuple[str, str] | None = None) -> dict:
     """Winkelrapport voor de periode, met optionele vergelijkingsdelta's."""
-    orders = _fetch_orders(shop, token, start, end)
+    orders = _orders_for(shop, token, start, end)
     data = _aggregate(orders)
 
     if compare:
         try:
-            prev = _aggregate(_fetch_orders(shop, token, compare[0], compare[1]))["kpis"]
+            prev = _aggregate(_orders_for(shop, token, compare[0], compare[1]))["kpis"]
 
             def delta(key):
                 c, p = data["kpis"].get(key, 0) or 0, prev.get(key, 0) or 0
