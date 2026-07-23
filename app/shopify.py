@@ -232,6 +232,24 @@ def run_overview(shop: str, token: str, start: str, end: str,
     return data
 
 
+def fetch_shop_info(shop: str, token: str) -> dict:
+    """Winkelnaam + eigenaars-e-mail via shop.json (best-effort, faalt zacht).
+
+    Gebruikt bij een self-serve App Store-installatie om de nieuwe organisatie een
+    nette naam te geven. Elke fout levert lege velden op; de koppeling zelf gaat
+    daar niet op stuk."""
+    try:
+        resp = requests.get(
+            f"{_api_base(shop)}/shop.json",
+            headers={"X-Shopify-Access-Token": token}, timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        s = (resp.json() or {}).get("shop", {})
+        return {"name": s.get("name"), "email": s.get("email")}
+    except (requests.RequestException, ValueError, ShopifyError):
+        return {"name": None, "email": None}
+
+
 def test_connection(shop: str, token: str) -> None:
     """Kleine validatiecall bij het koppelen; raise ShopifyError bij mislukking."""
     try:
