@@ -68,7 +68,14 @@ class H(BaseHTTPRequestHandler):
                 widgets.append({"source": "bestaat_niet_xyz", "kind": "kpi", "size": 3, "title": "Ongeldig"})
                 layout = {"widgets": widgets, "notes": "Testconcept met een afgeleide KPI.",
                           "requests": ["een heatmap van klikken op de pagina"]}
-                msg = {"role": "assistant", "content": "```json\n" + json.dumps(layout) + "\n```"}
+                payload_json = json.dumps(layout)
+                # "denkmodel": simuleer kimi-k2.6 dat met lege content eindigt en
+                # de JSON (met een losse accolade ervoor) in reasoning_content zet.
+                if "denkmodel" in lu.lower():
+                    msg = {"role": "assistant", "content": "",
+                           "reasoning_content": "Ik denk na over {bron}. Uiteindelijk: " + payload_json}
+                else:
+                    msg = {"role": "assistant", "content": "```json\n" + payload_json + "\n```"}
                 body = json.dumps({"id": "x", "object": "chat.completion", "model": "fake",
                                    "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}]}).encode()
                 self.send_response(200); self.send_header("Content-Type", "application/json")

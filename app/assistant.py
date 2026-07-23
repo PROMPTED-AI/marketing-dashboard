@@ -662,33 +662,55 @@ DASHBOARD_PROMPT = (
 
 
 def _extract_json(text: str) -> dict | None:
-    """Haal het JSON-object uit een modelantwoord. Bestand tegen denkende modellen
-    (qwen3 stuurt <think>...</think>), code-fences en trailing komma's."""
+    """Haal het JSON-object uit een modelantwoord. Bestand tegen redenerende
+    modellen (kimi-k2.6 levert zijn tekst vaak via reasoning_content, met losse
+    accolades in de denktekst), <think>-blokken, code-fences en trailing komma's.
+
+    Aanpak: scan de tekst en decodeer elk JSON-object dat begint bij een '{';
+    prefereer het laatste object met een 'widgets'-sleutel. Zo pikken we de echte
+    indeling eruit, ook als er eerder in de redenering losse accolades staan."""
     if not text:
         return None
     import re
-    t = text.strip()
-    # Denkblokken van redenerende modellen weghalen voordat we JSON zoeken.
-    t = re.sub(r"<think>.*?</think>", "", t, flags=re.DOTALL)
-    t = re.sub(r"<think>.*$", "", t, flags=re.DOTALL)  # afgekapt denkblok zonder sluiting
-    t = t.strip()
+    t = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    t = re.sub(r"<think>.*$", "", t, flags=re.DOTALL).strip()  # afgekapt denkblok
     if "```" in t:
         m = re.search(r"```(?:json)?\s*(.+?)```", t, re.DOTALL)
         if m:
             t = m.group(1).strip()
-    start, end = t.find("{"), t.rfind("}")
-    if start < 0 or end <= start:
-        return None
-    snippet = t[start:end + 1]
-    # Twee pogingen: rauw, en met trailing komma's verwijderd (veelvoorkomend).
-    for candidate in (snippet, re.sub(r",(\s*[}\]])", r"\1", snippet)):
+
+    found: list[dict] = []
+    dec = json.JSONDecoder()
+    i = 0
+    while True:
+        j = t.find("{", i)
+        if j < 0:
+            break
         try:
-            obj = json.loads(candidate)
-        except (ValueError, TypeError):
-            continue
-        if isinstance(obj, dict):
-            return obj
-    return None
+            obj, endpos = dec.raw_decode(t, j)
+            if isinstance(obj, dict):
+                found.append(obj)
+            i = endpos
+        except ValueError:
+            i = j + 1
+
+    # Vangnet voor trailing komma's: eerste { .. laatste } opschonen en parsen.
+    if not found:
+        a, b = t.find("{"), t.rfind("}")
+        if 0 <= a < b:
+            try:
+                obj = json.loads(re.sub(r",(\s*[}\]])", r"\1", t[a:b + 1]))
+                if isinstance(obj, dict):
+                    found.append(obj)
+            except (ValueError, TypeError):
+                pass
+
+    if not found:
+        return None
+    for f in reversed(found):
+        if "widgets" in f:
+            return f
+    return found[-1]
 
 
 def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
@@ -698,9 +720,9 @@ def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
     de aanroeper valideert dat tegen de echte catalogus. Kan een uitzondering
     gooien (gateway-fout) of ValueError als er geen JSON uitkwam.
 
-    Ruime max_tokens en een strikte herkansing, zodat een denkend model (qwen3)
-    genoeg ruimte heeft om ná het redeneren de JSON te geven en we niet op een
-    afgekapt of in denkstappen verpakt antwoord stuklopen."""
+    Ruime max_tokens en een strikte herkansing, zodat een redenerend model
+    (kimi-k2.6) genoeg ruimte heeft om ná het denken de JSON te geven; de
+    reasoning_content dient als vangnet als het model met lege content eindigt."""
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=90, max_retries=1)
     user = f"CATALOGUS (beschikbare widgets):\n{catalog_json}\n\n"
     if context:
