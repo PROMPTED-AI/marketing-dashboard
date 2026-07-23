@@ -195,6 +195,49 @@ def test_shopify_demo(demo):
     print(f"shopify-demo: voorbeeldwinkel geeft {body['kpis']['orders']} orders en omzet")
 
 
+def test_shopify_webhook_hmac():
+    """De webhook-HMAC (base64 van HMAC-SHA256 over de rauwe body) accepteert een
+    geldige handtekening en weigert een ongeldige/lege. Puur, zonder server."""
+    import base64, hashlib
+    import hmac as hmaclib
+    from app import config, shopify_oauth
+    body = b'{"shop_domain":"x.myshopify.com"}'
+    sig = base64.b64encode(hmaclib.new(config.SHOPIFY_API_SECRET.encode(), body, hashlib.sha256).digest()).decode()
+    assert shopify_oauth.verify_webhook_hmac(body, sig) is True
+    assert shopify_oauth.verify_webhook_hmac(body, "fout") is False
+    assert shopify_oauth.verify_webhook_hmac(body, "") is False
+    print("shopify-webhook-HMAC: geldige handtekening geaccepteerd, ongeldige geweigerd")
+
+
+def test_shopify_webhooks(demo, tk_org_id):
+    """De GDPR-webhooks: geldige HMAC -> 200 op alle drie de topics, ongeldige
+    HMAC -> 401, en shop/redact verwijdert echt de Shopify-koppeling van die shop.
+    Vereist de draaiende server (echte HTTP)."""
+    import base64, hashlib
+    import hmac as hmaclib
+    from app import config, models
+    secret = config.SHOPIFY_API_SECRET.encode()
+
+    def sign(b):
+        return base64.b64encode(hmaclib.new(secret, b, hashlib.sha256).digest()).decode()
+
+    shop = "webhooktest.myshopify.com"
+    body = json.dumps({"shop_domain": shop}).encode()
+    hdr = {"X-Shopify-Hmac-Sha256": sign(body), "X-Shopify-Shop-Domain": shop, "Content-Type": "application/json"}
+    for path in ("customers-data-request", "customers-redact", "shop-redact"):
+        r = requests.post(f"{BASE}/api/webhooks/shopify/{path}", data=body, headers=hdr)
+        assert r.status_code == 200, (path, r.status_code, r.text)
+    # Ongeldige handtekening wordt geweigerd.
+    assert requests.post(f"{BASE}/api/webhooks/shopify/shop-redact", data=body,
+                         headers={"X-Shopify-Hmac-Sha256": "fout"}).status_code == 401
+    # shop/redact verwijdert de koppeling van die shop.
+    models.save_connection(tk_org_id, shop, {"shop": shop, "access_token": "x"}, provider="shopify")
+    assert models.get_connection(tk_org_id, provider="shopify")
+    assert requests.post(f"{BASE}/api/webhooks/shopify/shop-redact", data=body, headers=hdr).status_code == 200
+    assert models.get_connection(tk_org_id, provider="shopify") is None
+    print("shopify-webhooks: HMAC 200/401 en shop/redact verwijdert de koppeling")
+
+
 def test_shopify_aggregate():
     """Alleen betaalde orders tellen mee in de Shopify-omzetberekening."""
     from app import shopify
@@ -473,6 +516,8 @@ if __name__ == "__main__":
     test_meta_data_no_crash()
     test_shopify_flow(demo)
     test_shopify_demo(demo)
+    test_shopify_webhook_hmac()
+    test_shopify_webhooks(demo, tk_org_id)
     test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
     test_agency_environments(admin)

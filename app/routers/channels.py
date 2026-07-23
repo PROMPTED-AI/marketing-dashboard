@@ -6,7 +6,7 @@ import uuid
 from datetime import date, timedelta
 
 import requests
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
@@ -335,6 +335,60 @@ def shopify_report(
     payload = {"org_id": target_org, "shop": shop, **data}
     cache.set(key, payload, cache.ttl_for_range(end))
     return payload
+
+
+# ------------------------------------------------- Shopify GDPR-webhooks
+#
+# Verplichte compliance-webhooks voor een publieke Shopify-app. Shopify tekent
+# elke webhook met base64(HMAC-SHA256(app_secret, rauwe body)) in de header
+# X-Shopify-Hmac-Sha256; we valideren die op de RAUWE body vóór enige verwerking
+# en weigeren (401) als de handtekening niet klopt. Deze endpoints hebben geen
+# sessie/auth (Shopify roept ze server-to-server aan).
+
+async def _verify_shopify_webhook(request: Request) -> tuple[bytes, dict]:
+    raw = await request.body()
+    if not shopify_oauth.verify_webhook_hmac(raw, request.headers.get("X-Shopify-Hmac-Sha256", "")):
+        raise HTTPException(status_code=401, detail="Ongeldige webhook-handtekening")
+    try:
+        payload = json.loads(raw or b"{}")
+    except (ValueError, TypeError):
+        payload = {}
+    return raw, payload
+
+
+def _webhook_shop(request: Request, payload: dict) -> str | None:
+    return request.headers.get("X-Shopify-Shop-Domain") or payload.get("shop_domain")
+
+
+@router.post("/api/webhooks/shopify/customers-data-request")
+async def shopify_customers_data_request(request: Request):
+    """GDPR: verzoek om klantdata. Wij slaan geen individuele klant-PII op (enkel
+    tijdelijke, verlopende geaggregeerde rapporten), dus er is niets te leveren."""
+    _, payload = await _verify_shopify_webhook(request)
+    log.info("shopify webhook customers/data_request shop=%s", _webhook_shop(request, payload))
+    return Response(status_code=200)
+
+
+@router.post("/api/webhooks/shopify/customers-redact")
+async def shopify_customers_redact(request: Request):
+    """GDPR: wis klantdata. Wij bewaren geen persoonsgegevens per klant; de
+    geaggregeerde rapporten in de cache verlopen vanzelf. Bevestig met 200."""
+    _, payload = await _verify_shopify_webhook(request)
+    log.info("shopify webhook customers/redact shop=%s", _webhook_shop(request, payload))
+    return Response(status_code=200)
+
+
+@router.post("/api/webhooks/shopify/shop-redact")
+async def shopify_shop_redact(request: Request):
+    """GDPR: wis winkeldata (48 uur na deïnstallatie). Verwijder de opgeslagen
+    Shopify-koppeling(en) voor deze shop en leeg hun gecachte rapporten."""
+    _, payload = await _verify_shopify_webhook(request)
+    shop = _webhook_shop(request, payload)
+    if shop:
+        for org_id in models.delete_shopify_connections_for_shop(shop):
+            cache.invalidate_org(org_id)
+        log.info("shopify webhook shop/redact verwerkt shop=%s", shop)
+    return Response(status_code=200)
 
 
 @router.get("/api/meta/accounts")

@@ -633,6 +633,27 @@ def delete_connection(organization_id: str, provider: str) -> None:
         )
 
 
+def delete_shopify_connections_for_shop(shop: str) -> list[str]:
+    """Verwijder elke Shopify-koppeling die naar `shop` verwijst (voor de GDPR
+    ``shop/redact``-webhook). De shop staat versleuteld in de creds, dus we
+    ontsleutelen per Shopify-koppeling en matchen op `creds.shop`. Returnt de
+    org-id's zodat de aanroeper hun cache kan legen."""
+    affected: list[str] = []
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, organization_id, encrypted_creds FROM connections WHERE provider = 'shopify'"
+        ).fetchall()
+        for cid, org_id, blob in rows:
+            try:
+                creds = json.loads(crypto.decrypt(blob))
+            except Exception:  # noqa: BLE001 - onleesbare rij overslaan
+                continue
+            if creds.get("shop") == shop:
+                conn.execute("DELETE FROM connections WHERE id = %s", (cid,))
+                affected.append(org_id)
+    return affected
+
+
 def count_google_connections(organization_id: str) -> int:
     """How many Google-provider connections remain for an org."""
     with db.get_conn() as conn:
