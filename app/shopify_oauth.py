@@ -6,6 +6,7 @@ onze callback met een ``code`` (plus een HMAC-handtekening die we verifieren),
 en die code wisselen we in voor een permanent Admin-API-token. Dat token wordt
 (zoals alle tokens) Fernet-versleuteld per organisatie opgeslagen.
 """
+import base64
 import hashlib
 import hmac
 import re
@@ -73,6 +74,21 @@ def verify_hmac(params: dict) -> bool:
         config.SHOPIFY_API_SECRET.encode(), pairs.encode(), hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(digest, received)
+
+
+def verify_webhook_hmac(raw_body: bytes, header: str) -> bool:
+    """Verifieer de handtekening van een Shopify-webhook.
+
+    Anders dan de OAuth-callback (die gesorteerde queryparameters hasht) tekent
+    Shopify een webhook met ``base64(HMAC-SHA256(app_secret, rauwe request-body))``
+    in de header ``X-Shopify-Hmac-Sha256``. We hashen daarom exact de rauwe bytes
+    van de body, vóór enige JSON-parsing.
+    """
+    if not header or not config.SHOPIFY_API_SECRET:
+        return False
+    digest = hmac.new(config.SHOPIFY_API_SECRET.encode(), raw_body, hashlib.sha256).digest()
+    expected = base64.b64encode(digest).decode()
+    return hmac.compare_digest(expected, header)
 
 
 def exchange_code(shop: str, code: str) -> dict:
