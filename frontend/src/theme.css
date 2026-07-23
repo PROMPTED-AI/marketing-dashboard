@@ -196,8 +196,21 @@ a { color: inherit; }
 @keyframes chip-in { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
 .bubble-in { animation: bubble-in 0.22s ease; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* Skeleton-laadkaart: een schimmende placeholder terwijl content (bijv. een
+   met AI samengesteld dashboard) nog wordt opgebouwd. */
+.skeleton-card {
+  border-radius: 16px;
+  border: 1px solid var(--c-border);
+  background: linear-gradient(100deg, var(--c-surface-2) 30%, var(--c-track) 50%, var(--c-surface-2) 70%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .typing-dot, .thinking-label, .chip-in, .bubble-in { animation: none; }
+  .skeleton-card { animation: none; }
 }
 
 /* Print / Save-as-PDF: drop app chrome, force light, let content flow. */

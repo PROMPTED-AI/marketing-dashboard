@@ -297,7 +297,7 @@ def test_dashboard_generate(demo):
     assert "users" in srcs and "channels" in srcs, srcs
     assert "bestaat_niet_xyz" not in srcs and body["dropped"] >= 1, body
     custom = next((w for w in widgets if w["source"] == "custom"), None)
-    assert custom and custom["kind"] == "kpi" and custom["spec"]["refs"] == ["sessions", "users"], custom
+    assert custom and custom["kind"] == "kpi" and set(custom["spec"]["refs"]) == {"users", "sessions"}, custom
     assert body["requests"], body
     # Het concept is een geldige, bewaarbare layout.
     created = demo.post(f"{BASE}/api/dashboards", json={"name": "AI-concept", "layout": body["layout"], "page": "analytics"})

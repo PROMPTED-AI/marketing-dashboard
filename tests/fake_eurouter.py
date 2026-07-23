@@ -40,21 +40,34 @@ class H(BaseHTTPRequestHandler):
         # JSON-completion teruggeven. Bij "leegstil" blijft óók de herkansing
         # leeg (alleen reasoning), zodat het reasoning-vangnet getest wordt.
         if not req.get("stream"):
-            # Dashboard-generatie: geef een JSON-indeling terug met een geldige
-            # bron, een custom-KPI (afgeleide metric) en één ongeldige bron, zodat
-            # de server-side validatie (droppen + custom-spec) getest wordt.
+            # Dashboard-generatie: lees de meegestuurde catalogus en bouw een
+            # indeling met echte bronsleutels (werkt dus voor elk tabblad, ook de
+            # genamespacete Custom/Overzicht-catalogus), plus een custom-KPI
+            # (afgeleide metric) en één ongeldige bron, zodat de server-side
+            # validatie (droppen + custom-spec) getest wordt.
             if "catalogus" in str(last_user).lower():
-                layout = {
-                    "widgets": [
-                        {"source": "users", "kind": "kpi", "size": 3, "title": "Bezoekers"},
-                        {"source": "channels", "kind": "donut", "size": 4, "title": "Verkeersbronnen"},
-                        {"source": "custom", "kind": "kpi", "size": 3, "title": "Sessies per bezoeker",
-                         "spec": {"op": "ratio", "refs": ["sessions", "users"], "fmt": "ratio"}},
-                        {"source": "bestaat_niet_xyz", "kind": "kpi", "size": 3, "title": "Ongeldig"},
-                    ],
-                    "notes": "Testconcept met een afgeleide KPI.",
-                    "requests": ["een heatmap van klikken op de pagina"],
-                }
+                lu = str(last_user)
+                idx = lu.find("{", lu.lower().find("catalogus"))
+                try:
+                    cat, _ = json.JSONDecoder().raw_decode(lu[idx:])
+                    srcs = cat.get("sources", [])
+                except (ValueError, TypeError):
+                    srcs = []
+                scalars = [s["key"] for s in srcs if s.get("scalar")]
+                kpi_src = next((s["key"] for s in srcs if "kpi" in (s.get("kinds") or [])), None)
+                dist = next((s for s in srcs if any(k in (s.get("kinds") or []) for k in ("donut", "bars", "table"))), None)
+                widgets = []
+                if kpi_src:
+                    widgets.append({"source": kpi_src, "kind": "kpi", "size": 3, "title": "Kerncijfer"})
+                if dist:
+                    kind = next(k for k in ("donut", "bars", "table") if k in dist["kinds"])
+                    widgets.append({"source": dist["key"], "kind": kind, "size": 4, "title": "Verdeling"})
+                if len(scalars) >= 2:
+                    widgets.append({"source": "custom", "kind": "kpi", "size": 3, "title": "Afgeleide KPI",
+                                    "spec": {"op": "ratio", "refs": [scalars[0], scalars[1]], "fmt": "ratio"}})
+                widgets.append({"source": "bestaat_niet_xyz", "kind": "kpi", "size": 3, "title": "Ongeldig"})
+                layout = {"widgets": widgets, "notes": "Testconcept met een afgeleide KPI.",
+                          "requests": ["een heatmap van klikken op de pagina"]}
                 msg = {"role": "assistant", "content": "```json\n" + json.dumps(layout) + "\n```"}
                 body = json.dumps({"id": "x", "object": "chat.completion", "model": "fake",
                                    "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}]}).encode()

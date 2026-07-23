@@ -22,8 +22,14 @@ import DashboardEditor from "../../components/dashboard/DashboardEditor.jsx";
 import { CHANNELS, CATALOGS } from "../../lib/widgets/index.js";
 import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
 
-// De tabs: het cross-kanaal Overzicht eerst, daarna de losse kanalen.
-const TABS = [{ key: "overview", label: "Overzicht", catalog: null }, ...CHANNELS];
+// De tabs: het cross-kanaal Overzicht eerst, dan Custom (door AI samengestelde
+// dashboards), daarna de losse kanalen. Custom hergebruikt de gecombineerde
+// catalogus maar met een eigen pagina-sleutel en de AI-generatieknop.
+const TABS = [
+  { key: "overview", label: "Overzicht", catalog: null },
+  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "custom", subtitle: "je met AI samengestelde dashboards" },
+  ...CHANNELS,
+];
 
 // Welke koppeling hoort bij welk tabblad. Net als in de sidebar tonen we
 // alleen de tabs van gekoppelde kanalen; META Organisch deelt de
@@ -68,7 +74,7 @@ export default function MyDashboards() {
       <div style={{ marginBottom: 14 }}>
         <div className="display" style={{ fontSize: 30 }}>mijn dashboards</div>
         <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
-          Stel per kanaal je eigen indeling samen. Kies de cijfers, grafieken en tabellen die jij wilt zien.
+          Stel per kanaal je eigen indeling samen, of laat de AI onder Custom een dashboard voor je bouwen.
         </div>
       </div>
 
@@ -94,7 +100,8 @@ export default function MyDashboards() {
         })}
       </div>
 
-      <Wrapper key={active.key} catalog={active.catalog} />
+      <Wrapper key={active.key} catalog={active.catalog}
+        page={active.page} canGenerate={active.canGenerate} tabTitle={active.title} tabSubtitle={active.subtitle} />
     </div>
   );
 }
@@ -105,7 +112,7 @@ export default function MyDashboards() {
 // en voedt de gecombineerde catalogus, zodat één dashboard widgets uit
 // verschillende kanalen mixt. Kanalen zonder koppeling doen niet mee (hun
 // widgets en groepen verschijnen ook niet in de widget-kiezer).
-function OverviewData() {
+function OverviewData({ page = "overview-mix", canGenerate = false, tabTitle = "overzicht", tabSubtitle }) {
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const { data: connData } = useConnections();
@@ -155,13 +162,14 @@ function OverviewData() {
 
   if (loading) return <TabState loading />;
   if (active && active.size === 0)
-    return <Empty>Koppel eerst een kanaal via Integraties, daarna kun je hier een overzichtsdashboard samenstellen.</Empty>;
+    return <Empty>Koppel eerst een kanaal via Integraties, daarna kun je hier een {canGenerate ? "dashboard met AI laten samenstellen" : "overzichtsdashboard samenstellen"}.</Empty>;
 
   return (
     <DashboardEditor
-      catalog={catalog} page="overview-mix" data={data} loading={false} error={null} ctx={ctx}
-      title="overzicht" subtitle={"alle kanalen in één dashboard · " + label}
-      exportFilename="overzicht-dashboard"
+      catalog={catalog} page={page} data={data} loading={false} error={null} ctx={ctx}
+      title={tabTitle} subtitle={tabSubtitle ? tabSubtitle + " · " + label : "alle kanalen in één dashboard · " + label}
+      exportFilename={page === "custom" ? "custom-dashboard" : "overzicht-dashboard"}
+      canGenerate={canGenerate}
     />
   );
 }
@@ -353,6 +361,7 @@ function WooCommerceData({ catalog }) {
 
 const WRAPPERS = {
   "overview": OverviewData,
+  "custom": OverviewData,
   "analytics": AnalyticsData,
   "search-console": SearchConsoleData,
   "google-ads": GoogleAdsData,

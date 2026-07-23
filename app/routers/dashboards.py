@@ -34,8 +34,8 @@ router = APIRouter()
 # waarden uit. De frontend gebruikt deze kanaalsleutels; het cross-kanaal
 # "Overzicht"-tabblad gebruikt 'overview-mix' (en 'overview' bestaat als legacy).
 _DASHBOARD_PAGES = {
-    "overview", "overview-mix", "analytics", "search-console", "google-ads",
-    "meta-ads", "meta-organic", "woocommerce",
+    "overview", "overview-mix", "custom", "analytics", "search-console",
+    "google-ads", "meta-ads", "meta-organic", "woocommerce",
 }
 # Een widgetlayout is klein (hooguit enkele tientallen widgets). Begrens de
 # opgeslagen JSON zodat niemand willekeurig grote/diepe blobs kan wegschrijven.
