@@ -628,3 +628,81 @@ def stream_feedback_analysis(item: dict, *, api_key: str, base_url: str, model: 
     except Exception:  # noqa: BLE001
         log.exception("feedback-analyse faalde")
         yield _sse("error", message="De AI-uitwerking is niet gelukt. Probeer het later opnieuw.")
+
+
+# ---------------------------------------------------------- dashboard genereren
+
+DASHBOARD_PROMPT = (
+    "Je bent een assistent die een marketingdashboard samenstelt uit widgets. Je "
+    "krijgt een CATALOGUS met beschikbare bronnen (widgets) en een verzoek van de "
+    "gebruiker. Stel een passend, overzichtelijk dashboard samen.\n\n"
+    "Antwoord UITSLUITEND met één JSON-object, zonder tekst eromheen, precies zo:\n"
+    '{"widgets": [ {"source": "<bronsleutel uit de catalogus>", "kind": '
+    '"kpi|area|donut|bars|table", "size": 3, "title": "<korte titel>"} ], '
+    '"notes": "<één korte zin over keuzes, of leeg>", "requests": ["<gevraagde '
+    'widget die niet kon, of niets>"]}\n\n'
+    "Regels:\n"
+    "- Gebruik voor 'source' ALLEEN sleutels die exact in de catalogus staan, en voor "
+    "'kind' alleen een waarde die in de 'kinds' van die bron staat.\n"
+    "- Groottes (kolommen van 12): KPI 3, cirkeldiagram 4, balkenlijst/tabel 6, "
+    "lijngrafiek 12.\n"
+    "- Bestaat een gevraagde afgeleide metric niet als bron (bijv. 'kosten per "
+    "bestelling', 'omzet per bezoeker')? Maak dan een custom KPI: "
+    '{"source":"custom","kind":"kpi","size":3,"title":"...","spec":{"op":'
+    '"ratio|sum|diff|product|identity","refs":["<bronsleutel>","<bronsleutel>"],'
+    '"fmt":"int|euro|ratio|percent"}}. Gebruik in \'refs\' uitsluitend bronsleutels '
+    "met \"scalar\": true uit de catalogus. Voor een verhouding gebruik je 'ratio' "
+    "met precies twee refs (teller, noemer).\n"
+    "- Kan iets echt niet met deze catalogus? Zet een korte omschrijving in 'requests' "
+    "en laat de widget weg.\n"
+    "- Geef 6 tot 14 widgets tenzij anders gevraagd, belangrijkste KPI's eerst.\n"
+    "- Titels in het Nederlands, met een hoofdletter. Verzin geen cijfers; je kiest "
+    "alleen wélke widgets op het dashboard komen."
+)
+
+
+def _extract_json(text: str) -> dict | None:
+    """Haal het JSON-object uit een modelantwoord (met of zonder ```-fence)."""
+    if not text:
+        return None
+    t = text.strip()
+    if "```" in t:
+        # Pak de inhoud van het eerste code-blok.
+        import re
+        m = re.search(r"```(?:json)?\s*(.+?)```", t, re.DOTALL)
+        if m:
+            t = m.group(1).strip()
+    start, end = t.find("{"), t.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        obj = json.loads(t[start:end + 1])
+    except (ValueError, TypeError):
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
+                       base_url: str, model: str, context: str | None = None) -> dict:
+    """Vraag het model een dashboard-indeling voor te stellen op basis van de
+    catalogus. Geeft het rauwe, geparste object terug ({widgets, notes, requests});
+    de aanroeper valideert dat tegen de echte catalogus. Kan een uitzondering
+    gooien (gateway-fout) of ValueError als er geen JSON uitkwam."""
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=60, max_retries=1)
+    user = f"CATALOGUS (beschikbare widgets):\n{catalog_json}\n\n"
+    if context:
+        user += f"CONTEXT (ter inspiratie, geen cijfers overnemen):\n{context}\n\n"
+    user += f"VERZOEK VAN DE GEBRUIKER:\n{prompt}"
+    messages = [
+        {"role": "system", "content": DASHBOARD_PROMPT},
+        {"role": "user", "content": user},
+    ]
+    resp = client.chat.completions.create(model=model, messages=messages, max_tokens=2000, stream=False)
+    msg = resp.choices[0].message if resp.choices else None
+    text = (getattr(msg, "content", None) or "").strip()
+    if not text and getattr(msg, "reasoning_content", None):
+        text = msg.reasoning_content
+    obj = _extract_json(text)
+    if obj is None:
+        raise ValueError("Geen bruikbare JSON in het modelantwoord")
+    return obj
