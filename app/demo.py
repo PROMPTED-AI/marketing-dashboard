@@ -17,7 +17,7 @@ import hashlib
 import time
 from datetime import date, datetime, timedelta
 
-from . import auth, models, woocommerce
+from . import auth, models, shopify, woocommerce
 
 DEMO_ORG_NAME = "Janssen"
 DEMO_ORG_DOMAIN = "janssen.nl"
@@ -72,6 +72,14 @@ def seed() -> None:
             org["id"], "Demowinkel (voorbeelddata)",
             {"store_url": woocommerce.DEMO_STORE, "consumer_key": "", "consumer_secret": ""},
             provider="woocommerce",
+        )
+    # Idem voor Shopify: een demo-koppeling naar de ingebouwde voorbeeldwinkel,
+    # zodat het Shopify-scherm en de sidebar ook in de demo gevuld zijn.
+    if not models.get_connection(org["id"], provider="shopify"):
+        models.save_connection(
+            org["id"], "Demowinkel Shopify (voorbeelddata)",
+            {"shop": shopify.DEMO_SHOP, "access_token": "demo"},
+            provider="shopify",
         )
 
 
