@@ -22,13 +22,13 @@ import DashboardEditor from "../../components/dashboard/DashboardEditor.jsx";
 import { CHANNELS, CATALOGS } from "../../lib/widgets/index.js";
 import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
 
-// De tabs: het cross-kanaal Overzicht eerst, dan Custom (door AI samengestelde
-// dashboards), daarna de losse kanalen. Custom hergebruikt de gecombineerde
+// De tabs: het cross-kanaal Overzicht eerst, dan de losse kanalen, en als laatste
+// Custom (door AI samengestelde dashboards). Custom hergebruikt de gecombineerde
 // catalogus maar met een eigen pagina-sleutel en de AI-generatieknop.
 const TABS = [
   { key: "overview", label: "Overzicht", catalog: null },
-  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "custom", subtitle: "je met AI samengestelde dashboards" },
   ...CHANNELS,
+  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "custom", subtitle: "je met AI samengestelde dashboards" },
 ];
 
 // Welke koppeling hoort bij welk tabblad. Net als in de sidebar tonen we
