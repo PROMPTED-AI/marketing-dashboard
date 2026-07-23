@@ -259,6 +259,19 @@ def test_dashboard_spec_validation():
     print("dashboard-generatie: spec-validatie en sanering slagen")
 
 
+def test_extract_json_robust():
+    """De JSON-extractie uit modelantwoorden is bestand tegen denkblokken
+    (qwen3), code-fences en trailing komma's. Puur, zonder model."""
+    from app import assistant as a
+    assert a._extract_json('{"widgets": []}') == {"widgets": []}
+    assert a._extract_json("<think>even nadenken over {haakjes}</think>\n{\"widgets\": [1]}") == {"widgets": [1]}
+    assert a._extract_json("```json\n{\"a\": 1}\n```") == {"a": 1}
+    assert a._extract_json('Hier is het:\n{"a": 1, "b": [2,],}') == {"a": 1, "b": [2]}   # trailing komma's
+    assert a._extract_json("<think>onafgemaakt denken zonder json") is None
+    assert a._extract_json("geen json hier") is None
+    print("JSON-extractie: denkblokken, fences en trailing komma's worden correct verwerkt")
+
+
 def test_dashboard_generate(demo):
     """AI stelt een dashboard samen: het endpoint valideert tegen de meegestuurde
     catalogus, dropt een ongeldige widget, accepteert een custom-KPI, en het
@@ -416,6 +429,7 @@ if __name__ == "__main__":
     test_signalen(demo)
     test_cross_channel_signals()
     test_dashboard_spec_validation()
+    test_extract_json_robust()
     test_dashboard_generate(demo)
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()

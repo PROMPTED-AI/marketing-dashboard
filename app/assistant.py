@@ -662,24 +662,33 @@ DASHBOARD_PROMPT = (
 
 
 def _extract_json(text: str) -> dict | None:
-    """Haal het JSON-object uit een modelantwoord (met of zonder ```-fence)."""
+    """Haal het JSON-object uit een modelantwoord. Bestand tegen denkende modellen
+    (qwen3 stuurt <think>...</think>), code-fences en trailing komma's."""
     if not text:
         return None
+    import re
     t = text.strip()
+    # Denkblokken van redenerende modellen weghalen voordat we JSON zoeken.
+    t = re.sub(r"<think>.*?</think>", "", t, flags=re.DOTALL)
+    t = re.sub(r"<think>.*$", "", t, flags=re.DOTALL)  # afgekapt denkblok zonder sluiting
+    t = t.strip()
     if "```" in t:
-        # Pak de inhoud van het eerste code-blok.
-        import re
         m = re.search(r"```(?:json)?\s*(.+?)```", t, re.DOTALL)
         if m:
             t = m.group(1).strip()
     start, end = t.find("{"), t.rfind("}")
     if start < 0 or end <= start:
         return None
-    try:
-        obj = json.loads(t[start:end + 1])
-    except (ValueError, TypeError):
-        return None
-    return obj if isinstance(obj, dict) else None
+    snippet = t[start:end + 1]
+    # Twee pogingen: rauw, en met trailing komma's verwijderd (veelvoorkomend).
+    for candidate in (snippet, re.sub(r",(\s*[}\]])", r"\1", snippet)):
+        try:
+            obj = json.loads(candidate)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
 
 
 def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
@@ -687,8 +696,12 @@ def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
     """Vraag het model een dashboard-indeling voor te stellen op basis van de
     catalogus. Geeft het rauwe, geparste object terug ({widgets, notes, requests});
     de aanroeper valideert dat tegen de echte catalogus. Kan een uitzondering
-    gooien (gateway-fout) of ValueError als er geen JSON uitkwam."""
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=60, max_retries=1)
+    gooien (gateway-fout) of ValueError als er geen JSON uitkwam.
+
+    Ruime max_tokens en een strikte herkansing, zodat een denkend model (qwen3)
+    genoeg ruimte heeft om ná het redeneren de JSON te geven en we niet op een
+    afgekapt of in denkstappen verpakt antwoord stuklopen."""
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=90, max_retries=1)
     user = f"CATALOGUS (beschikbare widgets):\n{catalog_json}\n\n"
     if context:
         user += f"CONTEXT (ter inspiratie, geen cijfers overnemen):\n{context}\n\n"
@@ -697,12 +710,23 @@ def generate_dashboard(prompt: str, catalog_json: str, *, api_key: str,
         {"role": "system", "content": DASHBOARD_PROMPT},
         {"role": "user", "content": user},
     ]
-    resp = client.chat.completions.create(model=model, messages=messages, max_tokens=2000, stream=False)
-    msg = resp.choices[0].message if resp.choices else None
-    text = (getattr(msg, "content", None) or "").strip()
-    if not text and getattr(msg, "reasoning_content", None):
-        text = msg.reasoning_content
-    obj = _extract_json(text)
+
+    def _ask(msgs):
+        resp = client.chat.completions.create(model=model, messages=msgs, max_tokens=3500, stream=False)
+        m = resp.choices[0].message if resp.choices else None
+        txt = (getattr(m, "content", None) or "").strip()
+        if not txt and getattr(m, "reasoning_content", None):
+            txt = m.reasoning_content
+        return txt
+
+    obj = _extract_json(_ask(messages))
+    if obj is None:
+        # Eén strikte herkansing: uitsluitend JSON, geen uitleg of denkstappen.
+        strict = messages + [{
+            "role": "user",
+            "content": "Geef nu UITSLUITEND het JSON-object terug, zonder enige uitleg, tekst of denkstappen eromheen.",
+        }]
+        obj = _extract_json(_ask(strict))
     if obj is None:
         raise ValueError("Geen bruikbare JSON in het modelantwoord")
     return obj
