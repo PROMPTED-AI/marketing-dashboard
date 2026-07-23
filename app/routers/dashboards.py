@@ -34,8 +34,8 @@ router = APIRouter()
 # waarden uit. De frontend gebruikt deze kanaalsleutels; het cross-kanaal
 # "Overzicht"-tabblad gebruikt 'overview-mix' (en 'overview' bestaat als legacy).
 _DASHBOARD_PAGES = {
-    "overview", "overview-mix", "analytics", "search-console", "google-ads",
-    "meta-ads", "meta-organic", "woocommerce",
+    "overview", "overview-mix", "custom", "analytics", "search-console",
+    "google-ads", "meta-ads", "meta-organic", "woocommerce",
 }
 # Een widgetlayout is klein (hooguit enkele tientallen widgets). Begrens de
 # opgeslagen JSON zodat niemand willekeurig grote/diepe blobs kan wegschrijven.
@@ -279,7 +279,11 @@ def generate_dashboard_endpoint(request: Request, payload: DashboardGenerateIn, 
             prompt, catalog_json,
             api_key=config.EUROUTER_API_KEY, base_url=config.EUROUTER_BASE_URL, model=config.EUROUTER_MODEL,
         )
-    except Exception:  # noqa: BLE001 - elke gateway-/parse-fout wordt een nette 502
+    except ValueError:
+        # Het model gaf geen bruikbare JSON terug (ook niet na de herkansing).
+        log.warning("dashboard genereren: geen geldige JSON van het model org=%s", target_org)
+        raise HTTPException(status_code=502, detail="De AI gaf geen bruikbare indeling terug. Probeer je vraag iets concreter te formuleren.")
+    except Exception:  # noqa: BLE001 - gateway-/verbindingsfout
         log.exception("dashboard genereren faalde org=%s", target_org)
         raise HTTPException(status_code=502, detail="Het samenstellen met AI is niet gelukt. Probeer het opnieuw.")
 

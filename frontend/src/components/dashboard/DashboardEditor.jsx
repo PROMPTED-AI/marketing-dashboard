@@ -21,6 +21,7 @@ const serialize = (l) => JSON.stringify(l?.widgets ?? []);
 export default function DashboardEditor({
   catalog, page, data, loading, error, ctx,
   title, subtitle, assetControls, exportFilename, exportSections,
+  canGenerate = false,
 }) {
   const { orgId, businessType } = useActiveOrg();
   const dash = useDashboards(orgId, page);
@@ -34,6 +35,9 @@ export default function DashboardEditor({
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState(null);
   const [genNotice, setGenNotice] = useState(null); // {notes, requests, dropped} na AI-samenstellen
+  const [generating, setGenerating] = useState(false); // AI bouwt het dashboard (skeleton tonen)
+  const [genError, setGenError] = useState(null);
+  const [lastGenPrompt, setLastGenPrompt] = useState("");
 
   const storeKey = orgId ? `kompas-dash-${page}-${orgId}` : null;
   const initRef = useRef(null);
@@ -140,24 +144,35 @@ export default function DashboardEditor({
     setEditing(true);
   });
 
-  // AI stelt een indeling samen uit de catalogus; het concept komt als
-  // niet-opgeslagen werkversie in de editor, zodat de gebruiker het eerst
-  // bekijkt en bijschaaft voor hij het via "Opslaan als…" bewaart. Gooit door
-  // naar de dialoog bij een fout (die toont hem daar) i.p.v. een alert.
+  // AI stelt een indeling samen uit de catalogus. De dialoog sluit meteen en de
+  // editor toont een skeleton-dashboard zodat de gebruiker ziet dat de AI bezig
+  // is; het concept komt daarna als niet-opgeslagen werkversie binnen om te
+  // bekijken en bij te schaven voor hij het via "Opslaan als…" bewaart.
   const applyGenerated = async (prompt) => {
-    const manifest = buildManifest(catalog);
-    const res = await generateDashboard({ prompt, page, manifest, orgId });
-    const layout = sanitizeLayout(catalog, res.layout);
-    if (!layout.widgets.length) {
-      throw new Error("De AI kon met deze gegevens geen widgets samenstellen. Formuleer je vraag eventueel anders.");
-    }
-    setActiveId(null);
-    setWorking(layout);
-    setBaseline(null); // niet-opgeslagen concept -> als gewijzigd gemarkeerd
-    setActiveMeta({ is_owner: true, visibility: "private" });
-    setEditing(true);
     setModal(null);
-    setGenNotice({ notes: res.notes, requests: res.requests || [], dropped: res.dropped || 0 });
+    setGenError(null);
+    setGenNotice(null);
+    setLastGenPrompt(prompt);
+    setGenerating(true);
+    setEditing(true);
+    try {
+      const manifest = buildManifest(catalog);
+      const res = await generateDashboard({ prompt, page, manifest, orgId });
+      const layout = sanitizeLayout(catalog, res.layout);
+      if (!layout.widgets.length) {
+        setGenError("De AI kon met deze gegevens geen widgets samenstellen. Formuleer je vraag eventueel anders.");
+        return;
+      }
+      setActiveId(null);
+      setWorking(layout);
+      setBaseline(null); // niet-opgeslagen concept -> als gewijzigd gemarkeerd
+      setActiveMeta({ is_owner: true, visibility: "private" });
+      setGenNotice({ notes: res.notes, requests: res.requests || [], dropped: res.dropped || 0 });
+    } catch (e) {
+      setGenError(e?.message || "Het samenstellen met AI is niet gelukt. Probeer het opnieuw.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   // Widgets die de AI niet kon bouwen als verbeterverzoek naar het team sturen,
@@ -215,7 +230,7 @@ export default function DashboardEditor({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {assetControls}
-          <button className="btn-ghost" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 14px" }} title="Stel een dashboard samen met AI">✨ Genereer met AI</button>
+          {canGenerate && <button className="btn-ghost" onClick={() => setModal("generate")} disabled={generating} style={{ height: 40, padding: "0 14px" }} title="Stel een dashboard samen met AI">✨ Genereer met AI</button>}
           <DashboardSwitcher list={dash.list} activeId={activeId} onSwitch={switchTo} onNew={() => setModal("template")} />
           {activeId && activeMeta.visibility === "shared" && <span className="pill accent">gedeeld</span>}
           {activeId && !isOwner && <span className="pill muted">van een collega</span>}
@@ -265,14 +280,26 @@ export default function DashboardEditor({
         </div>
       )}
 
-      <TabState loading={loading && !data} error={error} onConnect />
+      {genError && !generating && (
+        <div className="card" style={{ padding: "12px 16px", marginBottom: 16, borderLeft: "3px solid var(--c-neg)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--c-neg)" }}>{genError}</div>
+            <button className="btn-ghost" style={{ height: 32, padding: "0 12px", fontSize: 12.5 }} onClick={() => { setGenError(null); setModal("generate"); }}>Opnieuw proberen</button>
+            <button className="icon-btn" onClick={() => setGenError(null)} title="Sluiten" style={{ flex: "none", fontSize: 16, lineHeight: 1, padding: 4, color: "var(--c-muted)" }}>×</button>
+          </div>
+        </div>
+      )}
 
-      {!error && (data || !loading) && (
+      {generating && <GeneratingSkeleton />}
+
+      {!generating && <TabState loading={loading && !data} error={error} onConnect />}
+
+      {!generating && !error && (data || !loading) && (
         widgets.length === 0 ? (
           <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--c-muted)" }}>
             <div style={{ marginBottom: 14 }}>Dit dashboard heeft nog geen widgets.</div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button className="btn-primary" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 18px" }}>✨ Genereer met AI</button>
+              {canGenerate && <button className="btn-primary" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 18px" }}>✨ Genereer met AI</button>}
               <button className="btn-ghost" onClick={() => { setEditing(true); setModal("widget"); }} style={{ height: 40, padding: "0 18px" }}>Widget toevoegen</button>
               <button className="btn-ghost" onClick={() => setModal("template")} style={{ height: 40, padding: "0 18px" }}>Kies een template</button>
             </div>
@@ -313,8 +340,31 @@ export default function DashboardEditor({
         <NameDialog title="Dashboard hernoemen" label="Nieuwe naam" initial={dash.list.find((d) => d.id === activeId)?.name || ""} confirmLabel="Opslaan" onConfirm={renameCurrent} onClose={() => setModal(null)} />
       )}
       {modal === "generate" && (
-        <GenerateDialog onGenerate={applyGenerated} onClose={() => setModal(null)} />
+        <GenerateDialog onGenerate={applyGenerated} onClose={() => setModal(null)} initial={lastGenPrompt} />
       )}
+    </div>
+  );
+}
+
+// Skeleton-dashboard terwijl de AI de indeling samenstelt: schimmende
+// placeholder-kaarten in hetzelfde 12-koloms raster, met een duidelijke melding
+// dat de assistent bezig is. Zo ziet de gebruiker meteen dat er iets gebeurt.
+function GeneratingSkeleton() {
+  const blocks = [3, 3, 3, 3, 12, 6, 6, 4, 4, 4];
+  return (
+    <div>
+      <div className="card bubble-in" style={{ padding: "13px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, borderLeft: "3px solid var(--c-accent)" }}>
+        <div className="spin" style={{ width: 18, height: 18, borderWidth: 2, flex: "none" }} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700 }}>✨ AI stelt je dashboard samen…</div>
+          <div className="thinking-label" style={{ fontSize: 12.5, color: "var(--c-muted)" }}>De widgets worden gekozen en opgebouwd op basis van je vraag.</div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: 16 }}>
+        {blocks.map((span, i) => (
+          <div key={i} className="skeleton-card" style={{ gridColumn: `span ${span}`, height: span === 12 ? 232 : 150 }} />
+        ))}
+      </div>
     </div>
   );
 }

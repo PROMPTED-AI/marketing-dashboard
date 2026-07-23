@@ -259,6 +259,22 @@ def test_dashboard_spec_validation():
     print("dashboard-generatie: spec-validatie en sanering slagen")
 
 
+def test_extract_json_robust():
+    """De JSON-extractie uit modelantwoorden is bestand tegen denkblokken
+    (qwen3), code-fences en trailing komma's. Puur, zonder model."""
+    from app import assistant as a
+    assert a._extract_json('{"widgets": []}') == {"widgets": []}
+    assert a._extract_json("<think>even nadenken over {haakjes}</think>\n{\"widgets\": [1]}") == {"widgets": [1]}
+    assert a._extract_json("```json\n{\"a\": 1}\n```") == {"a": 1}
+    assert a._extract_json('Hier is het:\n{"a": 1, "b": [2,],}') == {"a": 1, "b": [2]}   # trailing komma's
+    # kimi-achtige redeneertekst met losse accolades, gevolgd door de echte JSON:
+    # pak het laatste object met 'widgets', niet de losse accolade ervoor.
+    assert a._extract_json('Ik gebruik {bron: users} en dan... {"widgets": [{"source": "users"}]}') == {"widgets": [{"source": "users"}]}
+    assert a._extract_json("<think>onafgemaakt denken zonder json") is None
+    assert a._extract_json("geen json hier") is None
+    print("JSON-extractie: denkblokken, losse accolades, fences en trailing komma's worden correct verwerkt")
+
+
 def test_dashboard_generate(demo):
     """AI stelt een dashboard samen: het endpoint valideert tegen de meegestuurde
     catalogus, dropt een ongeldige widget, accepteert een custom-KPI, en het
@@ -284,7 +300,7 @@ def test_dashboard_generate(demo):
     assert "users" in srcs and "channels" in srcs, srcs
     assert "bestaat_niet_xyz" not in srcs and body["dropped"] >= 1, body
     custom = next((w for w in widgets if w["source"] == "custom"), None)
-    assert custom and custom["kind"] == "kpi" and custom["spec"]["refs"] == ["sessions", "users"], custom
+    assert custom and custom["kind"] == "kpi" and set(custom["spec"]["refs"]) == {"users", "sessions"}, custom
     assert body["requests"], body
     # Het concept is een geldige, bewaarbare layout.
     created = demo.post(f"{BASE}/api/dashboards", json={"name": "AI-concept", "layout": body["layout"], "page": "analytics"})
@@ -292,6 +308,27 @@ def test_dashboard_generate(demo):
     got = demo.get(f"{BASE}/api/dashboards/{created.json()['id']}").json()
     assert any(w["source"] == "custom" for w in got["layout"]["widgets"]), got
     print("dashboard-generatie (end-to-end): valideren, custom-KPI, opslaan en herladen slagen")
+
+
+def test_dashboard_generate_reasoning(demo):
+    """Kimi-achtig gedrag: het model eindigt met lege content en levert de JSON
+    via reasoning_content (met een losse accolade in de denktekst). De generatie
+    moet daar doorheen prikken. Vereist de nep-EuRouter."""
+    manifest = {
+        "page": "analytics", "kinds": ["kpi", "donut"], "sizes": [3, 4, 6, 12],
+        "custom_ops": ["ratio", "sum", "diff", "product", "identity"],
+        "sources": [
+            {"key": "users", "label": "Bezoekers", "kinds": ["kpi"], "scalar": True},
+            {"key": "sessions", "label": "Sessies", "kinds": ["kpi"], "scalar": True},
+        ],
+    }
+    r = demo.post(f"{BASE}/api/dashboards/generate", json={
+        "prompt": "denkmodel: geef mijn kerncijfers", "page": "analytics", "manifest": manifest,
+    })
+    assert r.status_code == 200, (r.status_code, r.text)
+    widgets = r.json()["layout"]["widgets"]
+    assert any(w["source"] == "users" for w in widgets), widgets
+    print("dashboard-generatie (redeneermodel): JSON uit reasoning_content wordt correct verwerkt")
 
 
 def test_account_flow(admin, tk_org_id):
@@ -416,7 +453,9 @@ if __name__ == "__main__":
     test_signalen(demo)
     test_cross_channel_signals()
     test_dashboard_spec_validation()
+    test_extract_json_robust()
     test_dashboard_generate(demo)
+    test_dashboard_generate_reasoning(demo)
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
     test_shopify_flow(demo)
