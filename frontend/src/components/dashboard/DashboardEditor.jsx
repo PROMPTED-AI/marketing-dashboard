@@ -12,7 +12,9 @@ import WidgetFrame from "./WidgetFrame.jsx";
 import WidgetPicker from "./WidgetPicker.jsx";
 import TemplatePicker from "./TemplatePicker.jsx";
 import NameDialog from "./NameDialog.jsx";
-import { instantiateTemplate, sanitizeLayout, newWidget, defaultTemplateFor } from "../../lib/widgets/kit.js";
+import GenerateDialog from "./GenerateDialog.jsx";
+import { instantiateTemplate, sanitizeLayout, newWidget, defaultTemplateFor, buildManifest } from "../../lib/widgets/kit.js";
+import { api, generateDashboard } from "../../lib/api.js";
 
 const serialize = (l) => JSON.stringify(l?.widgets ?? []);
 
@@ -31,6 +33,7 @@ export default function DashboardEditor({
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState(null);
+  const [genNotice, setGenNotice] = useState(null); // {notes, requests, dropped} na AI-samenstellen
 
   const storeKey = orgId ? `kompas-dash-${page}-${orgId}` : null;
   const initRef = useRef(null);
@@ -137,6 +140,39 @@ export default function DashboardEditor({
     setEditing(true);
   });
 
+  // AI stelt een indeling samen uit de catalogus; het concept komt als
+  // niet-opgeslagen werkversie in de editor, zodat de gebruiker het eerst
+  // bekijkt en bijschaaft voor hij het via "Opslaan als…" bewaart. Gooit door
+  // naar de dialoog bij een fout (die toont hem daar) i.p.v. een alert.
+  const applyGenerated = async (prompt) => {
+    const manifest = buildManifest(catalog);
+    const res = await generateDashboard({ prompt, page, manifest, orgId });
+    const layout = sanitizeLayout(catalog, res.layout);
+    if (!layout.widgets.length) {
+      throw new Error("De AI kon met deze gegevens geen widgets samenstellen. Formuleer je vraag eventueel anders.");
+    }
+    setActiveId(null);
+    setWorking(layout);
+    setBaseline(null); // niet-opgeslagen concept -> als gewijzigd gemarkeerd
+    setActiveMeta({ is_owner: true, visibility: "private" });
+    setEditing(true);
+    setModal(null);
+    setGenNotice({ notes: res.notes, requests: res.requests || [], dropped: res.dropped || 0 });
+  };
+
+  // Widgets die de AI niet kon bouwen als verbeterverzoek naar het team sturen,
+  // via het bestaande feedbacksysteem (komt in de kanban-kolom Requests).
+  const requestWidgets = guard(async (requests) => {
+    const message = "Widget-aanvraag vanuit Mijn dashboards (" + page + "):\n- " + requests.join("\n- ");
+    await api("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: "idee", message, page: `dashboard:${page}`, org_id: orgId || undefined }),
+    });
+    setGenNotice((n) => (n ? { ...n, requests: [], sent: true } : n));
+    alert("Bedankt, je aanvraag is doorgestuurd naar het team.");
+  });
+
   const renameCurrent = guard(async (name) => {
     await dash.update(activeId, { name });
     setModal(null);
@@ -179,6 +215,7 @@ export default function DashboardEditor({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {assetControls}
+          <button className="btn-ghost" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 14px" }} title="Stel een dashboard samen met AI">✨ Genereer met AI</button>
           <DashboardSwitcher list={dash.list} activeId={activeId} onSwitch={switchTo} onNew={() => setModal("template")} />
           {activeId && activeMeta.visibility === "shared" && <span className="pill accent">gedeeld</span>}
           {activeId && !isOwner && <span className="pill muted">van een collega</span>}
@@ -206,6 +243,28 @@ export default function DashboardEditor({
         </div>
       )}
 
+      {genNotice && (
+        <div className="card" style={{ padding: "12px 16px", marginBottom: 16, borderLeft: "3px solid var(--c-accent)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--c-ink-soft)", lineHeight: 1.55 }}>
+              <span style={{ fontWeight: 700 }}>Concept samengesteld met AI.</span>{" "}
+              Bekijk en schaaf bij, en bewaar met “Opslaan als…”.
+              {genNotice.notes ? <div style={{ marginTop: 4 }}>{genNotice.notes}</div> : null}
+              {genNotice.dropped > 0 && (
+                <div style={{ marginTop: 4, color: "var(--c-muted)" }}>{genNotice.dropped} voorgestelde widget(s) waren niet geldig en zijn weggelaten.</div>
+              )}
+              {genNotice.requests?.length > 0 && (
+                <div style={{ marginTop: 6, color: "var(--c-muted)" }}>
+                  Niet beschikbaar als widget: {genNotice.requests.join("; ")}.{" "}
+                  <button className="btn-ghost" style={{ height: 26, padding: "0 10px", fontSize: 12 }} onClick={() => requestWidgets(genNotice.requests)}>Widget aanvragen</button>
+                </div>
+              )}
+            </div>
+            <button className="icon-btn" onClick={() => setGenNotice(null)} title="Sluiten" style={{ flex: "none", fontSize: 16, lineHeight: 1, padding: 4, color: "var(--c-muted)" }}>×</button>
+          </div>
+        </div>
+      )}
+
       <TabState loading={loading && !data} error={error} onConnect />
 
       {!error && (data || !loading) && (
@@ -213,7 +272,8 @@ export default function DashboardEditor({
           <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--c-muted)" }}>
             <div style={{ marginBottom: 14 }}>Dit dashboard heeft nog geen widgets.</div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button className="btn-primary" onClick={() => { setEditing(true); setModal("widget"); }} style={{ height: 40, padding: "0 18px" }}>Widget toevoegen</button>
+              <button className="btn-primary" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 18px" }}>✨ Genereer met AI</button>
+              <button className="btn-ghost" onClick={() => { setEditing(true); setModal("widget"); }} style={{ height: 40, padding: "0 18px" }}>Widget toevoegen</button>
               <button className="btn-ghost" onClick={() => setModal("template")} style={{ height: 40, padding: "0 18px" }}>Kies een template</button>
             </div>
           </div>
@@ -251,6 +311,9 @@ export default function DashboardEditor({
       )}
       {modal === "rename" && (
         <NameDialog title="Dashboard hernoemen" label="Nieuwe naam" initial={dash.list.find((d) => d.id === activeId)?.name || ""} confirmLabel="Opslaan" onConfirm={renameCurrent} onClose={() => setModal(null)} />
+      )}
+      {modal === "generate" && (
+        <GenerateDialog onGenerate={applyGenerated} onClose={() => setModal(null)} />
       )}
     </div>
   );

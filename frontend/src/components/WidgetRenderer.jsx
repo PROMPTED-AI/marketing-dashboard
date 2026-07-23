@@ -6,6 +6,7 @@
 import { num, pct1, duration, deltaProps, shortDate } from "../lib/format.js";
 import { KpiCard, SectionCard, ProgressRow } from "./ui.jsx";
 import { AreaChart, Donut, Legend, palette } from "./charts.jsx";
+import { customSource, isValidCustomSpec } from "../lib/widgets/custom.js";
 
 function fmtScalar(value, fmt) {
   if (fmt === "percent") return pct1(value);
@@ -14,7 +15,11 @@ function fmtScalar(value, fmt) {
 }
 
 export default function WidgetRenderer({ widget, data, catalog, ctx }) {
-  const src = catalog?.SOURCES?.[widget.source];
+  // Custom widgets zijn data-gedefinieerd: bouw een synthetische KPI-bron uit de
+  // spec (die naar bestaande bronnen verwijst). Ongeldige spec -> nette melding.
+  const src = widget.source === "custom"
+    ? (isValidCustomSpec(catalog, widget.spec) ? customSource(catalog, widget.spec) : null)
+    : catalog?.SOURCES?.[widget.source];
   if (!src) return <SectionCard title={widget.title}>Onbekende bron.</SectionCard>;
 
   // Bron-specifieke datums gaan voor (cross-kanaal catalogus: elke bron leest

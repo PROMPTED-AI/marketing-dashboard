@@ -122,6 +122,18 @@ export function deleteOrganization(orgId) {
   return api(`/api/admin/organizations/${orgId}`, { method: "DELETE" });
 }
 
+// Laat de AI een dashboard-indeling samenstellen uit de meegestuurde catalogus.
+// Geeft { layout, notes, requests, dropped }; de layout is al server-side tegen
+// de catalogus gevalideerd (de frontend saneert daarna nog een keer).
+export function generateDashboard({ prompt, page, manifest, orgId }) {
+  const q = orgId ? "?org_id=" + encodeURIComponent(orgId) : "";
+  return api("/api/dashboards/generate" + q, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, page, manifest }),
+  });
+}
+
 // Disconnect a source (revokes the Google grant when it's the last one).
 export function disconnectProvider(provider, orgId) {
   const q = orgId ? "?org_id=" + encodeURIComponent(orgId) : "";

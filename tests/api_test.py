@@ -232,6 +232,68 @@ def test_cross_channel_signals():
     print("cross-kanaal-signalen: rendement, opschalen, lage ROAS en verkeersmix vuren correct")
 
 
+def test_dashboard_spec_validation():
+    """De server-side validatie van AI-gegenereerde widgets: onbekende bronnen
+    worden gedropt, een ongeldige kind valt terug, en een custom-KPI-spec moet
+    naar bestaande scalar-bronnen verwijzen. Puur, zonder server of model."""
+    from app.routers import dashboards as d
+    sources = {
+        "cost": {"kinds": ["kpi"], "scalar": True, "label": "Kosten"},
+        "orders": {"kinds": ["kpi"], "scalar": True, "label": "Bestellingen"},
+        "channels": {"kinds": ["donut", "bars"], "scalar": False, "label": "Bronnen"},
+    }
+    assert d._clean_custom_spec({"op": "ratio", "refs": ["cost", "orders"], "fmt": "euro"}, sources) == {"op": "ratio", "refs": ["cost", "orders"], "fmt": "euro"}
+    assert d._clean_custom_spec({"op": "ratio", "refs": ["cost"]}, sources) is None            # ratio vereist 2 refs
+    assert d._clean_custom_spec({"op": "sum", "refs": ["channels"]}, sources) is None           # geen scalar
+    assert d._clean_custom_spec({"op": "pow", "refs": ["cost", "orders"]}, sources) is None      # onbekende op
+    widgets, dropped = d._sanitize_generated([
+        {"source": "cost", "kind": "kpi", "size": 3, "title": "Kosten"},
+        {"source": "channels", "kind": "pie", "size": 4, "title": "Bronnen"},   # pie ongeldig -> donut
+        {"source": "weg", "kind": "kpi", "size": 3},                             # onbekend -> gedropt
+        {"source": "custom", "kind": "kpi", "size": 3, "title": "CPO", "spec": {"op": "ratio", "refs": ["cost", "orders"]}},
+    ], sources)
+    assert dropped == 1, (dropped, widgets)
+    pairs = {(w["source"], w["kind"]) for w in widgets}
+    assert ("cost", "kpi") in pairs and ("channels", "donut") in pairs, pairs
+    assert any(w["source"] == "custom" and w["spec"]["op"] == "ratio" for w in widgets), widgets
+    print("dashboard-generatie: spec-validatie en sanering slagen")
+
+
+def test_dashboard_generate(demo):
+    """AI stelt een dashboard samen: het endpoint valideert tegen de meegestuurde
+    catalogus, dropt een ongeldige widget, accepteert een custom-KPI, en het
+    concept is als dashboard te bewaren en terug te laden. Vereist de nep-EuRouter."""
+    manifest = {
+        "page": "analytics",
+        "kinds": ["kpi", "area", "donut", "bars", "table"],
+        "sizes": [3, 4, 6, 12],
+        "custom_ops": ["ratio", "sum", "diff", "product", "identity"],
+        "sources": [
+            {"key": "users", "label": "Bezoekers", "kinds": ["kpi"], "scalar": True},
+            {"key": "sessions", "label": "Sessies", "kinds": ["kpi"], "scalar": True},
+            {"key": "channels", "label": "Verkeersbronnen", "kinds": ["donut", "bars", "table"], "scalar": False},
+        ],
+    }
+    r = demo.post(f"{BASE}/api/dashboards/generate", json={
+        "prompt": "laat mijn verkeer zien met sessies per bezoeker", "page": "analytics", "manifest": manifest,
+    })
+    assert r.status_code == 200, (r.status_code, r.text)
+    body = r.json()
+    widgets = body["layout"]["widgets"]
+    srcs = [w["source"] for w in widgets]
+    assert "users" in srcs and "channels" in srcs, srcs
+    assert "bestaat_niet_xyz" not in srcs and body["dropped"] >= 1, body
+    custom = next((w for w in widgets if w["source"] == "custom"), None)
+    assert custom and custom["kind"] == "kpi" and custom["spec"]["refs"] == ["sessions", "users"], custom
+    assert body["requests"], body
+    # Het concept is een geldige, bewaarbare layout.
+    created = demo.post(f"{BASE}/api/dashboards", json={"name": "AI-concept", "layout": body["layout"], "page": "analytics"})
+    assert created.status_code == 200, (created.status_code, created.text)
+    got = demo.get(f"{BASE}/api/dashboards/{created.json()['id']}").json()
+    assert any(w["source"] == "custom" for w in got["layout"]["widgets"]), got
+    print("dashboard-generatie (end-to-end): valideren, custom-KPI, opslaan en herladen slagen")
+
+
 def test_account_flow(admin, tk_org_id):
     invitee = "nieuw@testklant.nl"
     # 1. uitnodiging aanmaken (zonder SMTP komt de link terug, niet gemaild)
@@ -353,6 +415,8 @@ if __name__ == "__main__":
     test_framework(demo)
     test_signalen(demo)
     test_cross_channel_signals()
+    test_dashboard_spec_validation()
+    test_dashboard_generate(demo)
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
     test_shopify_flow(demo)

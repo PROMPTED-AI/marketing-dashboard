@@ -40,6 +40,27 @@ class H(BaseHTTPRequestHandler):
         # JSON-completion teruggeven. Bij "leegstil" blijft óók de herkansing
         # leeg (alleen reasoning), zodat het reasoning-vangnet getest wordt.
         if not req.get("stream"):
+            # Dashboard-generatie: geef een JSON-indeling terug met een geldige
+            # bron, een custom-KPI (afgeleide metric) en één ongeldige bron, zodat
+            # de server-side validatie (droppen + custom-spec) getest wordt.
+            if "catalogus" in str(last_user).lower():
+                layout = {
+                    "widgets": [
+                        {"source": "users", "kind": "kpi", "size": 3, "title": "Bezoekers"},
+                        {"source": "channels", "kind": "donut", "size": 4, "title": "Verkeersbronnen"},
+                        {"source": "custom", "kind": "kpi", "size": 3, "title": "Sessies per bezoeker",
+                         "spec": {"op": "ratio", "refs": ["sessions", "users"], "fmt": "ratio"}},
+                        {"source": "bestaat_niet_xyz", "kind": "kpi", "size": 3, "title": "Ongeldig"},
+                    ],
+                    "notes": "Testconcept met een afgeleide KPI.",
+                    "requests": ["een heatmap van klikken op de pagina"],
+                }
+                msg = {"role": "assistant", "content": "```json\n" + json.dumps(layout) + "\n```"}
+                body = json.dumps({"id": "x", "object": "chat.completion", "model": "fake",
+                                   "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}]}).encode()
+                self.send_response(200); self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+                return
             if "leegstil" in str(last_user).lower():
                 msg = {"role": "assistant", "content": "",
                        "reasoning_content": "## Uitgewerkte omschrijving\nDit komt uit de denkstappen."}

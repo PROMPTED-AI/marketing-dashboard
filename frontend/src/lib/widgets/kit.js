@@ -14,6 +14,7 @@
 // catalogus als prop mee.
 
 import { shortDate } from "../format.js";
+import { isValidCustomSpec, normalizeSpec } from "./custom.js";
 
 // Visualisaties + hun standaardgrootte (kolommen in een 12-koloms raster).
 export const KINDS = {
@@ -89,6 +90,9 @@ export function newWidget(catalog, sourceId, kind) {
 export function instantiateTemplate(catalog, tpl) {
   return {
     widgets: (tpl?.widgets || []).map((w) => {
+      if (w.source === "custom") {
+        return { id: newId(), source: "custom", kind: "kpi", size: w.size || KINDS.kpi.defaultSize, title: w.title || "Custom", spec: normalizeSpec(w.spec) };
+      }
       const src = catalog.SOURCES[w.source];
       const out = {
         id: newId(),
@@ -109,8 +113,24 @@ export function sanitizeLayout(catalog, layout) {
   const widgets = Array.isArray(layout?.widgets) ? layout.widgets : [];
   return {
     widgets: widgets
-      .filter((w) => w && catalog.SOURCES[w.source] && catalog.SOURCES[w.source].kinds.includes(w.kind))
+      .filter((w) => {
+        if (!w) return false;
+        // Custom widgets zijn data-gedefinieerd (KPI): geldig als hun spec naar
+        // bestaande bronnen in deze catalogus verwijst met een whitelisted op.
+        if (w.source === "custom") return isValidCustomSpec(catalog, w.spec);
+        return catalog.SOURCES[w.source] && catalog.SOURCES[w.source].kinds.includes(w.kind);
+      })
       .map((w) => {
+        if (w.source === "custom") {
+          return {
+            id: w.id || newId(),
+            source: "custom",
+            kind: "kpi",
+            size: SIZES.some((s) => s.value === w.size) ? w.size : KINDS.kpi.defaultSize,
+            title: w.title || "Custom",
+            spec: normalizeSpec(w.spec),
+          };
+        }
         const src = catalog.SOURCES[w.source];
         const out = {
           id: w.id || newId(),
@@ -126,6 +146,25 @@ export function sanitizeLayout(catalog, layout) {
         }
         return out;
       }),
+  };
+}
+
+// Compact, machineleesbaar overzicht van wat er in deze catalogus bestaat, zodat
+// de AI alleen bestaande bronnen/visualisaties voorstelt. Bevat geen klantdata.
+export function buildManifest(catalog) {
+  const sources = Object.entries(catalog?.SOURCES || {}).map(([key, src]) => ({
+    key,
+    label: src.label || key,
+    group: src.group || null,
+    kinds: src.kinds || [],
+    scalar: typeof src.scalar === "function", // bruikbaar als ref voor een custom KPI
+  }));
+  return {
+    page: catalog?.key || "overview",
+    kinds: Object.keys(KINDS),
+    sizes: SIZES.map((s) => s.value),
+    custom_ops: ["ratio", "sum", "diff", "product", "identity"],
+    sources,
   };
 }
 
