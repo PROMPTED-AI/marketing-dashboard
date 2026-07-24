@@ -193,7 +193,14 @@ def admin_available_assets(request: Request, org_id: str):
     auth.require_admin(request)
     if models.is_demo_org(org_id):
         return {"properties": demo.DEMO_PROPERTIES, "sites": demo.DEMO_SITES, "ads_accounts": demo.DEMO_ADS_ACCOUNTS}
-    out = {"properties": [], "sites": [], "ads_accounts": []}
+    # Welk Google-account de lijsten voedt: de lijsten tonen precies waar dít
+    # account toegang toe heeft, dus de UI laat het zien om verwarring te
+    # voorkomen ("waarom zie ik mijn klanten niet?").
+    conn = models.get_connection(org_id, provider="google_analytics") or \
+        models.get_connection(org_id, provider="search_console") or \
+        models.get_connection(org_id, provider="google_ads")
+    out = {"properties": [], "sites": [], "ads_accounts": [],
+           "google_email": (conn or {}).get("google_email")}
     try:
         creds = _org_credentials(org_id)
         out["properties"] = _google_data(org_id, "google_analytics", lambda: analytics.list_properties(creds))
