@@ -395,16 +395,37 @@ async def shopify_customers_redact(request: Request):
     return Response(status_code=200)
 
 
-@router.post("/api/webhooks/shopify/shop-redact")
-async def shopify_shop_redact(request: Request):
-    """GDPR: wis winkeldata (48 uur na deïnstallatie). Verwijder de opgeslagen
-    Shopify-koppeling(en) voor deze shop en leeg hun gecachte rapporten."""
-    _, payload = await _verify_shopify_webhook(request)
+def _shop_redact(request: Request, payload: dict) -> None:
+    """Verwijder de opgeslagen Shopify-koppeling(en) voor deze shop en leeg
+    hun gecachte rapporten."""
     shop = _webhook_shop(request, payload)
     if shop:
         for org_id in models.delete_shopify_connections_for_shop(shop):
             cache.invalidate_org(org_id)
         log.info("shopify webhook shop/redact verwerkt shop=%s", shop)
+
+
+@router.post("/api/webhooks/shopify/shop-redact")
+async def shopify_shop_redact(request: Request):
+    """GDPR: wis winkeldata (48 uur na deïnstallatie)."""
+    _, payload = await _verify_shopify_webhook(request)
+    _shop_redact(request, payload)
+    return Response(status_code=200)
+
+
+@router.post("/api/webhooks/shopify/compliance")
+async def shopify_compliance(request: Request):
+    """Verzamel-endpoint voor de drie compliance-topics, dispatch op de
+    X-Shopify-Topic-header. Zo werkt zowel één gedeelde webhook-URL als de drie
+    aparte per-topic-URL's; de HMAC-eis is identiek."""
+    _, payload = await _verify_shopify_webhook(request)
+    topic = request.headers.get("X-Shopify-Topic", "")
+    if topic == "shop/redact":
+        _shop_redact(request, payload)
+    else:
+        # customers/data_request en customers/redact: wij bewaren geen
+        # persoonsgegevens per klant, dus loggen + bevestigen volstaat.
+        log.info("shopify webhook %s shop=%s", topic or "onbekend", _webhook_shop(request, payload))
     return Response(status_code=200)
 
 

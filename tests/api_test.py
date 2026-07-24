@@ -260,7 +260,19 @@ def test_shopify_webhooks(demo, tk_org_id):
     assert models.get_connection(tk_org_id, provider="shopify")
     assert requests.post(f"{BASE}/api/webhooks/shopify/shop-redact", data=body, headers=hdr).status_code == 200
     assert models.get_connection(tk_org_id, provider="shopify") is None
-    print("shopify-webhooks: HMAC 200/401 en shop/redact verwijdert de koppeling")
+    # Het verzamel-endpoint dispatcht op de X-Shopify-Topic-header: dezelfde
+    # HMAC-eis (401 zonder), 200 op elk topic, en shop/redact wist ook hier.
+    for topic in ("customers/data_request", "customers/redact"):
+        r = requests.post(f"{BASE}/api/webhooks/shopify/compliance", data=body,
+                          headers={**hdr, "X-Shopify-Topic": topic})
+        assert r.status_code == 200, (topic, r.status_code, r.text)
+    assert requests.post(f"{BASE}/api/webhooks/shopify/compliance", data=body,
+                         headers={"X-Shopify-Hmac-Sha256": "fout", "X-Shopify-Topic": "shop/redact"}).status_code == 401
+    models.save_connection(tk_org_id, shop, {"shop": shop, "access_token": "x"}, provider="shopify")
+    assert requests.post(f"{BASE}/api/webhooks/shopify/compliance", data=body,
+                         headers={**hdr, "X-Shopify-Topic": "shop/redact"}).status_code == 200
+    assert models.get_connection(tk_org_id, provider="shopify") is None
+    print("shopify-webhooks: HMAC 200/401, shop/redact wist, ook via /compliance")
 
 
 def test_shopify_aggregate():
