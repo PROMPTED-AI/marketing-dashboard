@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, LOGOUT_URL } from "../lib/api.js";
+import { useActiveOrg } from "../lib/ActiveOrgProvider.jsx";
 import { useMe } from "../lib/useMe.jsx";
 import { invalidateAll } from "../lib/swr.js";
 import Topbar from "../components/Topbar.jsx";
@@ -42,6 +43,7 @@ function ago(iso) {
 
 export default function Admin() {
   const { me, loading: meLoading } = useMe();
+  const { reload: reloadActiveOrgs, setOrg } = useActiveOrg();
   const nav = useNavigate();
   const [orgs, setOrgs] = useState(null);
   const [error, setError] = useState(null);
@@ -53,6 +55,14 @@ export default function Admin() {
   const reload = () => api("/api/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(setError);
 
   useEffect(() => { reload(); }, []);
+
+  // Open de omgeving van een klant in het dashboard (zoals de klant hem ziet),
+  // bijvoorbeeld om een klaargezette omgeving te controleren vóór de uitnodiging.
+  const openEnv = async (o) => {
+    try { await reloadActiveOrgs(); } catch { /* switcher ververst anders bij navigatie */ }
+    setOrg(o.id);
+    nav("/app/integrations");
+  };
 
   if (meLoading) return null;
   if (!me) return <Navigate to="/login" replace />;
@@ -132,7 +142,7 @@ export default function Admin() {
           <div className="card" style={{ overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
             <div style={{ ...headRow }}>
-              <span>Klant</span><span>Gekoppelde tools</span><span>Status</span><span>Laatste sync</span><span>Proefperiode</span>
+              <span>Klant</span><span>Gekoppelde tools</span><span>Status</span><span>Laatste sync</span><span>Proefperiode</span><span />
             </div>
             {(orgs || []).map((o) => {
               const st = orgStatus(o);
@@ -151,6 +161,13 @@ export default function Admin() {
                   <span><span className={`pill ${st.cls}`}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />{st.label}</span></span>
                   <span style={{ color: "var(--c-muted)", fontSize: 13 }}>{ago(o.last_sync)}</span>
                   <TrialCell org={o} onChanged={reload} />
+                  <span style={{ textAlign: "right" }}>
+                    <button className="btn-ghost" onClick={() => openEnv(o)}
+                      title="Open het dashboard van deze klant zoals de klant het ziet"
+                      style={{ height: 32, padding: "0 12px", fontSize: 12.5, whiteSpace: "nowrap" }}>
+                      Bekijk omgeving
+                    </button>
+                  </span>
                 </div>
               );
             })}
@@ -317,5 +334,5 @@ const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpac
 const navActive = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
-const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr 1fr", minWidth: 980, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr 1fr", minWidth: 980, gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
