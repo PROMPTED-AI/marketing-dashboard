@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, createInvitation, linkAgency, availableAssets, setOrgAssets } from "../../lib/api.js";
+import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { IcPlug, IcUsers, IcGrid, IcStar } from "../../components/icons.jsx";
 
 // Klant-wizard: één vloeiende flow die de drie losse beheerstappen samenvoegt —
@@ -230,11 +232,24 @@ function StepKanalen({ org, onNext }) {
 }
 
 // Stap 4 — samenvatting: toont de uitnodigingslink (kopieerbaar) en welke
-// bronnen zijn toegewezen.
+// bronnen zijn toegewezen. "Omgeving bekijken" zet de klant als actieve
+// organisatie en opent het dashboard, zodat de beheerder de omgeving kan
+// controleren vóórdat de klant wordt uitgenodigd.
 function StepKlaar({ org, invite, assetSummary, onDone }) {
   const [copied, setCopied] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const { reload: reloadOrgs, setOrg } = useActiveOrg();
+  const nav = useNavigate();
   const copy = async () => {
     try { await navigator.clipboard.writeText(invite.invite_url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard geblokkeerd */ }
+  };
+  const openEnv = async () => {
+    setOpening(true);
+    // Eerst de orgs-lijst verversen: de switcher valt terug op de eigen org
+    // zolang de nieuwe organisatie nog niet in zijn lijst staat.
+    try { await reloadOrgs(); } catch { /* lijst ververst bij navigatie alsnog */ }
+    setOrg(org.id);
+    nav("/app/integrations");
   };
 
   return (
@@ -268,7 +283,11 @@ function StepKlaar({ org, invite, assetSummary, onDone }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <button className="pill-btn" style={btnGhost} disabled={opening} onClick={openEnv}
+          title="Open het dashboard van deze klant om de omgeving te controleren voordat je de klant uitnodigt">
+          {opening ? "openen…" : "omgeving bekijken"}
+        </button>
         <button className="btn-primary" style={{ height: 42, padding: "0 22px" }} onClick={onDone}>klaar</button>
       </div>
     </div>

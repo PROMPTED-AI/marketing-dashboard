@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useConnections } from "../../lib/useConnections.jsx";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
+import { useMe } from "../../lib/useMe.jsx";
 import { api, connectUrl, metaLoginUrl, shopifyLoginUrl, disconnectProvider } from "../../lib/api.js";
 import { invalidateOrg } from "../../lib/swr.js";
 import { GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph, ShopifyGlyph } from "../../components/icons.jsx";
@@ -136,13 +138,21 @@ function ShopifyConnectDialog({ orgId, onClose }) {
   );
 }
 
+const GOOGLE_PROVIDERS = new Set(["google_analytics", "search_console", "google_ads"]);
+
 export default function Integrations() {
   const { data, loading, reload } = useConnections();
   const { orgId } = useActiveOrg();
+  const { me } = useMe();
   const [wooOpen, setWooOpen] = useState(false);
   const [shopifyOpen, setShopifyOpen] = useState(false);
   if (loading) return <TabState loading />;
   const items = data?.connections || [];
+  // Een admin die de omgeving van een klánt bekijkt: de gewone Google-connect
+  // koppelt altijd de eigen organisatie van de ingelogde gebruiker, dus die
+  // knop zou hier stilletjes het verkeerde doen. Voor Google-kanalen is de
+  // juiste route dan de bureau-koppeling (Klantenbeheer → Omgevingen).
+  const viewingOtherOrg = me?.role === "agency_admin" && orgId && orgId !== me?.organization?.id;
 
   const onDisconnect = (provider, name) => {
     if (window.confirm(`${name} ontkoppelen? De toegang wordt ingetrokken.`)) {
@@ -179,6 +189,8 @@ export default function Integrations() {
                   <button className="btn-primary" onClick={() => setWooOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>Koppelen</button>
                 ) : c.provider === "shopify" ? (
                   <button className="btn-primary" onClick={() => setShopifyOpen(true)} style={{ height: 38, padding: "0 16px", fontSize: 13 }}>Koppelen</button>
+                ) : viewingOtherOrg && GOOGLE_PROVIDERS.has(c.provider) ? (
+                  <Link className="btn-ghost" to="/admin" title="Google-kanalen koppel je voor een klant via de bureau-koppeling in Klantenbeheer → Omgevingen" style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Via bureau-koppeling</Link>
                 ) : (
                   <a className="btn-primary" href={c.provider === "meta_ads" ? metaLoginUrl(orgId) : connectUrl([c.provider], "/app/integrations")} style={{ height: 38, padding: "0 16px", fontSize: 13, textDecoration: "none" }}>Koppelen</a>
                 ))}
