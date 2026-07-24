@@ -215,11 +215,16 @@ function StepKanalen({ org, onNext }) {
         </div>
       ) : (
         <div>
+          {available.google_email && (
+            <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>
+              Bureau-account: <strong style={{ color: "var(--c-ink-soft)" }}>{available.google_email}</strong> — de lijsten tonen wat dít Google-account mag zien.
+            </div>
+          )}
           {field("Google Analytics-property", "ga_property_id", available.properties, "property_id", (p) => p.display_name ? `${p.display_name} (${p.property_id})` : p.property_id)}
           {field("Search Console-site", "gsc_site_url", available.sites, "site_url", (s) => s.site_url)}
           {field("Google Ads-klant", "ads_customer_id", available.ads_accounts, "customer_id", (c) => c.name ? `${c.name} (${c.customer_id})` : c.customer_id)}
           <div style={{ fontSize: 12, color: "var(--c-muted)", marginBottom: 16 }}>
-            Staat er niets in een lijst? Dan geeft de koppeling voor dat kanaal (nog) geen bronnen terug.
+            Mis je klanten in een lijst? Geef het bureau-account hierboven dan (manager)toegang tot die bron, of koppel op je eigen Integraties-pagina het juiste Google-account en gebruik de bureau-koppeling opnieuw.
           </div>
           {err && <div style={errBox}>{String(err.message || err)}</div>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>

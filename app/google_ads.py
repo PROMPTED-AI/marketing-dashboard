@@ -43,8 +43,12 @@ def _int(v) -> int:
         return 0
 
 
-def _client(creds: Credentials):
-    """Build a GoogleAdsClient from a stored OAuth grant + the developer token."""
+def _client(creds: Credentials, login_customer_id: str | None = None):
+    """Build a GoogleAdsClient from a stored OAuth grant + the developer token.
+
+    ``login_customer_id`` overrides the configured default; nodig wanneer we
+    onder een specifiek manager-account (MCC) willen kijken, zoals bij het
+    opsommen van de klantaccounts eronder."""
     if not config.GOOGLE_ADS_DEVELOPER_TOKEN:
         raise AdsNotConfigured("GOOGLE_ADS_DEVELOPER_TOKEN is not set")
     from google.ads.googleads.client import GoogleAdsClient
@@ -56,8 +60,9 @@ def _client(creds: Credentials):
         "refresh_token": creds.refresh_token,
         "use_proto_plus": True,
     }
-    if config.GOOGLE_ADS_LOGIN_CUSTOMER_ID:
-        cfg["login_customer_id"] = config.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+    login = login_customer_id or config.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+    if login:
+        cfg["login_customer_id"] = _digits(login)
     return GoogleAdsClient.load_from_dict(cfg)
 
 
@@ -65,22 +70,59 @@ def _digits(customer_id: str) -> str:
     return "".join(c for c in (customer_id or "") if c.isdigit())
 
 
+def _expand_manager(creds: Credentials, manager_id: str, seen: set) -> list[dict]:
+    """Alle actieve klantaccounts ónder een manager-account (MCC).
+
+    ``list_accessible_customers`` geeft alleen accounts waar de gebruiker zelf
+    direct op staat — bij een bureau is dat meestal alleen het MCC zelf. De
+    klantaccounts eronder komen uit een ``customer_client``-query op het MCC,
+    met dat MCC als login-customer. Faalt de expansie, dan geeft dit een lege
+    lijst en valt de aanroeper terug op het MCC zelf."""
+    out: list[dict] = []
+    try:
+        client = _client(creds, login_customer_id=manager_id)
+        ga_service = client.get_service("GoogleAdsService")
+        rows = ga_service.search(
+            customer_id=_digits(manager_id),
+            query=(
+                "SELECT customer_client.id, customer_client.descriptive_name, "
+                "customer_client.manager, customer_client.hidden "
+                "FROM customer_client WHERE customer_client.status = 'ENABLED'"
+            ),
+        )
+        for row in rows:
+            c = row.customer_client
+            cid = str(c.id)
+            # Managers (het MCC zelf en sub-MCC's) zijn niet rapporteerbaar;
+            # alleen de echte klantaccounts horen in de toewijzingslijst.
+            if c.hidden or c.manager or cid in seen:
+                continue
+            seen.add(cid)
+            out.append({"customer_id": cid, "name": c.descriptive_name or cid})
+    except Exception as exc:  # noqa: BLE001 - expansie mag de lijst nooit breken
+        log.info("google_ads: MCC-expansie mislukt voor %s: %s", manager_id, exc)
+    return out
+
+
 def list_accounts(creds: Credentials) -> list[dict]:
     """List the ad accounts the authenticated user can access.
 
     Returns the accessible customer ids, enriched with the descriptive name
     where that lookup succeeds (it can fail for accounts the login customer
-    cannot describe — that must not break the list).
+    cannot describe — that must not break the list). Manager-accounts (MCC's)
+    worden uitgeklapt naar de klantaccounts eronder, zodat een bureau met één
+    manager-login al zijn klanten in de toewijzingslijst ziet.
     """
     client = _client(creds)
     customer_service = client.get_service("CustomerService")
     accessible = customer_service.list_accessible_customers()
     ga_service = client.get_service("GoogleAdsService")
 
-    accounts = []
+    accounts: list[dict] = []
+    seen: set = set()
     for resource_name in accessible.resource_names:
         cid = resource_name.split("/")[-1]
-        name = cid
+        name, is_manager = cid, False
         try:
             rows = ga_service.search(
                 customer_id=cid,
@@ -91,10 +133,17 @@ def list_accounts(creds: Credentials) -> list[dict]:
             )
             for row in rows:
                 name = row.customer.descriptive_name or cid
+                is_manager = bool(row.customer.manager)
                 break
         except Exception as exc:  # noqa: BLE001 - one account must not break the list
             log.info("google_ads: name lookup failed for %s: %s", cid, exc)
-        accounts.append({"customer_id": cid, "name": name})
+        children = _expand_manager(creds, cid, seen) if is_manager else []
+        if children:
+            accounts.extend(children)
+        elif cid not in seen:
+            # Geen (vindbare) klantaccounts: toon het account zelf, zoals voorheen.
+            seen.add(cid)
+            accounts.append({"customer_id": cid, "name": name})
     return accounts
 
 
