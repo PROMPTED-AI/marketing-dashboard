@@ -182,6 +182,31 @@ def test_shopify_flow(demo):
     print("shopify: login-redirect, domeinvalidatie en 409 zonder koppeling")
 
 
+def test_shopify_app_launch(demo):
+    """App Store-launch: Shopify opent de App URL met ?shop=&hmac=. Een geldige
+    (correct ondertekende) launch moet meteen naar de OAuth-installatieflow
+    redirecten; een ontbrekende/ongeldige HMAC toont gewoon de SPA (geen redirect)."""
+    import hashlib
+    import hmac as hmaclib
+    from app import config
+
+    shop = "launchtest.myshopify.com"
+
+    def launch_hmac(params):
+        pairs = "&".join(f"{k}={v}" for k, v in sorted(params.items()) if k != "hmac")
+        return hmaclib.new(config.SHOPIFY_API_SECRET.encode(), pairs.encode(), hashlib.sha256).hexdigest()
+
+    params = {"shop": shop, "timestamp": "1700000000", "host": "abc123"}
+    params["hmac"] = launch_hmac(params)
+    r = demo.get(f"{BASE}/", params=params, allow_redirects=False)
+    assert r.status_code in (302, 307), (r.status_code, r.text[:150])
+    assert f"{shop}/admin/oauth/authorize" in r.headers.get("location", ""), r.headers.get("location")
+    # Ongeldige HMAC -> geen OAuth-redirect (SPA of 503, nooit naar Shopify).
+    bad = demo.get(f"{BASE}/", params={**params, "hmac": "fout"}, allow_redirects=False)
+    assert "oauth/authorize" not in bad.headers.get("location", ""), bad.headers.get("location")
+    print("shopify-launch: geldige App URL-launch redirect naar OAuth, ongeldige HMAC niet")
+
+
 def test_shopify_demo(demo):
     """De demo-organisatie heeft een ingebouwde Shopify-demowinkel met
     deterministische voorbeelddata (omzet, orders, topproducten, delta's)."""

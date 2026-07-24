@@ -276,13 +276,16 @@ def shopify_callback(request: Request):
     if not shopify_oauth.verify_hmac(params):
         raise HTTPException(status_code=400, detail="Ongeldige Shopify-handtekening")
     org_id = request.session.pop("shopify_oauth_org", None)
+    # Door de App URL gestarte install (self-serve vanuit de Shopify App Store):
+    # er is nog geen ingelogde gebruiker/organisatie; we richten die hieronder in.
+    merchant = request.session.pop("shopify_oauth_merchant", False)
     stored_shop = request.session.pop("shopify_oauth_shop", None)
     return_to = request.session.pop("shopify_oauth_return", "/app/integrations")
     request.session.pop("shopify_oauth_state", None)
 
     code = params.get("code")
     shop = params.get("shop")
-    if not code or not org_id or not shop:
+    if not code or not shop or (not org_id and not merchant):
         return RedirectResponse(return_to)
     try:
         shop = shopify_oauth.normalize_shop(shop)
@@ -297,6 +300,20 @@ def shopify_callback(request: Request):
     except (shopify_oauth.ShopifyError, requests.RequestException):
         log.exception("shopify token exchange faalde org=%s", org_id)
         raise HTTPException(status_code=502, detail="Koppelen met Shopify is mislukt - probeer het opnieuw.")
+
+    if not org_id:
+        # Merchant-onboarding: maak (of vind) een geïsoleerde organisatie voor
+        # deze winkel, log de gebruiker in en stuur hem het dashboard in. De
+        # login-identiteit is shop-gebonden (owner@<shop>) zodat we nooit een
+        # bestaand account met hetzelfde e-mailadres overschrijven.
+        info = shopify.fetch_shop_info(shop, creds["access_token"])
+        org = models.get_or_create_shop_org(shop, info.get("name") or shop)
+        org_id = org["id"]
+        login_email = f"owner@{shop}"
+        user = models.upsert_user(login_email, org_id, auth.role_for(login_email))
+        request.session["user_id"] = user["id"]
+        return_to = "/app/shopify"
+
     models.save_connection(org_id, shop, creds, provider="shopify")
     cache.invalidate_org(org_id)
     return RedirectResponse(return_to)

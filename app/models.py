@@ -44,6 +44,25 @@ def get_or_create_personal_org(email: str) -> dict:
         return {"id": org_id, "name": email, "domain": email}
 
 
+def get_or_create_shop_org(shop: str, name: str | None = None) -> dict:
+    """Geïsoleerde organisatie voor één Shopify-winkel (self-serve install via de
+    App Store). Gekeyd op het shopdomein en gemarkeerd als persoonlijk, zodat hij
+    buiten de bureau-klantlijst blijft, met een proefperiode van 14 dagen."""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, domain FROM organizations WHERE domain = %s", (shop,)
+        ).fetchone()
+        if row:
+            return {"id": row[0], "name": row[1], "domain": row[2]}
+        org_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO organizations (id, name, domain, is_personal, plan, trial_ends_at) "
+            "VALUES (%s, %s, %s, true, 'trial', now() + interval '14 days')",
+            (org_id, (name or shop)[:200], shop),
+        )
+        return {"id": org_id, "name": name or shop, "domain": shop}
+
+
 def org_for_login(email: str) -> dict:
     """Resolve the org a signing-in user belongs to (invite-only model).
 

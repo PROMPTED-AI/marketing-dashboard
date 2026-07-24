@@ -22,15 +22,16 @@ GET  /api/analytics/properties      -> GA4 properties for an organization
 GET  /api/analytics/report          -> sample GA4 report for a property
 """
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import cache, config, db, demo
+from . import cache, config, db, demo, shopify_oauth
 
 # Zonder basisconfiguratie hebben de app-loggers geen handler onder uvicorn en
 # verdwijnen INFO-regels (zoals de assistent-telemetrie) stilletjes. Uvicorns
@@ -98,9 +99,29 @@ app.include_router(feedback.router)
 app.include_router(framework.router)
 
 @app.get("/{full_path:path}")
-def spa(full_path: str):
+def spa(full_path: str, request: Request):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
+    # Shopify App Store-installatie: Shopify opent de App URL met ?shop=&hmac=.
+    # Een publieke (niet-embedded) app moet dan meteen authenticeren, dus starten
+    # we direct de OAuth-installatieflow in plaats van de SPA te tonen. We
+    # verifieren de HMAC zodat alleen echte Shopify-launches deze redirect krijgen;
+    # de callback richt vervolgens de winkel-organisatie in (merchant-onboarding).
+    params = dict(request.query_params)
+    if params.get("shop") and params.get("hmac") and shopify_oauth.is_configured() \
+            and shopify_oauth.verify_hmac(params):
+        try:
+            shop = shopify_oauth.normalize_shop(params["shop"])
+        except shopify_oauth.ShopifyError:
+            shop = None
+        if shop:
+            state = uuid.uuid4().hex
+            request.session["shopify_oauth_state"] = state
+            request.session["shopify_oauth_shop"] = shop
+            request.session["shopify_oauth_merchant"] = True
+            request.session["shopify_oauth_return"] = "/app/shopify"
+            request.session.pop("shopify_oauth_org", None)
+            return RedirectResponse(shopify_oauth.build_install_url(shop, state))
     if SPA_INDEX.exists():
         return FileResponse(SPA_INDEX, headers={"Cache-Control": "no-cache"})
     return JSONResponse(
