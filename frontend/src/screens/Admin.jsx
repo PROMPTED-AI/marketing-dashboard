@@ -10,6 +10,7 @@ import AdminConnections from "./admin/AdminConnections.jsx";
 import AdminEnvironments from "./admin/AdminEnvironments.jsx";
 import AdminActivity from "./admin/AdminActivity.jsx";
 import AdminBilling from "./admin/AdminBilling.jsx";
+import ClientWizard from "./admin/ClientWizard.jsx";
 import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid } from "../components/icons.jsx";
 
 const PROVIDERS = [
@@ -162,64 +163,7 @@ export default function Admin() {
         </div>
       </div>
 
-      {adding && <AddClientModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); }} />}
-    </div>
-  );
-}
-
-function AddClientModal({ onClose, onDone }) {
-  const [name, setName] = useState("");
-  const [domain, setDomain] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-  const [org, setOrg] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    try {
-      const d = await api("/api/admin/organizations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, domain }) });
-      setOrg(d.organization);
-    } catch (e2) {
-      setErr(e2);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div style={overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="card" style={{ width: 460, maxWidth: "calc(100vw - 32px)", padding: 26 }}>
-        {org ? (
-          <div>
-            <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>klant aangemaakt</div>
-            <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
-              <strong style={{ color: "var(--c-ink)" }}>{org.name}</strong> ({org.domain}) staat klaar. Nodig de klant uit door iemand met een
-              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard. Ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button className="btn-primary" style={{ height: 42, padding: "0 20px" }} onClick={onDone}>klaar</button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={submit}>
-            <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>klant toevoegen</div>
-            <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Maak een organisatie aan en nodig de klant uit via hun e-maildomein.</div>
-            <label style={lbl}>Naam organisatie</label>
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
-            <label style={lbl}>E-maildomein</label>
-            <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="voorbeeld.nl" style={inp} />
-            <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Iedereen die met dit domein inlogt, hoort bij deze klant.</div>
-            {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 12 }}>{String(err.message || err)}</div>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-              <button type="button" className="pill-btn" onClick={onClose} style={btnGhost}>annuleren</button>
-              <button type="submit" disabled={busy || !name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
-                {busy ? "bezig…" : "aanmaken"}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+      {adding && <ClientWizard onClose={() => setAdding(false)} onDone={() => { setAdding(false); reload(); }} />}
     </div>
   );
 }
@@ -375,7 +319,3 @@ const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
 const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
 const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr", minWidth: 860, gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
-const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
-const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", margin: "12px 0 6px" };
-const inp = { width: "100%", height: 44, padding: "0 14px", fontSize: 14, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", boxSizing: "border-box" };
-const btnGhost = { height: 42, padding: "0 18px", fontSize: 13.5, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 };
