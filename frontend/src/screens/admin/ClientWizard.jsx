@@ -300,7 +300,9 @@ function StepKlaar({ org, invite, features, assetSummary, onDone }) {
     // zolang de nieuwe organisatie nog niet in zijn lijst staat.
     try { await reloadOrgs(); } catch { /* lijst ververst bij navigatie alsnog */ }
     setOrg(org.id);
-    nav("/app/integrations");
+    // Naar de index: die kiest het eerste gekoppelde kanaal en respecteert de
+    // zojuist gekozen functies (Integraties kan voor dit account uitstaan).
+    nav("/app");
   };
 
   return (

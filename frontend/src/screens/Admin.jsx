@@ -62,7 +62,10 @@ export default function Admin() {
   const openEnv = async (o) => {
     try { await reloadActiveOrgs(); } catch { /* switcher ververst anders bij navigatie */ }
     setOrg(o.id);
-    nav("/app/integrations");
+    // Naar de index, niet hard naar Integraties: die kiest het eerste gekoppelde
+    // kanaal en respecteert de functies van deze omgeving (Integraties kan uit
+    // staan — dan zou je op een "staat uit"-pagina landen).
+    nav("/app");
   };
 
   if (meLoading) return null;

@@ -108,10 +108,15 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
           )
         ))}
         {user?.role === "agency_admin" && (
-          <NavLink to="/admin" className="icon-btn" onClick={onNavigate} style={() => navItem(false)}>
-            <IcUsers s={18} />
-            Klantenbeheer
-          </NavLink>
+          <>
+            {/* Scheidslijn: Klantenbeheer is beheer (alleen admins/bureaus zien
+                dit), geen onderdeel van het gewone dashboardmenu. */}
+            <div style={navSeparator} />
+            <NavLink to="/admin" className="icon-btn" onClick={onNavigate} style={() => navItem(false)}>
+              <IcUsers s={18} />
+              Klantenbeheer
+            </NavLink>
+          </>
         )}
       </div>
 
@@ -159,6 +164,7 @@ const switchMenu = { position: "absolute", top: "calc(100% + 6px)", left: 0, rig
 const switchRow = { display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--c-ink-soft)" };
 const switchRowActive = { background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "var(--c-muted)", textTransform: "uppercase", margin: "6px 0 6px 8px" };
+const navSeparator = { height: 1, background: "var(--c-border)", margin: "8px 12px" };
 const progressCard = { margin: 14, padding: 14, borderRadius: 12, background: "var(--c-accent-soft)" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
 const userMenu = { position: "absolute", bottom: "100%", left: 14, right: 14, marginBottom: 8, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 20 };

@@ -8,6 +8,8 @@ een spreadsheet bijhoudt: automatische waarden uit de gekoppelde kanalen
 server-side berekend zodat elke weergave dezelfde formules gebruikt.
 """
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Request
@@ -25,7 +27,12 @@ router = APIRouter()
 # Handmatig in te vullen velden (per organisatie per maand opgeslagen).
 MANUAL_KEYS = ("budget", "kosten_per_klant", "inkoopwaarde", "returns")
 BTW_FACTOR = 1.21
+DEFAULT_MONTHS = 12  # elk account ziet standaard de laatste 12 maanden
 MAX_MONTHS = 24
+# Gelijktijdige kanaal-calls bij het vullen van ontbrekende maanden. Koud staan
+# er tot 12 maanden x 5 kanalen open; sequentieel duurde dat tientallen
+# seconden, parallel is de tabel zo snel als de traagste losse call.
+_FETCH_WORKERS = 8
 
 
 def _month_range(month: str) -> tuple[str, str]:
@@ -74,12 +81,16 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
     assigned = models.get_org_assets(org_id)
 
     def once(setup):
+        # Met een lock: maanden worden parallel opgehaald, en zonder lock zouden
+        # meerdere threads tegelijk dezelfde credentials/accountkeuze oplossen.
         memo: dict = {}
+        lock = threading.Lock()
 
         def get():
-            if "v" not in memo:
-                memo["v"] = setup()
-            return memo["v"]
+            with lock:
+                if "v" not in memo:
+                    memo["v"] = setup()
+                return memo["v"]
         return get
 
     def ga_ctx():
@@ -151,36 +162,19 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
     }
 
 
-def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dict | None) -> dict:
-    """Automatische kanaalcijfers voor één maand.
+def _cache_key(org_id: str, month: str, property_id: str | None) -> str:
+    # v2 in de sleutel: entries van vóór de 0-euro-telling voor niet-gekoppelde
+    # advertentiekanalen worden zo genegeerd, anders bleven afgesloten maanden
+    # nog tot 24 uur een leeg veld tonen.
+    return f"{org_id}|framework:v2|{month}|{property_id or '-'}"
 
-    Elk kanaal wordt defensief opgehaald: niet gekoppeld, geen data of een
-    API-fout betekent None voor dat kanaal, nooit een kapotte tabel. De demo-org
-    krijgt gegenereerde voorbeelddata; echte organisaties worden per maand
-    gecachet (afgesloten maanden lang, de lopende maand kort; maanden waarin
-    een kanaal faalde extra kort, zodat een storing geen dagen blijft plakken).
+
+def _assemble_auto(ga, ads, mads, woo, shop, google_connected: bool, meta_connected: bool) -> dict:
+    """Stel de automatische kanaalcijfers voor één maand samen (pure berekening).
+
+    Elk kanaal is defensief opgehaald: niet gekoppeld, geen data of een
+    API-fout betekent None voor dat kanaal, nooit een kapotte tabel.
     """
-    start, end = _month_range(month)
-
-    if models.is_demo_org(org_id):
-        ga = demo.overview(start, end, None)
-        ads = demo.ads_overview(start, end, None)
-        mads = demo.meta_ads_overview(start, end, None)
-        woo = None
-        shop = None
-    else:
-        # v2 in de sleutel: entries van vóór de 0-euro-telling voor
-        # niet-gekoppelde advertentiekanalen worden zo genegeerd, anders
-        # bleven afgesloten maanden nog tot 24 uur een leeg veld tonen.
-        key = f"{org_id}|framework:v2|{month}|{property_id or '-'}"
-        cached = cache.get(key)
-        if cached is not None:
-            return cached
-        ga = fetchers["ga"](start, end)
-        ads = fetchers["ads"](start, end)
-        mads = fetchers["meta"](start, end)
-        woo = fetchers["woo"](start, end)
-        shop = fetchers["shopify"](start, end)
 
     def r2(v):
         return round(v, 2) if isinstance(v, (int, float)) else v
@@ -192,10 +186,6 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
     # per lead toch berekend kan worden. Is een kanaal wél gekoppeld maar geeft
     # het (tijdelijk) geen data, dan blijft het leeg: dat is onbekend, geen 0,
     # en anders zou een storing als nul-uitgave worden verhuld.
-    demo_org = models.is_demo_org(org_id)
-    google_connected = demo_org or _connected(org_id, "google_ads")
-    meta_connected = demo_org or _connected(org_id, "meta_ads")
-
     def _spend(value, connected):
         value = r2(value)
         if value is not None:
@@ -236,7 +226,7 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
     elif ga_kpis.get("revenue"):
         omzet, omzet_bron, orders = ga_kpis.get("revenue"), "google_analytics", ga_kpis.get("transactions")
 
-    auto = {
+    return {
         "ads_google": ads_google,
         "ads_meta": ads_meta,
         "ads_kosten": ads_kosten,
@@ -246,10 +236,73 @@ def _auto_values(org_id: str, month: str, property_id: str | None, fetchers: dic
         "omzet_bron": omzet_bron,
         "orders": orders,
     }
-    if not models.is_demo_org(org_id):
+
+
+_CHANNELS = ("ga", "ads", "meta", "woo", "shopify")
+
+
+def _auto_values_for_months(org_id: str, month_list: list[str], property_id: str | None,
+                            fetchers: dict | None, demo_org: bool) -> dict[str, dict]:
+    """Automatische kanaalcijfers per maand: {maand: auto}.
+
+    Gecachete maanden komen direct uit de cache; alleen de ontbrekende maanden
+    gaan naar de kanalen, en die calls (maand x kanaal) lopen parallel. Zo is
+    het eerste bezoek zo snel als de traagste losse call in plaats van de som
+    van tientallen seriële calls, en kost een extra maand alleen die maand.
+    Echte organisaties worden per maand gecachet (afgesloten maanden lang, de
+    lopende maand kort; maanden waarin een kanaal faalde extra kort, zodat een
+    storing geen dagen blijft plakken). De demo-org genereert voorbeelddata.
+    """
+    if demo_org:
+        out = {}
+        for month in month_list:
+            start, end = _month_range(month)
+            out[month] = _assemble_auto(
+                demo.overview(start, end, None), demo.ads_overview(start, end, None),
+                demo.meta_ads_overview(start, end, None), None, None,
+                google_connected=True, meta_connected=True,
+            )
+        return out
+
+    out: dict[str, dict] = {}
+    todo: list[str] = []
+    for month in month_list:
+        cached = cache.get(_cache_key(org_id, month, property_id))
+        if cached is not None:
+            out[month] = cached
+        else:
+            todo.append(month)
+    if not todo:
+        return out
+
+    google_connected = _connected(org_id, "google_ads")
+    meta_connected = _connected(org_id, "meta_ads")
+
+    # Alle ontbrekende (maand, kanaal)-combinaties in één parallelle burst. De
+    # fetchers zijn guarded (fouten worden None + errors-set), dus een future
+    # levert nooit een exception op; de kanaal-contexten zijn thread-safe
+    # gememoiseerd zodat credentials maar één keer worden opgelost.
+    raw: dict[tuple[str, str], dict | None] = {}
+    with ThreadPoolExecutor(max_workers=_FETCH_WORKERS) as pool:
+        futures = {}
+        for month in todo:
+            start, end = _month_range(month)
+            for channel in _CHANNELS:
+                futures[pool.submit(fetchers[channel], start, end)] = (month, channel)
+        for future in as_completed(futures):
+            raw[futures[future]] = future.result()
+
+    for month in todo:
+        auto = _assemble_auto(
+            raw.get((month, "ga")), raw.get((month, "ads")), raw.get((month, "meta")),
+            raw.get((month, "woo")), raw.get((month, "shopify")),
+            google_connected, meta_connected,
+        )
+        _, end = _month_range(month)
         ttl = 300 if fetchers["errors"] else cache.ttl_for_range(end)
-        cache.set(f"{org_id}|framework:v2|{month}|{property_id or '-'}", auto, ttl)
-    return auto
+        cache.set(_cache_key(org_id, month, property_id), auto, ttl)
+        out[month] = auto
+    return out
 
 
 def _derived(auto: dict, manual: dict) -> dict:
@@ -292,10 +345,8 @@ def _derived(auto: dict, manual: dict) -> dict:
     }
 
 
-def _month_payload(org_id: str, month: str, property_id: str | None,
-                   manual_by_month: dict, fetchers: dict | None) -> dict:
+def _month_payload(month: str, auto: dict, manual_by_month: dict) -> dict:
     start, end = _month_range(month)
-    auto = _auto_values(org_id, month, property_id, fetchers)
     manual = {k: v for k, v in (manual_by_month.get(month) or {}).items() if k in MANUAL_KEYS}
     return {
         "month": month,
@@ -308,7 +359,9 @@ def _month_payload(org_id: str, month: str, property_id: str | None,
 
 
 @router.get("/api/framework")
-def framework(request: Request, months: int = 3, property_id: str | None = None, org_id: str | None = None):
+def framework(request: Request, months: int = DEFAULT_MONTHS,
+              property_id: str | None = None, org_id: str | None = None):
+    """De KPI-tabel: standaard de laatste 12 maanden, voor elk account."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "framework")
@@ -316,11 +369,13 @@ def framework(request: Request, months: int = 3, property_id: str | None = None,
     month_list = _last_months(months)
     manual_by_month = models.get_framework_values(target_org, month_list)
     org = models.get_organization(target_org) or {}
-    fetchers = None if models.is_demo_org(target_org) else _make_fetchers(target_org, property_id)
+    demo_org = bool(org.get("is_demo"))
+    fetchers = None if demo_org else _make_fetchers(target_org, property_id)
+    auto_by_month = _auto_values_for_months(target_org, month_list, property_id, fetchers, demo_org)
     return {
         "org_id": target_org,
         "business_type": org.get("business_type") or "leadgen",
-        "months": [_month_payload(target_org, m, property_id, manual_by_month, fetchers) for m in month_list],
+        "months": [_month_payload(m, auto_by_month[m], manual_by_month) for m in month_list],
     }
 
 
@@ -345,5 +400,7 @@ def save_framework(request: Request, month: str, payload: FrameworkValuesIn,
     if values:
         models.save_framework_values(target_org, month, values)
     manual_by_month = models.get_framework_values(target_org, [month])
-    fetchers = None if models.is_demo_org(target_org) else _make_fetchers(target_org, property_id)
-    return {"org_id": target_org, **_month_payload(target_org, month, property_id, manual_by_month, fetchers)}
+    demo_org = models.is_demo_org(target_org)
+    fetchers = None if demo_org else _make_fetchers(target_org, property_id)
+    auto = _auto_values_for_months(target_org, [month], property_id, fetchers, demo_org)[month]
+    return {"org_id": target_org, **_month_payload(month, auto, manual_by_month)}

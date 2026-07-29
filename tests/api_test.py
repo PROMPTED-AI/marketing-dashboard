@@ -113,6 +113,12 @@ def test_admin_pages(admin, tk_org_id):
 
 
 def test_framework(demo):
+    # Zonder parameter: altijd de laatste 12 maanden, oplopend t/m de lopende maand.
+    standaard = demo.get(f"{BASE}/api/framework").json()
+    assert len(standaard["months"]) == 12, len(standaard["months"])
+    maanden = [m["month"] for m in standaard["months"]]
+    assert maanden == sorted(maanden) and all(m["auto"] for m in standaard["months"]), maanden
+
     d = demo.get(f"{BASE}/api/framework?months=3").json()
     assert len(d["months"]) == 3 and d["business_type"] in ("leadgen", "ecommerce"), d
     m = d["months"][-1]
