@@ -135,6 +135,11 @@ onderdelen (sidebar, routes, notificatiebel), maar de grens ligt server-side:
 `_require_feature()` weigert de bijbehorende endpoints met een 403, zodat een directe
 URL niets extra's opent.
 
+Naast de functies geldt een **kanaal-allowlist** per omgeving (zelfde tabel, met een
+`channel:`-prefix): Integraties uit = geen enkel kanaal zichtbaar voor de klant;
+Integraties aan = de klant ziet en koppelt precies de kanalen die het bureau heeft
+aangevinkt (`_require_channel()`, admins mogen altijd koppelen).
+
 ## Verzoek-flow (voorbeeld: Overzicht)
 
 1. Browser laadt `dashboard.prompted-ai.nl` → Cloud Run serveert de React-app.

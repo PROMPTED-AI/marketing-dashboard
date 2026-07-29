@@ -91,7 +91,9 @@ export default function Analytics() {
           <div style={{ width: 34, height: 34, borderRadius: 9, background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center" }}><GaGlyph s={20} /></div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Google Analytics 4</div>
-            <div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>{prop ? `${prop.display_name} · ${prop.account}` : "property"}</div>
+            {/* Accountnaam alleen tonen als die er is: in een bureau-omgeving
+                wordt hij weggelaten (kan de naam van een andere klant zijn). */}
+            <div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>{prop ? `${prop.display_name || prop.property_id}${prop.account ? ` · ${prop.account}` : ""}` : "property"}</div>
           </div>
         </div>
         {props.length > 1 && (

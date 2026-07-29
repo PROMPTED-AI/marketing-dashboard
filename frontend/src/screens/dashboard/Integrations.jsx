@@ -142,12 +142,18 @@ const GOOGLE_PROVIDERS = new Set(["google_analytics", "search_console", "google_
 
 export default function Integrations() {
   const { data, loading, reload } = useConnections();
-  const { orgId } = useActiveOrg();
+  const { orgId, channels } = useActiveOrg();
   const { me } = useMe();
   const [wooOpen, setWooOpen] = useState(false);
   const [shopifyOpen, setShopifyOpen] = useState(false);
   if (loading) return <TabState loading />;
-  const items = data?.connections || [];
+  // Alleen de kanalen die het bureau voor deze omgeving heeft toegestaan; een
+  // admin ziet alles (die moet bijvoorbeeld Meta of een webshop voor de klant
+  // kunnen koppelen — de server staat dat voor admins ook toe).
+  const isAdmin = me?.role === "agency_admin";
+  const items = (data?.connections || []).filter(
+    (c) => isAdmin || channels[c.provider] !== false,
+  );
   // Een admin die de omgeving van een klánt bekijkt: de gewone Google-connect
   // koppelt altijd de eigen organisatie van de ingelogde gebruiker, dus die
   // knop zou hier stilletjes het verkeerde doen. Voor Google-kanalen is de

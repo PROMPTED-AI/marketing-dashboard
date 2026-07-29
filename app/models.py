@@ -289,6 +289,93 @@ def feature_enabled(org_id: str, feature: str) -> bool:
     return True if row is None else bool(row[0])
 
 
+# ------------------------------------------------------ kanalen per omgeving
+#
+# Naast de functies bepaalt het bureau per klantaccount welke kánalen de klant
+# mag zien en koppelen. Staat de functie Integraties uit, dan is geen enkel
+# kanaal zichtbaar; staat hij aan, dan geldt per kanaal deze allowlist.
+# Opslag hergebruikt org_features met een 'channel:'-prefix (geen rij = aan),
+# zodat er geen schemawijziging of extra tabel nodig is.
+
+CHANNELS = {
+    "google_analytics": "Google Analytics",
+    "search_console": "Search Console",
+    "google_ads": "Google Ads",
+    "meta_ads": "META",
+    "woocommerce": "WooCommerce",
+    "shopify": "Shopify",
+}
+_CHANNEL_PREFIX = "channel:"
+
+
+def default_channels() -> dict:
+    return {key: True for key in CHANNELS}
+
+
+def get_org_channels(org_id: str) -> dict:
+    """Alle kanalen met hun stand voor deze omgeving (ontbrekend = aan)."""
+    out = default_channels()
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT feature, enabled FROM org_features "
+            "WHERE organization_id = %s AND feature LIKE %s",
+            (org_id, _CHANNEL_PREFIX + "%"),
+        ).fetchall()
+    for feature, enabled in rows:
+        key = feature.removeprefix(_CHANNEL_PREFIX)
+        if key in out:
+            out[key] = enabled
+    return out
+
+
+def get_channels_by_org(org_ids: list[str]) -> dict[str, dict]:
+    """De kanaalstand van meerdere omgevingen in één query (voor lijsten)."""
+    out = {org_id: default_channels() for org_id in org_ids}
+    if not org_ids:
+        return out
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT organization_id, feature, enabled FROM org_features "
+            "WHERE organization_id = ANY(%s) AND feature LIKE %s",
+            (list(org_ids), _CHANNEL_PREFIX + "%"),
+        ).fetchall()
+    for org_id, feature, enabled in rows:
+        key = feature.removeprefix(_CHANNEL_PREFIX)
+        if org_id in out and key in CHANNELS:
+            out[org_id][key] = enabled
+    return out
+
+
+def set_org_channels(org_id: str, values: dict) -> dict:
+    """Sla de kanaalstand op (alleen bekende kanalen) en geef het resultaat."""
+    with db.get_conn() as conn:
+        for channel, enabled in values.items():
+            if channel not in CHANNELS or enabled is None:
+                continue
+            conn.execute(
+                """
+                INSERT INTO org_features (organization_id, feature, enabled, updated_at)
+                VALUES (%s, %s, %s, now())
+                ON CONFLICT (organization_id, feature)
+                DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()
+                """,
+                (org_id, _CHANNEL_PREFIX + channel, bool(enabled)),
+            )
+    return get_org_channels(org_id)
+
+
+def channel_allowed(org_id: str, channel: str) -> bool:
+    """Mag deze omgeving dit kanaal zien/koppelen? Onbekende kanalen: ja."""
+    if channel not in CHANNELS:
+        return True
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT enabled FROM org_features WHERE organization_id = %s AND feature = %s",
+            (org_id, _CHANNEL_PREFIX + channel),
+        ).fetchone()
+    return True if row is None else bool(row[0])
+
+
 # ------------------------------------------------------------------ abonnement
 #
 # Nieuwe organisaties starten met een proefperiode van 14 dagen. 'active' is
@@ -905,6 +992,7 @@ def list_organizations_with_connections(agency_id: str | None = None) -> list[di
         }
     assets_by_org = {r[0]: dict(zip(_ASSET_FIELDS, r[1:])) for r in assets}
     features_by_org = get_features_by_org([r[0] for r in orgs])
+    channels_by_org = get_channels_by_org([r[0] for r in orgs])
 
     out = []
     for (org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package,
@@ -925,6 +1013,7 @@ def list_organizations_with_connections(agency_id: str | None = None) -> list[di
                 "is_agency": is_agency,
                 "agency_id": agency_id,
                 "features": features_by_org.get(org_id, default_features()),
+                "channels": channels_by_org.get(org_id, default_channels()),
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,

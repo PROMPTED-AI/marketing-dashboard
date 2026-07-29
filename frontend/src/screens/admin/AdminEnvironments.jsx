@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import {
   api, linkAgency, availableAssets, getOrgAssets, setOrgAssets, deleteOrganization,
-  setOrgFeatures,
+  setOrgFeatures, setOrgChannels,
 } from "../../lib/api.js";
-import FeatureToggles, { featureSummary } from "./FeatureToggles.jsx";
+import FeatureToggles, { ChannelToggles, featureSummary } from "./FeatureToggles.jsx";
 import AssetPicker from "./AssetPicker.jsx";
 
 // Omgevingen: het bureau-model. Het bureau logt in met één manageraccount en
@@ -79,6 +79,7 @@ function EnvModal({ org, onClose, onSaved }) {
   const [assets, setAssets] = useState(null);      // huidige toewijzing
   const [available, setAvailable] = useState(null); // { properties, sites, ads_accounts }
   const [features, setFeatures] = useState(org.features || {});
+  const [channels, setChannels] = useState(org.channels || {});
   const [featBusy, setFeatBusy] = useState(false);
   const [featSaved, setFeatSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,6 +96,19 @@ function EnvModal({ org, onClose, onSaved }) {
     } catch (e) {
       setError(e);
       setFeatures(org.features || {});  // mislukt: terug naar de opgeslagen stand
+    } finally { setFeatBusy(false); }
+  };
+
+  const saveChannels = async (next) => {
+    setChannels(next);
+    setFeatBusy(true); setError(null); setFeatSaved(false);
+    try {
+      const d = await setOrgChannels(org.id, next);
+      setChannels(d.channels);
+      setFeatSaved(true);
+    } catch (e) {
+      setError(e);
+      setChannels(org.channels || {});
     } finally { setFeatBusy(false); }
   };
 
@@ -146,6 +160,18 @@ function EnvModal({ org, onClose, onSaved }) {
           </div>
           <FeatureToggles features={features} onChange={saveFeatures} disabled={featBusy} />
         </div>
+
+        {/* Kanalen: alleen relevant zolang Integraties aanstaat — uit betekent
+            dat de klant geen enkel kanaal ziet, dus dan is er niets te kiezen. */}
+        {features.integrations !== false && (
+          <div style={{ marginBottom: 22 }}>
+            <span style={{ ...lbl, marginBottom: 8 }}>Zichtbare kanalen voor deze klant</span>
+            <ChannelToggles channels={channels} onChange={saveChannels} disabled={featBusy} />
+            <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8 }}>
+              Uitgevinkte kanalen verdwijnen uit het menu en op Integraties van deze klant, en de klant kan ze niet koppelen. Jij als beheerder kunt ze altijd nog koppelen.
+            </div>
+          </div>
+        )}
 
         {!managed ? (
           <div>

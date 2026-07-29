@@ -558,8 +558,26 @@ def test_account_features(admin):
     assert s.get(f"{BASE}/api/me").json()["features"]["signalen"] is True
     assert s.put(f"{BASE}/api/admin/organizations/{oid}/features",
                  json={"features": {"framework": True}}).status_code == 403
+
+    # Kanalen per account: standaard alles aan; uitgezet kanaal is voor de
+    # klant geblokkeerd om te koppelen, en /api/me draagt de stand mee.
+    assert admin.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                     json={"features": {"integrations": True},
+                           "channels": {"woocommerce": False, "onzin": True}}).status_code == 400
+    r = admin.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                  json={"features": {"integrations": True}, "channels": {"woocommerce": False}})
+    assert r.status_code == 200 and r.json()["channels"]["woocommerce"] is False, r.text
+    assert r.json()["channels"]["shopify"] is True, r.text
+    me = s.get(f"{BASE}/api/me").json()
+    assert me["channels"]["woocommerce"] is False and me["channels"]["google_ads"] is True, me["channels"]
+    assert s.post(f"{BASE}/api/woocommerce/connect-demo").status_code == 403
+    assert s.get(f"{BASE}/api/auth/google/connect?providers=google_analytics",
+                 allow_redirects=False).status_code in (302, 307)  # toegestaan kanaal
+    # De admin mag het kanaal nog wél koppelen voor deze klant.
+    assert admin.post(f"{BASE}/api/woocommerce/connect-demo?org_id={oid}").status_code == 200
+
     admin.delete(f"{BASE}/api/admin/organizations/{oid}")
-    print("functies per account: aanmaken, instellen, afdwingen en autorisatie slagen")
+    print("functies per account: aanmaken, instellen, kanalen en autorisatie slagen")
 
 
 def test_agency_scope(admin):

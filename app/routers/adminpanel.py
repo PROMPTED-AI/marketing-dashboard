@@ -277,7 +277,8 @@ def admin_set_assets(request: Request, org_id: str, payload: AssetsIn):
 
 
 class FeaturesIn(BaseModel):
-    features: dict[str, bool]
+    features: dict[str, bool] | None = None
+    channels: dict[str, bool] | None = None
 
 
 @router.get("/api/admin/features")
@@ -293,19 +294,29 @@ def admin_get_features(request: Request, org_id: str):
     if not models.get_organization(org_id):
         raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
     return {"features": models.get_org_features(org_id),
-            "catalog": [{"key": k, "label": v} for k, v in models.FEATURES.items()]}
+            "channels": models.get_org_channels(org_id),
+            "catalog": [{"key": k, "label": v} for k, v in models.FEATURES.items()],
+            "channel_catalog": [{"key": k, "label": v} for k, v in models.CHANNELS.items()]}
 
 
 @router.put("/api/admin/organizations/{org_id}/features")
 def admin_set_features(request: Request, org_id: str, payload: FeaturesIn):
-    """Zet functies aan of uit voor één klantomgeving."""
+    """Zet functies en/of kanalen aan of uit voor één klantomgeving."""
     auth.require_admin_org(request, org_id)
     if not models.get_organization(org_id):
         raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
-    unknown = [k for k in payload.features if k not in models.FEATURES]
+    unknown = [k for k in (payload.features or {}) if k not in models.FEATURES]
     if unknown:
         raise HTTPException(status_code=400, detail=f"Onbekende functie: {unknown[0]}")
-    return {"features": models.set_org_features(org_id, payload.features)}
+    unknown = [k for k in (payload.channels or {}) if k not in models.CHANNELS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Onbekend kanaal: {unknown[0]}")
+    if payload.features:
+        models.set_org_features(org_id, payload.features)
+    if payload.channels:
+        models.set_org_channels(org_id, payload.channels)
+    return {"features": models.get_org_features(org_id),
+            "channels": models.get_org_channels(org_id)}
 
 
 # ------------------------------------------------------- bureaus (platform-admin)
