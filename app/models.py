@@ -297,13 +297,33 @@ def feature_enabled(org_id: str, feature: str) -> bool:
 # Opslag hergebruikt org_features met een 'channel:'-prefix (geen rij = aan),
 # zodat er geen schemawijziging of extra tabel nodig is.
 
-CHANNELS = {
+# Eén bron van waarheid: elk kanaal dat de app kent (config) valt automatisch
+# onder de allowlist — ook een kanaal dat er later bij komt. Alleen het label is
+# per kanaal ingevuld; ontbreekt dat, dan wordt de sleutel netjes afgeleid, dus
+# een nieuw kanaal werkt meteen (en verschijnt in de beheerschermen) zonder dat
+# hier iets bijgewerkt hoeft te worden.
+_CHANNEL_LABELS = {
     "google_analytics": "Google Analytics",
     "search_console": "Search Console",
     "google_ads": "Google Ads",
-    "meta_ads": "META",
+    "meta_ads": "META (Ads en Organisch)",
     "woocommerce": "WooCommerce",
     "shopify": "Shopify",
+}
+
+
+def _channel_label(key: str) -> str:
+    return _CHANNEL_LABELS.get(key) or key.replace("_", " ").title()
+
+
+CHANNELS = {
+    key: _channel_label(key)
+    for key in (
+        list(config.GOOGLE_PROVIDERS)
+        + list(config.META_PROVIDERS)
+        + list(config.SHOP_PROVIDERS)
+        + list(config.PLACEHOLDER_PROVIDERS)
+    )
 }
 _CHANNEL_PREFIX = "channel:"
 

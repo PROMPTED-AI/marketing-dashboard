@@ -51,7 +51,12 @@ export default function FeatureToggles({ features, onChange, disabled = false })
 // Kanalen die het bureau per klantaccount kan toestaan. Alleen relevant als de
 // functie Integraties aanstaat: uit = geen enkel kanaal zichtbaar, aan = de
 // klant ziet (en koppelt) precies de aangevinkte kanalen.
-export const CHANNEL_LABELS = {
+//
+// De lijst komt uit de meegegeven `channels`-stand (de server kent alle kanalen,
+// inclusief kanalen die er later bij komen). Alleen het label is hier netter
+// gemaakt; een onbekende sleutel wordt afgeleid, zodat een nieuw kanaal meteen
+// verschijnt zonder aanpassing.
+const CHANNEL_LABEL_OVERRIDES = {
   google_analytics: "Google Analytics",
   search_console: "Search Console",
   google_ads: "Google Ads",
@@ -59,12 +64,20 @@ export const CHANNEL_LABELS = {
   woocommerce: "WooCommerce",
   shopify: "Shopify",
 };
-export const CHANNEL_ORDER = Object.keys(CHANNEL_LABELS);
+
+export function channelLabel(key) {
+  return CHANNEL_LABEL_OVERRIDES[key]
+    || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function ChannelToggles({ channels, onChange, disabled = false }) {
+  const keys = Object.keys(channels || {});
+  if (!keys.length) {
+    return <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Kanalen worden geladen…</div>;
+  }
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {CHANNEL_ORDER.map((key) => {
+      {keys.map((key) => {
         const on = channels?.[key] !== false;
         return (
           <label key={key} style={{ ...chip, opacity: disabled ? 0.6 : 1, cursor: disabled ? "default" : "pointer", borderColor: on ? "var(--c-accent)" : "var(--c-border)" }}>
@@ -75,7 +88,7 @@ export function ChannelToggles({ channels, onChange, disabled = false }) {
               onChange={(e) => onChange({ ...channels, [key]: e.target.checked })}
               style={{ width: 15, height: 15, accentColor: "var(--c-accent)", flex: "none" }}
             />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: on ? "var(--c-ink)" : "var(--c-muted)" }}>{CHANNEL_LABELS[key]}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: on ? "var(--c-ink)" : "var(--c-muted)" }}>{channelLabel(key)}</span>
           </label>
         );
       })}
