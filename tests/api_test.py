@@ -576,6 +576,36 @@ def test_account_features(admin):
     # De admin mag het kanaal nog wél koppelen voor deze klant.
     assert admin.post(f"{BASE}/api/woocommerce/connect-demo?org_id={oid}").status_code == 200
 
+    # Een uitgevinkt kanaal telt ook in de aggregaties (raamwerk, signalen) als
+    # niet gekoppeld: er is nu een Woo-koppeling, maar het kanaal staat uit.
+    from app import models, org_access
+    assert org_access._connected(oid, "woocommerce") is False
+    models.set_org_channels(oid, {"woocommerce": True})
+    assert org_access._connected(oid, "woocommerce") is True
+
+    # Generiek: elk kanaal dat de app kent valt onder de allowlist, en de
+    # datapagina's ervan zijn dicht zolang het kanaal uitstaat. Zo werkt een
+    # kanaal dat er later bij komt automatisch mee.
+    data_endpoints = {
+        "google_analytics": "/api/analytics/properties",
+        "search_console": "/api/search-console/sites",
+        "google_ads": "/api/google-ads/accounts",
+        "meta_ads": "/api/meta/accounts",
+        "woocommerce": "/api/woocommerce/report?start=2026-01-01&end=2026-01-31",
+        "shopify": "/api/shopify/report?start=2026-01-01&end=2026-01-31",
+    }
+    assert set(models.CHANNELS) == set(data_endpoints), models.CHANNELS
+    models.set_org_channels(oid, {k: False for k in models.CHANNELS})
+    conns = s.get(f"{BASE}/api/connections").json()
+    assert conns["connections"] == [] and conns["connected"] == 0, conns
+    for channel, endpoint in data_endpoints.items():
+        r = s.get(f"{BASE}{endpoint}")
+        assert r.status_code == 403, (channel, r.status_code, r.text)
+        assert "niet beschikbaar" in r.json()["detail"], (channel, r.text)
+    # Weer aanzetten: de kanalen staan meteen weer in de lijst.
+    models.set_org_channels(oid, {k: True for k in models.CHANNELS})
+    assert len(s.get(f"{BASE}/api/connections").json()["connections"]) == len(models.CHANNELS)
+
     admin.delete(f"{BASE}/api/admin/organizations/{oid}")
     print("functies per account: aanmaken, instellen, kanalen en autorisatie slagen")
 

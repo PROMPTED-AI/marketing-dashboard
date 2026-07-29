@@ -11,12 +11,11 @@ export const ALL_FEATURES_ON = {
   signalen: true, assistant: true, integrations: true, framework: true, dashboards: true,
 };
 
-// Kanalen die het bureau per klantaccount aan of uit kan zetten. Zelfde
-// principe: zolang de server niets zegt, geldt "aan".
-export const ALL_CHANNELS_ON = {
-  google_analytics: true, search_console: true, google_ads: true,
-  meta_ads: true, woocommerce: true, shopify: true,
-};
+// Kanalen die het bureau per klantaccount aan of uit kan zetten. De server
+// levert de volledige stand (en kent ook kanalen die er later bij komen); een
+// sleutel die we niet terugkrijgen geldt als "aan". Daarom geen hardcoded
+// kanaallijst hier — die zou stilzwijgend verouderen bij een nieuw kanaal.
+export const ALL_CHANNELS_ON = {};
 
 // Holds the organization the dashboard is currently scoped to. Agency admins
 // can switch between all client orgs; clients only have their own.

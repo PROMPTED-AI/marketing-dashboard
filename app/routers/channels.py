@@ -30,6 +30,7 @@ router = APIRouter()
 def properties(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_analytics", user)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "properties": demo.DEMO_PROPERTIES}
     key = f"{target_org}|props"
@@ -47,6 +48,7 @@ def properties(request: Request, org_id: str | None = None):
 def report(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_analytics", user)
     property_id = _effective_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "property_id": property_id, "rows": demo.basic_report()}
@@ -68,6 +70,7 @@ def analytics_overview(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_analytics", user)
     property_id = _effective_asset(target_org, "ga_property_id", property_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
@@ -88,6 +91,7 @@ def analytics_overview(
 def analytics_realtime(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_analytics", user)
     property_id = _effective_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"property_id": property_id, **demo.realtime()}
@@ -97,7 +101,14 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
 
 
 
-def _connections_payload(target_org: str) -> dict:
+def _connections_payload(target_org: str, user: dict | None = None) -> dict:
+    """Status per kanaal voor de onboarding, de sidebar en Integraties.
+
+    Voor een klant blijven kanalen die het bureau voor deze omgeving heeft
+    uitgezet volledig uit de lijst (en dus ook uit de teller "x van y
+    gekoppeld"); een beheerder ziet ze wel, want die moet ze nog kunnen
+    koppelen. Geldt automatisch voor elk kanaal dat de app kent.
+    """
     demo_org = models.is_demo_org(target_org)
     items = []
     for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
@@ -116,6 +127,8 @@ def _connections_payload(target_org: str) -> dict:
         )
     for provider in config.PLACEHOLDER_PROVIDERS:
         items.append({"provider": provider, "status": "coming_soon", "google_email": None})
+    if not (user and user.get("role") == "agency_admin"):
+        items = [i for i in items if models.channel_allowed(target_org, i["provider"])]
     connected = sum(1 for i in items if i["status"] == "connected")
     return {"org_id": target_org, "connected": connected, "total": len(items), "connections": items}
 
@@ -124,7 +137,7 @@ def _connections_payload(target_org: str) -> dict:
 def connections(request: Request, org_id: str | None = None):
     """Per-provider connection status for the onboarding + sidebar progress."""
     user = auth.current_user(request)
-    return _connections_payload(_resolve_org_id(user, org_id))
+    return _connections_payload(_resolve_org_id(user, org_id), user)
 
 
 @router.post("/api/connections/{provider}/disconnect")
@@ -135,6 +148,7 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
     _require_feature(target_org, "integrations")
     if provider not in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unknown provider")
+    _require_channel(target_org, provider, user)
 
     conn = models.get_connection(target_org, provider=provider)
     models.delete_connection(target_org, provider)
@@ -146,13 +160,14 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
             oauth.revoke(oauth.credentials_from_dict(conn["creds"]))
         except Exception:
             pass
-    return _connections_payload(target_org)
+    return _connections_payload(target_org, user)
 
 
 @router.get("/api/search-console/sites")
 def gsc_sites(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "search_console", user)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "sites": demo.DEMO_SITES}
     key = f"{target_org}|gscsites"
@@ -178,6 +193,7 @@ def gsc_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "search_console", user)
     site = _effective_asset(target_org, "gsc_site_url", site)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
@@ -336,6 +352,7 @@ def shopify_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "shopify", user)
     key = f"{target_org}|shopify|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
@@ -438,6 +455,7 @@ async def shopify_compliance(request: Request):
 def meta_accounts(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "meta_ads", user)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, **demo.DEMO_META_ASSETS}
     key = f"{target_org}|metaassets"
@@ -463,6 +481,7 @@ def meta_ads_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "meta_ads", user)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.meta_ads_overview(start, end, compare)
@@ -490,6 +509,7 @@ def meta_organic_report(
     user = auth.current_user(request)
     _require_period(start, end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "meta_ads", user)
     if models.is_demo_org(target_org):
         data = demo.meta_organic_overview(start, end)
         return {"org_id": target_org, "page_id": page_id, **data}
@@ -511,6 +531,7 @@ def meta_organic_report(
 def ads_accounts(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_ads", user)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "accounts": demo.DEMO_ADS_ACCOUNTS}
     key = f"{target_org}|adsaccounts"
@@ -539,6 +560,7 @@ def ads_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "google_ads", user)
     customer_id = _effective_asset(target_org, "ads_customer_id", customer_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
@@ -602,7 +624,7 @@ def wc_connect(request: Request, payload: WooConnectIn, org_id: str | None = Non
         provider="woocommerce",
     )
     cache.invalidate_org(target_org)
-    return _connections_payload(target_org)
+    return _connections_payload(target_org, user)
 
 
 @router.post("/api/woocommerce/connect-demo")
@@ -620,7 +642,7 @@ def wc_connect_demo(request: Request, org_id: str | None = None):
         provider="woocommerce",
     )
     cache.invalidate_org(target_org)
-    return _connections_payload(target_org)
+    return _connections_payload(target_org, user)
 
 
 @router.get("/api/woocommerce/report")
@@ -635,6 +657,7 @@ def wc_report(
     user = auth.current_user(request)
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
+    _require_channel(target_org, "woocommerce", user)
     key = f"{target_org}|woo|{start}|{end}|{compare_start}|{compare_end}"
     cached = cache.get(key)
     if cached is not None:
