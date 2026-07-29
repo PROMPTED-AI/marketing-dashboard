@@ -74,6 +74,11 @@ Google-calls duren 1–3s, daarom:
 Historische periodes (einddatum < vandaag) zijn onveranderlijk → lange TTL; periodes
 t/m vandaag → korte TTL.
 
+Het Raamwerk cachet per máánd (zelfde TTL-regels) en toont standaard de laatste 12
+maanden; alleen de maanden die niet in de cache staan gaan naar de kanalen, en die
+calls (maand × kanaal) lopen parallel. Zo kost een extra maand alleen die maand, en is
+een koude load zo snel als de traagste losse call in plaats van tientallen seriële.
+
 ### Docker + Cloud Build — automatisch deployen (`cloudbuild.yaml`)
 Een Cloud Build-trigger op GitHub bouwt en rolt uit bij elke merge naar `main`. Code op
 `main` = automatisch live, zonder handmatige `gcloud`-commando's.

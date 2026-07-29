@@ -67,12 +67,15 @@ function fmtValue(v, fmt) {
 }
 
 const MONTHS_KEY = "kompas-framework-months";
+// Elk account ziet standaard de laatste 12 maanden; bijladen kan tot 24.
+const DEFAULT_MONTHS = 12;
+const MAX_MONTHS = 24;
 
 export default function Framework() {
   const { orgId, businessType } = useActiveOrg();
   const [monthCount, setMonthCount] = useState(() => {
     const n = Number(localStorage.getItem(MONTHS_KEY));
-    return n >= 1 && n <= 24 ? n : 3;
+    return n >= DEFAULT_MONTHS && n <= MAX_MONTHS ? n : DEFAULT_MONTHS;
   });
 
   const property = localStorage.getItem("kompas-property");
@@ -81,24 +84,33 @@ export default function Framework() {
     : null;
   const { data, loading, error } = useCachedApi(url);
 
+  // Bij een extra maand (of verversing) wijzigt de URL en heeft de SWR-cache
+  // nog geen antwoord. Dan tonen we de laatst bekende tabel gedimd in plaats
+  // van een lege spinner — alleen bij het wisselen van klant hoort de tabel
+  // écht leeg te beginnen (nooit andermans cijfers laten staan).
+  const [lastGood, setLastGood] = useState(null);
+  useEffect(() => { if (data?.months) setLastGood(data); }, [data]);
+  useEffect(() => { setLastGood(null); }, [orgId]);
+  const active = data?.months ? data : lastGood;
+
   // Bewerkingen komen als volledige maand-payload terug uit de PUT; die winnen
   // van de (mogelijk verouderde) GET-data tot de volgende verversing.
   const [patched, setPatched] = useState({});
   useEffect(() => { setPatched({}); }, [url]);
 
   const months = useMemo(() => {
-    if (!data?.months) return null;
-    return data.months.map((m) => patched[m.month] || m);
-  }, [data, patched]);
+    if (!active?.months) return null;
+    return active.months.map((m) => patched[m.month] || m);
+  }, [active, patched]);
 
   // De variant volgt het bedrijfstype van de organisatie: de server geeft het
   // actuele type mee; tot de eerste load valt de UI terug op het type uit de
   // org-context, zodat er geen verkeerde rijenset opflitst.
-  const activeType = data?.business_type || businessType || "leadgen";
+  const activeType = active?.business_type || businessType || "leadgen";
   const rows = activeType === "ecommerce" ? ROWS_ECOMMERCE : ROWS_LEADGEN;
 
   const addMonth = () => {
-    const n = Math.min(monthCount + 1, 24);
+    const n = Math.min(monthCount + 1, MAX_MONTHS);
     setMonthCount(n);
     try { localStorage.setItem(MONTHS_KEY, String(n)); } catch { /* best effort */ }
   };
@@ -131,7 +143,7 @@ export default function Framework() {
           >
             {activeType === "ecommerce" ? "E-commerce" : "Leadgeneratie"}
           </span>
-          <button type="button" className="btn-primary" onClick={addMonth} disabled={monthCount >= 24}
+          <button type="button" className="btn-primary" onClick={addMonth} disabled={monthCount >= MAX_MONTHS}
             style={{ height: 38, padding: "0 14px", fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>
             <IcPlus s={14} />
             Maand toevoegen
