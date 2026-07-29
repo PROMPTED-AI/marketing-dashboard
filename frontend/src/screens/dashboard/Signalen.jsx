@@ -47,7 +47,10 @@ function groupByChannel(items) {
 
 export default function Signalen() {
   const nav = useNavigate();
-  const { orgId } = useActiveOrg();
+  const { orgId, features } = useActiveOrg();
+  // De adviesknoppen lopen via de assistent; staat die uit voor deze
+  // omgeving, dan tonen we alleen de signalen zelf.
+  const assistantOn = features?.assistant !== false;
   const { start, end, label } = useDateRange();
   const [signals, setSignals] = useState(null);
   const [error, setError] = useState(null);
@@ -160,7 +163,8 @@ export default function Signalen() {
 
       {!error && signals && (
         <>
-          {/* Samenvatten en prioriteren over alle signalen heen. */}
+          {/* Samenvatten en prioriteren over alle signalen heen (via de assistent). */}
+          {assistantOn && (
           <div className="card" style={{ padding: 18, marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 220 }}>
@@ -185,6 +189,7 @@ export default function Signalen() {
               </div>
             )}
           </div>
+          )}
 
           {signals.length === 0 && (
             <div className="card" style={{ padding: 28, textAlign: "center", color: "var(--c-muted)" }}>
@@ -218,18 +223,20 @@ export default function Signalen() {
                             </div>
                             <div style={{ fontSize: 13, color: "var(--c-muted)", marginTop: 3, lineHeight: 1.5 }}>{it.detail}</div>
                           </div>
-                          <div style={{ display: "flex", gap: 6, flex: "none" }}>
-                            <button className="btn-ghost" style={{ height: 32, padding: "0 12px", fontSize: 12.5 }}
-                              disabled={adv?.streaming}
-                              onClick={() => runAdvice(key, it.question)}>
-                              {adv?.streaming ? "Bezig…" : adv?.done ? "Opnieuw" : "Vraag advies"}
-                            </button>
-                            <button className="btn-ghost icon-btn" title="Doorvragen in de chat" aria-label="Doorvragen in de chat"
-                              style={{ height: 32, width: 34, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                              onClick={() => openInChat(it.question)}>
-                              <IcChat s={15} />
-                            </button>
-                          </div>
+                          {assistantOn && (
+                            <div style={{ display: "flex", gap: 6, flex: "none" }}>
+                              <button className="btn-ghost" style={{ height: 32, padding: "0 12px", fontSize: 12.5 }}
+                                disabled={adv?.streaming}
+                                onClick={() => runAdvice(key, it.question)}>
+                                {adv?.streaming ? "Bezig…" : adv?.done ? "Opnieuw" : "Vraag advies"}
+                              </button>
+                              <button className="btn-ghost icon-btn" title="Doorvragen in de chat" aria-label="Doorvragen in de chat"
+                                style={{ height: 32, width: 34, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                onClick={() => openInChat(it.question)}>
+                                <IcChat s={15} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {adv && (adv.text || adv.streaming || adv.error) && (
                           <div style={{ ...adviceBox, marginLeft: 21 }}>

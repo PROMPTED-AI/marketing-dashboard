@@ -15,13 +15,16 @@ const SEV_COLOR = { positive: "var(--c-pos)", negative: "var(--c-neg)", neutral:
 // als er signalen zijn; klik op een signaal en de assistent zoekt het uit.
 function NotificationBell() {
   const nav = useNavigate();
-  const { orgId } = useActiveOrg();
+  const { orgId, features } = useActiveOrg();
   const { start, end } = useDateRange();
   const [open, setOpen] = useState(false);
   const [insights, setInsights] = useState(null);
   const wrapRef = useRef(null);
 
+  const signalenOn = features?.signalen !== false;
+
   useEffect(() => {
+    if (!signalenOn) return;
     let alive = true;
     setInsights(null);
     const q = new URLSearchParams({ start, end });
@@ -34,7 +37,7 @@ function NotificationBell() {
       .then((d) => { if (alive) setInsights(d.insights || []); })
       .catch(() => { if (alive) setInsights([]); });
     return () => { alive = false; };
-  }, [orgId, start, end]);
+  }, [orgId, start, end, signalenOn]);
 
   // Sluit de dropdown bij een klik buiten het bel-gebied.
   useEffect(() => {
@@ -49,6 +52,9 @@ function NotificationBell() {
     sessionStorage.setItem("kompas-ask", question);
     nav("/app/assistant");
   };
+
+  // Signalen uitgezet voor deze omgeving: geen bel (en geen /api/insights-call).
+  if (!signalenOn) return null;
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }} className="hide-mobile">

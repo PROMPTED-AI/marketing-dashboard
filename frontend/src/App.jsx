@@ -20,6 +20,8 @@ import Integrations from "./screens/dashboard/Integrations.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
 import Admin from "./screens/Admin.jsx";
+import FeatureGate from "./components/FeatureGate.jsx";
+import { useActiveOrg } from "./lib/ActiveOrgProvider.jsx";
 
 function FullLoader() {
   return (
@@ -49,13 +51,24 @@ const CHANNEL_ROUTES = [
 
 function DashIndex() {
   const { data, loading } = useConnections();
+  const { features } = useActiveOrg();
   if (loading) return <FullLoader />;
   const skipped = localStorage.getItem("kompas-onboarded");
-  if (data && data.connected === 0 && !skipped) return <Navigate to="/onboarding" replace />;
+  // Onboarding gaat over zelf koppelen; staat Integraties uit, dan richt het
+  // bureau de omgeving in en heeft die stap voor de klant geen zin.
+  if (data && data.connected === 0 && !skipped && features.integrations !== false) {
+    return <Navigate to="/onboarding" replace />;
+  }
   const active = connectedProviders(data);
   const first = active && CHANNEL_ROUTES.find(([p]) => active.has(p));
   if (first) return <Navigate to={first[1]} replace />;
-  // Niets gekoppeld (of status onbekend): naar Integraties om te koppelen.
+  // Niets gekoppeld (of status onbekend): naar Integraties om te koppelen —
+  // tenzij die uitstaat, dan naar het eerste onderdeel dat wél beschikbaar is.
+  if (active && features.integrations === false) {
+    if (features.signalen !== false) return <Navigate to="/app/signalen" replace />;
+    if (features.dashboards !== false) return <Navigate to="/app/dashboards" replace />;
+    return <Navigate to="/app/analytics" replace />;
+  }
   return <Navigate to={active ? "/app/integrations" : "/app/analytics"} replace />;
 }
 
@@ -70,8 +83,8 @@ export default function App() {
 
       <Route path="/app" element={<RequireAuth><Dashboard /></RequireAuth>}>
         <Route index element={<DashIndex />} />
-        <Route path="assistant" element={<Assistant />} />
-        <Route path="signalen" element={<Signalen />} />
+        <Route path="assistant" element={<FeatureGate feature="assistant"><Assistant /></FeatureGate>} />
+        <Route path="signalen" element={<FeatureGate feature="signalen"><Signalen /></FeatureGate>} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<SearchConsole />} />
         <Route path="google-ads" element={<GoogleAds />} />
@@ -80,9 +93,9 @@ export default function App() {
         <Route path="meta" element={<Navigate to="/app/meta-ads" replace />} />
         <Route path="woocommerce" element={<WooCommerce />} />
         <Route path="shopify" element={<Shopify />} />
-        <Route path="dashboards" element={<MyDashboards />} />
-        <Route path="framework" element={<Framework />} />
-        <Route path="integrations" element={<Integrations />} />
+        <Route path="dashboards" element={<FeatureGate feature="dashboards"><MyDashboards /></FeatureGate>} />
+        <Route path="framework" element={<FeatureGate feature="framework"><Framework /></FeatureGate>} />
+        <Route path="integrations" element={<FeatureGate feature="integrations"><Integrations /></FeatureGate>} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

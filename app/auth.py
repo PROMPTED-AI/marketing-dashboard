@@ -60,12 +60,22 @@ def password_problem(password: str) -> str | None:
     return None
 
 
-def is_agency_admin(email: str) -> bool:
+def is_platform_admin(email: str) -> bool:
+    """Beheerder van het platform zelf (AGENCY_ADMIN_EMAILS).
+
+    Staat boven de bureaus: ziet en beheert alle organisaties, ongeacht bij
+    welk bureau ze horen. Bureau-admins (rol `agency_admin` zonder vermelding
+    in de env) beheren uitsluitend de omgevingen van hun eigen bureau.
+    """
     return email.lower() in config.AGENCY_ADMIN_EMAILS
 
 
+# Historische naam; een platform-admin is óók agency admin.
+is_agency_admin = is_platform_admin
+
+
 def role_for(email: str) -> str:
-    return "agency_admin" if is_agency_admin(email) else "client"
+    return "agency_admin" if is_platform_admin(email) else "client"
 
 
 def current_user(request: Request) -> dict:
@@ -83,4 +93,41 @@ def require_admin(request: Request) -> dict:
     user = current_user(request)
     if user["role"] != "agency_admin":
         raise HTTPException(status_code=403, detail="Agency admin only")
+    return user
+
+
+# ------------------------------------------------------------- bureau-scope
+#
+# Elk bureau (zoals TriplePro, met een MCC/manager-account) heeft een eigen
+# omgeving: het zet klantaccounts klaar en beheert uitsluitend die accounts.
+# Het bureau is zelf een organisatie; zijn klanten wijzen er via `agency_id`
+# naar terug. De platform-admin heeft geen scope en ziet alles.
+
+
+def admin_agency_id(user: dict) -> str | None:
+    """Het bureau waarvan deze admin de klanten beheert (None = het hele platform)."""
+    if is_platform_admin(user["email"]):
+        return None
+    return user["organization_id"]
+
+
+def can_admin_org(user: dict, org_id: str) -> bool:
+    """Mag deze admin deze organisatie beheren/bekijken?"""
+    agency_id = admin_agency_id(user)
+    if agency_id is None:
+        return True
+    if org_id == agency_id:
+        return True
+    org = models.get_organization(org_id)
+    return bool(org and org.get("agency_id") == agency_id)
+
+
+def require_admin_org(request: Request, org_id: str) -> dict:
+    """Admin die deze organisatie mag beheren, anders 403."""
+    user = require_admin(request)
+    if not can_admin_org(user, org_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Deze organisatie hoort niet bij jouw bureau.",
+        )
     return user

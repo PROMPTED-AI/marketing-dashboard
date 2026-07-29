@@ -12,21 +12,27 @@ from google.api_core.exceptions import PermissionDenied, Unauthenticated
 from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 
-from . import config, meta_oauth, models, oauth
+from . import auth, config, meta_oauth, models, oauth
 
 log = logging.getLogger("dashboard")
 
 def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
-    """Clients are pinned to their own org; admins may target any org.
+    """Clients are pinned to their own org; admins may target their own clients.
 
     Dit is het centrale punt waar alle org-gebonden data-endpoints langskomen,
     dus hier dwingen we ook de proefperiode af: is de trial van de eigen
     organisatie verlopen, dan krijgt de gebruiker een 402 en toont de app het
     verloopscherm. De agency admin behoudt altijd toegang (die beheert de
-    trials en moet mee kunnen kijken).
+    trials en moet mee kunnen kijken), maar uitsluitend voor de omgevingen van
+    het eigen bureau — de platform-admin voor alle.
     """
     if user["role"] == "agency_admin":
-        return requested_org_id or user["organization_id"]
+        target = requested_org_id or user["organization_id"]
+        if target != user["organization_id"] and not auth.can_admin_org(user, target):
+            raise HTTPException(
+                status_code=403, detail="Deze organisatie hoort niet bij jouw bureau."
+            )
+        return target
     org_id = user["organization_id"]
     if models.trial_expired(org_id):
         raise HTTPException(
@@ -34,6 +40,20 @@ def _resolve_org_id(user: dict, requested_org_id: str | None) -> str:
             detail="De proefperiode is verlopen. Neem contact op voor een betaalde verlenging.",
         )
     return org_id
+
+
+def _require_feature(org_id: str, feature: str) -> None:
+    """Weiger een functie die het bureau voor deze omgeving heeft uitgezet.
+
+    De frontend verbergt uitgeschakelde onderdelen al, maar de grens ligt hier:
+    zonder deze controle blijft het endpoint bereikbaar voor wie de URL kent.
+    """
+    if not models.feature_enabled(org_id, feature):
+        label = models.FEATURES.get(feature, feature)
+        raise HTTPException(
+            status_code=403,
+            detail=f"{label} is niet geactiveerd voor deze omgeving.",
+        )
 
 
 def _safe_return(path: str | None, default: str) -> str:

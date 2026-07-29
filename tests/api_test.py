@@ -500,6 +500,114 @@ def test_agency_environments(admin):
     print("bureau-omgevingen: hergebruik, toewijzen, afdwinging en autorisatie slagen")
 
 
+def test_account_features(admin):
+    """Functies per klantaccount: instellen, meegeven bij aanmaken en afdwingen."""
+    # Klant klaarzetten met twee functies uit. De rest staat standaard aan.
+    org = admin.post(f"{BASE}/api/admin/organizations", json={
+        "name": "FeatureKlant", "domain": "featureklant.nl",
+        "features": {"signalen": False, "framework": False},
+    }).json()["organization"]
+    oid = org["id"]
+    assert org["features"]["signalen"] is False and org["features"]["assistant"] is True, org
+    # De klant hangt onder het bureau van de admin, zodat alleen dat bureau hem beheert.
+    assert org["agency_id"], org
+
+    got = admin.get(f"{BASE}/api/admin/organizations/{oid}/features").json()
+    assert got["features"]["framework"] is False and got["features"]["dashboards"] is True, got
+    assert [f["key"] for f in got["catalog"]] == \
+        ["signalen", "assistant", "integrations", "framework", "dashboards"], got["catalog"]
+    # Onbekende functies worden geweigerd.
+    assert admin.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                     json={"features": {"onzin": True}}).status_code == 400
+
+    # Uitnodigen + inloggen als deze klant: de functiestand komt mee naar de app.
+    invite = admin.post(f"{BASE}/api/admin/invitations",
+                        json={"email": "gebruiker@featureklant.nl", "org_id": oid}).json()
+    token = invite["invite_url"].rsplit("/", 1)[1]
+    s = requests.Session()
+    assert s.post(f"{BASE}/api/invitations/{token}/accept", json={"password": "geheim123"}).status_code == 200
+    me = s.get(f"{BASE}/api/me").json()
+    assert me["features"]["signalen"] is False and me["is_platform_admin"] is False, me
+    assert s.get(f"{BASE}/api/organizations").json()["organizations"][0]["features"]["framework"] is False
+
+    # Uitgezette functies zijn server-side dicht, aangezette blijven bereikbaar.
+    assert s.get(f"{BASE}/api/insights?start=2026-01-01&end=2026-01-31").status_code == 403
+    assert s.get(f"{BASE}/api/framework").status_code == 403
+    assert s.post(f"{BASE}/api/assistant/chat", json={
+        "messages": [{"role": "user", "content": "hoi"}],
+        "start": "2026-01-01", "end": "2026-01-31"}).status_code != 403
+    assert s.get(f"{BASE}/api/dashboards").status_code == 200
+
+    # Integraties uitzetten sluit koppelen en ontkoppelen af.
+    assert admin.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                     json={"features": {"integrations": False}}).status_code == 200
+    assert s.get(f"{BASE}/api/auth/google/connect?providers=google_analytics",
+                 allow_redirects=False).status_code == 403
+    assert s.post(f"{BASE}/api/connections/google_analytics/disconnect").status_code == 403
+    assert s.post(f"{BASE}/api/woocommerce/connect-demo").status_code == 403
+
+    # Weer aanzetten werkt meteen; een klant zet zijn eigen functies niet.
+    assert admin.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                     json={"features": {"signalen": True}}).status_code == 200
+    assert s.get(f"{BASE}/api/me").json()["features"]["signalen"] is True
+    assert s.put(f"{BASE}/api/admin/organizations/{oid}/features",
+                 json={"features": {"framework": True}}).status_code == 403
+    admin.delete(f"{BASE}/api/admin/organizations/{oid}")
+    print("functies per account: aanmaken, instellen, afdwingen en autorisatie slagen")
+
+
+def test_agency_scope(admin):
+    """Bureau-scope: een bureau-admin beheert alleen de eigen klantomgevingen."""
+    from app import auth as app_auth, models
+
+    # Tweede bureau met een eigen klant en een eigen (niet-platform) admin.
+    ander = models.create_or_rename_organization("Ander Bureau", "ander-bureau-test.nl")
+    models.set_org_is_agency(ander["id"], True)
+    models.upsert_user("baas@ander-bureau-test.nl", ander["id"], "agency_admin")
+    models.set_user_password("baas@ander-bureau-test.nl", app_auth.hash_password("geheim123"))
+    vreemd = models.create_or_rename_organization(
+        "Vreemde BV", "vreemde-bv-test.nl", agency_id=ander["id"])
+    try:
+        andere_admin = login("baas@ander-bureau-test.nl", "geheim123")
+        me = andere_admin.get(f"{BASE}/api/me").json()
+        assert me["role"] == "agency_admin" and me["is_platform_admin"] is False, me
+
+        # Ziet uitsluitend het eigen bureau en de eigen klant.
+        namen = sorted(o["name"] for o in
+                       andere_admin.get(f"{BASE}/api/admin/organizations").json()["organizations"])
+        assert namen == ["Ander Bureau", "Vreemde BV"], namen
+        assert sorted(o["name"] for o in
+                      andere_admin.get(f"{BASE}/api/organizations").json()["organizations"]) == namen
+
+        # En komt nergens bij een klant van een ander bureau.
+        tk = next(o for o in admin.get(f"{BASE}/api/admin/organizations").json()["organizations"]
+                  if o["domain"] == "testklant.nl")
+        for r in (andere_admin.get(f"{BASE}/api/admin/organizations/{tk['id']}/features"),
+                  andere_admin.put(f"{BASE}/api/admin/organizations/{tk['id']}/features",
+                                   json={"features": {"signalen": False}}),
+                  andere_admin.get(f"{BASE}/api/admin/organizations/{tk['id']}/billing"),
+                  andere_admin.post(f"{BASE}/api/admin/organizations/{tk['id']}/link-agency"),
+                  andere_admin.delete(f"{BASE}/api/admin/organizations/{tk['id']}"),
+                  andere_admin.get(f"{BASE}/api/framework?org_id={tk['id']}"),
+                  andere_admin.post(f"{BASE}/api/admin/invitations",
+                                    json={"email": "x@vreemde-bv-test.nl", "org_id": tk["id"]})):
+            assert r.status_code == 403, (r.url, r.status_code, r.text)
+
+        # Bureaubeheer is voorbehouden aan de platform-admin.
+        assert andere_admin.get(f"{BASE}/api/admin/agencies").status_code == 403
+        assert andere_admin.patch(f"{BASE}/api/admin/organizations/{vreemd['id']}/agency",
+                                  json={"is_agency": True}).status_code == 403
+        agencies = admin.get(f"{BASE}/api/admin/agencies").json()["agencies"]
+        eigen = next(a for a in agencies if a["domain"] == "ander-bureau-test.nl")
+        assert eigen["client_count"] == 1 and eigen["admin_count"] == 1, eigen
+        # De platform-admin ziet de klanten van dat bureau wél.
+        assert admin.get(f"{BASE}/api/admin/organizations/{vreemd['id']}/features").status_code == 200
+        print("bureau-scope: eigen klanten zichtbaar, andermans klanten overal 403")
+    finally:
+        models.delete_organization(vreemd["id"])
+        models.delete_organization(ander["id"])
+
+
 def test_org_profile_and_delete(admin, tk_org_id, demo_org_id):
     """Bedrijfsprofiel instellen/bewerken, publiek-domein-blokkade en verwijderen."""
     # Klant stelt eigen bedrijfsprofiel in (naam los van e-mailadres).
@@ -558,6 +666,8 @@ if __name__ == "__main__":
     test_shopify_aggregate()
     test_account_flow(admin, tk_org_id)
     test_agency_environments(admin)
+    test_account_features(admin)
+    test_agency_scope(admin)
     test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

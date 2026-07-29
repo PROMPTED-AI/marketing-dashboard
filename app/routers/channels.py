@@ -19,8 +19,8 @@ from .. import (
 from ..org_access import (
     _compact, _connected, _effective_asset, _google_data, _GOOGLE_TRANSIENT_MSG,
     _is_grant_revoked, _limit_assets, _meta_token, _org_credentials,
-    _previous_period, _require_period, _resolve_org_id, _safe_return,
-    _shopify_creds, _wc_creds,
+    _previous_period, _require_feature, _require_period, _resolve_org_id,
+    _safe_return, _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -132,6 +132,7 @@ def disconnect(request: Request, provider: str, org_id: str | None = None):
     """Remove a source. Revoke the Google grant once the last Google source goes."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "integrations")
     if provider not in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unknown provider")
 
@@ -208,6 +209,7 @@ def meta_login(request: Request, org_id: str | None = None, return_to: str = "/a
         raise HTTPException(status_code=503, detail="Meta is nog niet geconfigureerd op de server")
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "integrations")
     state = uuid.uuid4().hex
     request.session["meta_oauth_state"] = state
     request.session["meta_oauth_org"] = target_org
@@ -255,6 +257,7 @@ def shopify_login(request: Request, shop: str, org_id: str | None = None,
         raise HTTPException(status_code=503, detail="Shopify is nog niet geconfigureerd op de server")
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "integrations")
     try:
         shop = shopify_oauth.normalize_shop(shop)
     except shopify_oauth.ShopifyError as e:
@@ -573,6 +576,7 @@ def wc_connect(request: Request, payload: WooConnectIn, org_id: str | None = Non
     """Koppel een echte WooCommerce-winkel (valideert URL + sleutel)."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "integrations")
     # Throttle: deze endpoint doet een uitgaande request, dus beperk het aantal
     # pogingen (dempt misbruik als blinde SSRF-probe).
     if not ratelimit.allow(f"woo-connect|{target_org}", limit=10, window_s=60):
@@ -603,6 +607,7 @@ def wc_connect_demo(request: Request, org_id: str | None = None):
     """Koppel de ingebouwde demowinkel (voor testen zonder echte shop)."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "integrations")
     if not ratelimit.allow(f"woo-connect|{target_org}", limit=10, window_s=60):
         raise HTTPException(status_code=429, detail="Te veel koppelpogingen - probeer het zo weer.")
     models.save_connection(

@@ -172,6 +172,43 @@ export function setOrgAssets(orgId, assets) {
   });
 }
 
+// --- functies per klantomgeving (signalen, assistent, integraties, …) ---
+
+// De beschikbare functies met hun label (voor de beheerschermen).
+export function featureCatalog() {
+  return api("/api/admin/features");
+}
+
+// De functiestand van één klantomgeving (+ de catalogus).
+export function getOrgFeatures(orgId) {
+  return api(`/api/admin/organizations/${orgId}/features`);
+}
+
+// Zet functies aan of uit voor één klantomgeving.
+export function setOrgFeatures(orgId, features) {
+  return api(`/api/admin/organizations/${orgId}/features`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ features }),
+  });
+}
+
+// --- bureaus (alleen de platform-beheerder) ---
+
+// Alle bureaus + organisaties die nog bij geen bureau horen.
+export function listAgencies() {
+  return api("/api/admin/agencies");
+}
+
+// Maak een organisatie een bureau en/of hang hem onder een bureau.
+export function setOrgAgency(orgId, payload) {
+  return api(`/api/admin/organizations/${orgId}/agency`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 // Shopify koppelt via zijn eigen OAuth-installatieflow; de klant vult zijn
 // shopdomein in en wordt naar het autorisatiescherm van zijn shop gestuurd.
 export function shopifyLoginUrl(shop, orgId, returnTo = "/app/integrations") {

@@ -11,6 +11,7 @@ import AdminConnections from "./admin/AdminConnections.jsx";
 import AdminEnvironments from "./admin/AdminEnvironments.jsx";
 import AdminActivity from "./admin/AdminActivity.jsx";
 import AdminBilling from "./admin/AdminBilling.jsx";
+import AdminAgencies from "./admin/AdminAgencies.jsx";
 import ClientWizard from "./admin/ClientWizard.jsx";
 import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid } from "../components/icons.jsx";
 
@@ -81,7 +82,7 @@ export default function Admin() {
           <div className="display" style={{ fontSize: 20 }}>kompas</div>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--c-surface)", background: "var(--c-ink)", padding: "3px 7px", borderRadius: 6 }}>admin</span>
         </div>
-        <div style={menuLabel}>Platform</div>
+        <div style={menuLabel}>{me.is_platform_admin ? "Platform" : "Bureau"}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
           {[
             ["klanten", "Klanten", IcUsers],
@@ -91,6 +92,8 @@ export default function Admin() {
             ["omgevingen", "Omgevingen", IcGrid],
             ["pakketten", "Pakketten & facturatie", IcDoc],
             ["activiteit", "Activiteitenlog", IcDoc],
+            // Bureaus bestuurt wie welke klanten beheert: alleen het platform.
+            ...(me.is_platform_admin ? [["bureaus", "Bureaus", IcStar]] : []),
           ].map(([key, label, Icon]) => (
             <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => pick(key)}>
               <Icon s={18} />{label}
@@ -104,7 +107,12 @@ export default function Admin() {
         </div>
         <div style={userFoot}>
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--c-ink)", color: "var(--c-surface)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{initials(me.email)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div><div style={{ fontSize: 11, color: "var(--c-muted)" }}>platform-admin</div></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div>
+            <div style={{ fontSize: 11, color: "var(--c-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {me.is_platform_admin ? "platform-admin" : `bureau-admin · ${me.organization?.name || ""}`}
+            </div>
+          </div>
           <a href={LOGOUT_URL} onClick={() => invalidateAll()} style={{ color: "var(--c-muted)" }} title="uitloggen"><IcChevDown s={16} /></a>
         </div>
       </div>
@@ -118,12 +126,17 @@ export default function Admin() {
             : tab === "koppelingen" ? <AdminConnections />
             : tab === "omgevingen" ? <AdminEnvironments />
             : tab === "activiteit" ? <AdminActivity />
+            : tab === "bureaus" ? <AdminAgencies />
             : tab === "pakketten" ? <AdminBilling />
             : (<>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div className="display" style={{ fontSize: 30 }}>klanten</div>
-              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>Alle organisaties op het platform: koppelingen, status en activiteit</div>
+              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
+                {me.is_platform_admin
+                  ? "Alle organisaties op het platform: koppelingen, status en activiteit"
+                  : `De klantomgevingen van ${me.organization?.name || "je bureau"}: koppelingen, status en activiteit`}
+              </div>
             </div>
             <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setAdding(true)}>
               <IcPlus s={16} /> klant toevoegen
