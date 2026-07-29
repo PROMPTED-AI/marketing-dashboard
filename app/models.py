@@ -181,6 +181,15 @@ def set_org_agency(org_id: str, agency_id: str | None) -> None:
         conn.execute("UPDATE organizations SET agency_id = %s WHERE id = %s", (agency_id, org_id))
 
 
+def count_agency_clients(agency_id: str) -> int:
+    """Hoeveel klantomgevingen hangen er onder dit bureau?"""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT count(*) FROM organizations WHERE agency_id = %s", (agency_id,)
+        ).fetchone()
+    return row[0] if row else 0
+
+
 def list_agencies() -> list[dict]:
     """Alle bureaus met hun aantal klantomgevingen (voor de platform-admin)."""
     with db.get_conn() as conn:

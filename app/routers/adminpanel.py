@@ -313,16 +313,21 @@ def admin_set_features(request: Request, org_id: str, payload: FeaturesIn):
 
 @router.get("/api/admin/agencies")
 def admin_agencies(request: Request):
-    """Alle bureaus op het platform (alleen de platform-admin)."""
+    """Bureaus plus álle organisaties met hun bureau (alleen de platform-admin).
+
+    De volledige lijst, niet alleen de niet-toegewezen organisaties: na de
+    migratie hoort elke organisatie al bij een bureau, en dan valt er zonder
+    volledige lijst niets meer te promoveren of te verhangen.
+    """
     admin = auth.require_admin(request)
     if auth.admin_agency_id(admin) is not None:
         raise HTTPException(status_code=403, detail="Alleen de platform-beheerder.")
     return {
         "agencies": models.list_agencies(),
-        "unassigned": [
-            {"id": o["id"], "name": o["name"], "domain": o["domain"]}
+        "organizations": [
+            {"id": o["id"], "name": o["name"], "domain": o["domain"],
+             "agency_id": o.get("agency_id"), "is_agency": o.get("is_agency")}
             for o in models.list_organizations_with_connections()
-            if not o.get("agency_id") and not o.get("is_agency")
         ],
     }
 
@@ -344,6 +349,11 @@ def admin_set_agency(request: Request, org_id: str, payload: AgencyIn):
         raise HTTPException(status_code=403, detail="Alleen de platform-beheerder.")
     if not models.get_organization(org_id):
         raise HTTPException(status_code=404, detail="Organisatie niet gevonden.")
+    if payload.is_agency is False and models.count_agency_clients(org_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Dit bureau heeft nog klantomgevingen. Verhang die eerst naar een ander bureau.",
+        )
     if payload.is_agency is not None:
         models.set_org_is_agency(org_id, payload.is_agency)
     if payload.agency_id is not None:

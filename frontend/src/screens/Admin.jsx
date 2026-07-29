@@ -13,7 +13,7 @@ import AdminActivity from "./admin/AdminActivity.jsx";
 import AdminBilling from "./admin/AdminBilling.jsx";
 import AdminAgencies from "./admin/AdminAgencies.jsx";
 import ClientWizard from "./admin/ClientWizard.jsx";
-import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid } from "../components/icons.jsx";
+import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid, IcMegaphone } from "../components/icons.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -83,17 +83,26 @@ export default function Admin() {
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--c-surface)", background: "var(--c-ink)", padding: "3px 7px", borderRadius: 6 }}>admin</span>
         </div>
         <div style={menuLabel}>{me.is_platform_admin ? "Platform" : "Bureau"}</div>
+        {/* Twee blokken met een scheidslijn: bovenin wie er in het systeem zit
+            (klanten, gebruikers, omgevingen, bureaus), daaronder de rest. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
           {[
             ["klanten", "Klanten", IcUsers],
-            ["feedback", "Feedback", IcChat],
             ["gebruikers", "Gebruikers & rollen", IcUsers],
-            ["koppelingen", "Koppelingen", IcPlug],
             ["omgevingen", "Omgevingen", IcGrid],
+            // Bureaus bestuurt wie welke klanten beheert: alleen het platform.
+            ...(me.is_platform_admin ? [["bureaus", "Bureaus", IcMegaphone]] : []),
+          ].map(([key, label, Icon]) => (
+            <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => pick(key)}>
+              <Icon s={18} />{label}
+            </div>
+          ))}
+          <div style={navSeparator} />
+          {[
+            ["feedback", "Feedback", IcChat],
+            ["koppelingen", "Koppelingen", IcPlug],
             ["pakketten", "Pakketten & facturatie", IcDoc],
             ["activiteit", "Activiteitenlog", IcDoc],
-            // Bureaus bestuurt wie welke klanten beheert: alleen het platform.
-            ...(me.is_platform_admin ? [["bureaus", "Bureaus", IcStar]] : []),
           ].map(([key, label, Icon]) => (
             <div key={key} className="icon-btn" style={tab === key ? navActive : { ...navItem, cursor: "pointer" }} onClick={() => pick(key)}>
               <Icon s={18} />{label}
@@ -346,6 +355,7 @@ function TrialCell({ org, onChanged }) {
 const menuLabel = { padding: "0 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "var(--c-muted)", textTransform: "uppercase", margin: "8px 0 6px 8px" };
 const navActive = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const navItem = { display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 10, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" };
+const navSeparator = { height: 1, background: "var(--c-border)", margin: "9px 12px" };
 const userFoot = { display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--c-border)" };
 const headRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr 1fr", minWidth: 980, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
 const dataRow = { display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 0.9fr 1.7fr 1fr", minWidth: 980, gap: 14, alignItems: "center", padding: "15px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };

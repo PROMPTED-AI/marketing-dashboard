@@ -597,15 +597,54 @@ def test_agency_scope(admin):
         assert andere_admin.get(f"{BASE}/api/admin/agencies").status_code == 403
         assert andere_admin.patch(f"{BASE}/api/admin/organizations/{vreemd['id']}/agency",
                                   json={"is_agency": True}).status_code == 403
-        agencies = admin.get(f"{BASE}/api/admin/agencies").json()["agencies"]
-        eigen = next(a for a in agencies if a["domain"] == "ander-bureau-test.nl")
+        data = admin.get(f"{BASE}/api/admin/agencies").json()
+        eigen = next(a for a in data["agencies"] if a["domain"] == "ander-bureau-test.nl")
         assert eigen["client_count"] == 1 and eigen["admin_count"] == 1, eigen
+        # De organisatielijst bevat álle organisaties met hun bureau, niet alleen
+        # de niet-toegewezen: anders valt er na de migratie niets te promoveren.
+        rij = next(o for o in data["organizations"] if o["domain"] == "vreemde-bv-test.nl")
+        assert rij["agency_id"] == eigen["id"] and rij["is_agency"] is False, rij
         # De platform-admin ziet de klanten van dat bureau wél.
         assert admin.get(f"{BASE}/api/admin/organizations/{vreemd['id']}/features").status_code == 200
         print("bureau-scope: eigen klanten zichtbaar, andermans klanten overal 403")
     finally:
         models.delete_organization(vreemd["id"])
         models.delete_organization(ander["id"])
+
+
+def test_agency_promotion(admin):
+    """Een organisatie die al onder een bureau hangt, tot bureau maken en terug."""
+    from app import models
+
+    org = admin.post(f"{BASE}/api/admin/organizations",
+                     json={"name": "PromoBureau", "domain": "promobureau-test.nl"}).json()["organization"]
+    oid = org["id"]
+    assert org["agency_id"], org  # hangt eerst onder het bureau van de admin
+    try:
+        # Promoveren: bureau worden en tegelijk losgekoppeld van het eigen bureau.
+        r = admin.patch(f"{BASE}/api/admin/organizations/{oid}/agency",
+                        json={"is_agency": True, "agency_id": ""})
+        assert r.status_code == 200, r.text
+        got = r.json()["organization"]
+        assert got["is_agency"] is True and got["agency_id"] is None, got
+        assert any(a["id"] == oid for a in admin.get(f"{BASE}/api/admin/agencies").json()["agencies"])
+
+        # Een klant onder het verse bureau hangen, en dan terugzetten weigeren.
+        klant = models.create_or_rename_organization("PromoKlant", "promoklant-test.nl")
+        try:
+            assert admin.patch(f"{BASE}/api/admin/organizations/{klant['id']}/agency",
+                               json={"agency_id": oid}).status_code == 200
+            r = admin.patch(f"{BASE}/api/admin/organizations/{oid}/agency", json={"is_agency": False})
+            assert r.status_code == 400 and "klantomgevingen" in r.json()["detail"], r.text
+        finally:
+            models.delete_organization(klant["id"])
+
+        # Zonder klanten mag het wel.
+        r = admin.patch(f"{BASE}/api/admin/organizations/{oid}/agency", json={"is_agency": False})
+        assert r.status_code == 200 and r.json()["organization"]["is_agency"] is False, r.text
+        print("bureau promoveren: toegewezen organisatie wordt bureau, terugzetten pas zonder klanten")
+    finally:
+        admin.delete(f"{BASE}/api/admin/organizations/{oid}")
 
 
 def test_org_profile_and_delete(admin, tk_org_id, demo_org_id):
@@ -668,6 +707,7 @@ if __name__ == "__main__":
     test_agency_environments(admin)
     test_account_features(admin)
     test_agency_scope(admin)
+    test_agency_promotion(admin)
     test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")
