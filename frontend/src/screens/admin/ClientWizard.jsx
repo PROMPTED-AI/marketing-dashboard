@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, createInvitation, linkAgency, availableAssets, setOrgAssets } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import FeatureToggles, { FEATURE_ORDER, FEATURE_LABELS } from "./FeatureToggles.jsx";
+import AssetPicker from "./AssetPicker.jsx";
 import { IcPlug, IcUsers, IcGrid, IcStar, IcCog } from "../../components/icons.jsx";
 
 // Klant-wizard: één vloeiende flow die de losse beheerstappen samenvoegt —
@@ -226,13 +227,16 @@ function StepKanalen({ org, onNext }) {
   };
 
   const field = (label, key, options, idKey, labelFn) => (
-    <label style={{ display: "block", marginBottom: 14 }}>
+    <div style={{ marginBottom: 14 }}>
       <span style={lbl}>{label}</span>
-      <select value={assets[key] || ""} onChange={(e) => setAssets((a) => ({ ...a, [key]: e.target.value || null }))} style={select}>
-        <option value="">— niet toegewezen —</option>
-        {(options || []).map((o) => <option key={o[idKey]} value={o[idKey]}>{labelFn(o)}</option>)}
-      </select>
-    </label>
+      <AssetPicker
+        value={assets[key] || ""}
+        onChange={(v) => setAssets((a) => ({ ...a, [key]: v }))}
+        options={options}
+        idKey={idKey}
+        labelFn={labelFn}
+      />
+    </div>
   );
 
   return (
@@ -359,6 +363,5 @@ function SummaryRow({ label, value, ok }) {
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", margin: "12px 0 6px" };
 const inp = { width: "100%", height: 44, padding: "0 14px", fontSize: 14, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", boxSizing: "border-box", fontFamily: "inherit", marginBottom: 2 };
-const select = { width: "100%", height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "inherit" };
 const btnGhost = { height: 42, padding: "0 18px", fontSize: 13.5, borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 };
 const errBox = { color: "var(--c-neg)", fontSize: 13, marginTop: 12 };

@@ -4,6 +4,7 @@ import {
   setOrgFeatures,
 } from "../../lib/api.js";
 import FeatureToggles, { featureSummary } from "./FeatureToggles.jsx";
+import AssetPicker from "./AssetPicker.jsx";
 
 // Omgevingen: het bureau-model. Het bureau logt in met één manageraccount en
 // richt per bedrijf een omgeving in — de bureau-koppeling wordt hergebruikt en
@@ -116,13 +117,16 @@ function EnvModal({ org, onClose, onSaved }) {
   };
 
   const field = (label, key, options, idKey, labelFn) => (
-    <label style={{ display: "block", marginBottom: 14 }}>
+    <div style={{ marginBottom: 14 }}>
       <span style={lbl}>{label}</span>
-      <select value={assets?.[key] || ""} onChange={(e) => { setAssets((a) => ({ ...a, [key]: e.target.value || null })); setSaved(false); }} style={select}>
-        <option value="">— niet toegewezen —</option>
-        {(options || []).map((o) => <option key={o[idKey]} value={o[idKey]}>{labelFn(o)}</option>)}
-      </select>
-    </label>
+      <AssetPicker
+        value={assets?.[key] || ""}
+        onChange={(v) => { setAssets((a) => ({ ...a, [key]: v })); setSaved(false); }}
+        options={options}
+        idKey={idKey}
+        labelFn={labelFn}
+      />
+    </div>
   );
 
   return (
@@ -190,4 +194,3 @@ const head = { display: "grid", gridTemplateColumns: cols, minWidth: 900, gap: 1
 const row = { display: "grid", gridTemplateColumns: cols, minWidth: 900, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", marginBottom: 6 };
-const select = { width: "100%", height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "inherit" };
