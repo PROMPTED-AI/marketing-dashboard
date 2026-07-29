@@ -16,8 +16,8 @@ from .. import (
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_feature,
-    _require_period, _resolve_org_id, _safe_return, _wc_creds,
+    _meta_token, _org_credentials, _previous_period, _require_channel,
+    _require_feature, _require_period, _resolve_org_id, _safe_return, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -38,6 +38,7 @@ def me(request: Request):
         "is_platform_admin": auth.is_platform_admin(user["email"]),
         "organization": org,
         "features": models.get_org_features(user["organization_id"]),
+        "channels": models.get_org_channels(user["organization_id"]),
         "subscription": subscription,
     }
     if org and org.get("is_demo"):
@@ -89,10 +90,13 @@ def connect(request: Request, providers: str, return_to: str = "/app/integration
     if not request.session.get("user_id"):
         return RedirectResponse("/login")
     # De koppeling landt op de eigen organisatie, dus daar geldt de functiestand:
-    # heeft het bureau Integraties uitgezet, dan koppelt deze omgeving niet zelf.
+    # heeft het bureau Integraties uitgezet, dan koppelt deze omgeving niet zelf,
+    # en per kanaal geldt de allowlist die het bureau heeft ingesteld.
     user = auth.current_user(request)
     _require_feature(user["organization_id"], "integrations")
     requested = [p for p in providers.split(",") if p in config.GOOGLE_PROVIDERS]
+    for p in requested:
+        _require_channel(user["organization_id"], p, user)
     if not requested:
         raise HTTPException(status_code=400, detail="No valid providers")
 
@@ -398,7 +402,8 @@ def organizations(request: Request):
             {"id": o["id"], "name": o["name"], "domain": o["domain"],
              "business_type": o.get("business_type"), "website": o.get("website"),
              "industry": o.get("industry"), "subscription": o.get("subscription"),
-             "features": o.get("features"), "is_agency": o.get("is_agency")}
+             "features": o.get("features"), "channels": o.get("channels"),
+             "is_agency": o.get("is_agency")}
             for o in orgs
         ]}
     org = models.get_organization(user["organization_id"])
@@ -406,6 +411,7 @@ def organizations(request: Request):
         {"id": org["id"], "name": org["name"], "domain": org["domain"],
          "business_type": org.get("business_type"), "website": org.get("website"),
          "industry": org.get("industry"), "subscription": models.subscription_info(org),
-         "features": models.get_org_features(org["id"]), "is_agency": org.get("is_agency")}
+         "features": models.get_org_features(org["id"]),
+         "channels": models.get_org_channels(org["id"]), "is_agency": org.get("is_agency")}
     ] if org else []}
 

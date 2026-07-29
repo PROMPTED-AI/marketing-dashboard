@@ -28,3 +28,24 @@ export default function FeatureGate({ feature, children }) {
     </div>
   );
 }
+
+// Kanaalpoort: een kanaalpagina is alleen bereikbaar als Integraties aanstaat
+// voor deze omgeving én het bureau dit kanaal heeft toegestaan. De sidebar
+// verbergt het item al; dit vangt directe links en oude bookmarks op.
+export function ChannelGate({ provider, children }) {
+  const { features, channels } = useActiveOrg() || {};
+  const visible = (features ?? ALL_FEATURES_ON).integrations !== false
+    && (channels ?? {})[provider] !== false;
+  if (visible) return children;
+  return (
+    <div className="card" style={{ padding: 28, maxWidth: 560 }}>
+      <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>
+        Dit kanaal is niet beschikbaar
+      </div>
+      <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6 }}>
+        Dit kanaal is niet geactiveerd voor deze omgeving. Vraag je bureau om
+        het beschikbaar te maken als je het wilt gebruiken.
+      </div>
+    </div>
+  );
+}

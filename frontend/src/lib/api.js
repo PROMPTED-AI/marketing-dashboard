@@ -193,6 +193,15 @@ export function setOrgFeatures(orgId, features) {
   });
 }
 
+// Zet per kanaal aan of uit wat deze klantomgeving mag zien/koppelen.
+export function setOrgChannels(orgId, channels) {
+  return api(`/api/admin/organizations/${orgId}/features`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channels }),
+  });
+}
+
 // --- bureaus (alleen de platform-beheerder) ---
 
 // Alle bureaus + organisaties die nog bij geen bureau horen.

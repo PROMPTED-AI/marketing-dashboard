@@ -19,8 +19,8 @@ from .. import (
 from ..org_access import (
     _compact, _connected, _effective_asset, _google_data, _GOOGLE_TRANSIENT_MSG,
     _is_grant_revoked, _limit_assets, _meta_token, _org_credentials,
-    _previous_period, _require_feature, _require_period, _resolve_org_id,
-    _safe_return, _shopify_creds, _wc_creds,
+    _previous_period, _require_channel, _require_feature, _require_period,
+    _resolve_org_id, _safe_return, _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -210,6 +210,7 @@ def meta_login(request: Request, org_id: str | None = None, return_to: str = "/a
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "integrations")
+    _require_channel(target_org, "meta_ads", user)
     state = uuid.uuid4().hex
     request.session["meta_oauth_state"] = state
     request.session["meta_oauth_org"] = target_org
@@ -258,6 +259,7 @@ def shopify_login(request: Request, shop: str, org_id: str | None = None,
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "integrations")
+    _require_channel(target_org, "shopify", user)
     try:
         shop = shopify_oauth.normalize_shop(shop)
     except shopify_oauth.ShopifyError as e:
@@ -577,6 +579,7 @@ def wc_connect(request: Request, payload: WooConnectIn, org_id: str | None = Non
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "integrations")
+    _require_channel(target_org, "woocommerce", user)
     # Throttle: deze endpoint doet een uitgaande request, dus beperk het aantal
     # pogingen (dempt misbruik als blinde SSRF-probe).
     if not ratelimit.allow(f"woo-connect|{target_org}", limit=10, window_s=60):
@@ -608,6 +611,7 @@ def wc_connect_demo(request: Request, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "integrations")
+    _require_channel(target_org, "woocommerce", user)
     if not ratelimit.allow(f"woo-connect|{target_org}", limit=10, window_s=60):
         raise HTTPException(status_code=429, detail="Te veel koppelpogingen - probeer het zo weer.")
     models.save_connection(

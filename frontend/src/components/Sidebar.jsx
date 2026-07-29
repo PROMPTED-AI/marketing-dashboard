@@ -44,11 +44,18 @@ const NAV = [
 // Filter de navigatie op actieve koppelingen. Zolang de status onbekend is
 // (eerste load, geen cache) tonen we alles — daarna klapt het menu netjes
 // terug naar alleen de gekoppelde kanalen. Groepen zonder kanalen verdwijnen.
-function navForConnections(active, features) {
+// Kanaalzichtbaarheid volgt het beheer: staat Integraties uit voor deze
+// omgeving, dan is geen enkel kanaal zichtbaar; staat hij aan, dan geldt de
+// per-kanaal allowlist van het bureau.
+function navForConnections(active, features, channels) {
+  const channelsVisible = features.integrations !== false;
   return NAV.map((item) => {
     if (!item.group) return item.feature && features[item.feature] === false ? null : item;
+    if (!channelsVisible) return null;
     if (!active) return item;
-    const children = item.children.filter((c) => !c.provider || active.has(c.provider));
+    const children = item.children.filter(
+      (c) => !c.provider || (active.has(c.provider) && channels[c.provider] !== false),
+    );
     return children.length ? { ...item, children } : null;
   }).filter(Boolean);
 }
@@ -59,9 +66,9 @@ function initials(name = "") {
 }
 
 export default function Sidebar({ user, connected = 0, total = 4, open = false, onNavigate }) {
-  const { orgs, orgId, orgName, setOrg, features } = useActiveOrg();
+  const { orgs, orgId, orgName, setOrg, features, channels } = useActiveOrg();
   const { data: connData } = useConnections();
-  const nav = navForConnections(connectedProviders(connData), features);
+  const nav = navForConnections(connectedProviders(connData), features, channels);
   const pct = Math.round((connected / total) * 100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
@@ -122,15 +129,18 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
 
       <div style={{ flex: 1 }} />
 
-      <div style={progressCard}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--c-accent)", marginBottom: 4 }}>{connected} van {total} gekoppeld</div>
-        <div style={{ fontSize: 11.5, color: "var(--c-muted)", lineHeight: 1.45, marginBottom: 10 }}>
-          {connected >= total ? "alle tools gekoppeld 🎉" : "koppel je overige tools voor compleet inzicht."}
+      {/* Koppel-voortgang alleen tonen als deze omgeving zelf mag koppelen. */}
+      {features.integrations !== false && (
+        <div style={progressCard}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--c-accent)", marginBottom: 4 }}>{connected} van {total} gekoppeld</div>
+          <div style={{ fontSize: 11.5, color: "var(--c-muted)", lineHeight: 1.45, marginBottom: 10 }}>
+            {connected >= total ? "alle tools gekoppeld 🎉" : "koppel je overige tools voor compleet inzicht."}
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: "var(--c-surface)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: "var(--c-accent)" }} />
+          </div>
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: "var(--c-surface)", overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: "var(--c-accent)" }} />
-        </div>
-      </div>
+      )}
 
       <div style={{ ...userFoot, position: "relative" }}>
         {menuOpen && (

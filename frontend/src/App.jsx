@@ -20,7 +20,7 @@ import Integrations from "./screens/dashboard/Integrations.jsx";
 import Settings from "./screens/dashboard/Settings.jsx";
 import Placeholder from "./screens/dashboard/Placeholder.jsx";
 import Admin from "./screens/Admin.jsx";
-import FeatureGate from "./components/FeatureGate.jsx";
+import FeatureGate, { ChannelGate } from "./components/FeatureGate.jsx";
 import { useActiveOrg } from "./lib/ActiveOrgProvider.jsx";
 
 function FullLoader() {
@@ -51,25 +51,29 @@ const CHANNEL_ROUTES = [
 
 function DashIndex() {
   const { data, loading } = useConnections();
-  const { features } = useActiveOrg();
+  const { features, channels } = useActiveOrg();
   if (loading) return <FullLoader />;
   const skipped = localStorage.getItem("kompas-onboarded");
-  // Onboarding gaat over zelf koppelen; staat Integraties uit, dan richt het
-  // bureau de omgeving in en heeft die stap voor de klant geen zin.
-  if (data && data.connected === 0 && !skipped && features.integrations !== false) {
+  // Staat Integraties uit, dan zijn kanalen onzichtbaar en richt het bureau de
+  // omgeving in; onboarding (zelf koppelen) heeft dan geen zin.
+  const channelsVisible = features.integrations !== false;
+  if (data && data.connected === 0 && !skipped && channelsVisible) {
     return <Navigate to="/onboarding" replace />;
   }
   const active = connectedProviders(data);
-  const first = active && CHANNEL_ROUTES.find(([p]) => active.has(p));
+  const first = channelsVisible && active &&
+    CHANNEL_ROUTES.find(([p]) => active.has(p) && channels[p] !== false);
   if (first) return <Navigate to={first[1]} replace />;
-  // Niets gekoppeld (of status onbekend): naar Integraties om te koppelen —
-  // tenzij die uitstaat, dan naar het eerste onderdeel dat wél beschikbaar is.
-  if (active && features.integrations === false) {
+  // Geen zichtbaar kanaal: naar het eerste onderdeel dat wél beschikbaar is,
+  // of naar Integraties om te koppelen als dat mag.
+  if (active || !channelsVisible) {
+    if (channelsVisible) return <Navigate to="/app/integrations" replace />;
     if (features.signalen !== false) return <Navigate to="/app/signalen" replace />;
     if (features.dashboards !== false) return <Navigate to="/app/dashboards" replace />;
-    return <Navigate to="/app/analytics" replace />;
+    if (features.framework !== false) return <Navigate to="/app/framework" replace />;
+    return <Navigate to="/app/settings" replace />;
   }
-  return <Navigate to={active ? "/app/integrations" : "/app/analytics"} replace />;
+  return <Navigate to="/app/analytics" replace />;
 }
 
 export default function App() {
@@ -85,14 +89,14 @@ export default function App() {
         <Route index element={<DashIndex />} />
         <Route path="assistant" element={<FeatureGate feature="assistant"><Assistant /></FeatureGate>} />
         <Route path="signalen" element={<FeatureGate feature="signalen"><Signalen /></FeatureGate>} />
-        <Route path="analytics" element={<Analytics />} />
-        <Route path="search-console" element={<SearchConsole />} />
-        <Route path="google-ads" element={<GoogleAds />} />
-        <Route path="meta-ads" element={<MetaAds />} />
-        <Route path="meta-organic" element={<MetaOrganic />} />
+        <Route path="analytics" element={<ChannelGate provider="google_analytics"><Analytics /></ChannelGate>} />
+        <Route path="search-console" element={<ChannelGate provider="search_console"><SearchConsole /></ChannelGate>} />
+        <Route path="google-ads" element={<ChannelGate provider="google_ads"><GoogleAds /></ChannelGate>} />
+        <Route path="meta-ads" element={<ChannelGate provider="meta_ads"><MetaAds /></ChannelGate>} />
+        <Route path="meta-organic" element={<ChannelGate provider="meta_ads"><MetaOrganic /></ChannelGate>} />
         <Route path="meta" element={<Navigate to="/app/meta-ads" replace />} />
-        <Route path="woocommerce" element={<WooCommerce />} />
-        <Route path="shopify" element={<Shopify />} />
+        <Route path="woocommerce" element={<ChannelGate provider="woocommerce"><WooCommerce /></ChannelGate>} />
+        <Route path="shopify" element={<ChannelGate provider="shopify"><Shopify /></ChannelGate>} />
         <Route path="dashboards" element={<FeatureGate feature="dashboards"><MyDashboards /></FeatureGate>} />
         <Route path="framework" element={<FeatureGate feature="framework"><Framework /></FeatureGate>} />
         <Route path="integrations" element={<FeatureGate feature="integrations"><Integrations /></FeatureGate>} />

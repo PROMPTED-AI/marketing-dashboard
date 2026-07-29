@@ -48,6 +48,41 @@ export default function FeatureToggles({ features, onChange, disabled = false })
   );
 }
 
+// Kanalen die het bureau per klantaccount kan toestaan. Alleen relevant als de
+// functie Integraties aanstaat: uit = geen enkel kanaal zichtbaar, aan = de
+// klant ziet (en koppelt) precies de aangevinkte kanalen.
+export const CHANNEL_LABELS = {
+  google_analytics: "Google Analytics",
+  search_console: "Search Console",
+  google_ads: "Google Ads",
+  meta_ads: "META (Ads en Organisch)",
+  woocommerce: "WooCommerce",
+  shopify: "Shopify",
+};
+export const CHANNEL_ORDER = Object.keys(CHANNEL_LABELS);
+
+export function ChannelToggles({ channels, onChange, disabled = false }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {CHANNEL_ORDER.map((key) => {
+        const on = channels?.[key] !== false;
+        return (
+          <label key={key} style={{ ...chip, opacity: disabled ? 0.6 : 1, cursor: disabled ? "default" : "pointer", borderColor: on ? "var(--c-accent)" : "var(--c-border)" }}>
+            <input
+              type="checkbox"
+              checked={on}
+              disabled={disabled}
+              onChange={(e) => onChange({ ...channels, [key]: e.target.checked })}
+              style={{ width: 15, height: 15, accentColor: "var(--c-accent)", flex: "none" }}
+            />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: on ? "var(--c-ink)" : "var(--c-muted)" }}>{CHANNEL_LABELS[key]}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 // Korte samenvatting voor in een tabel: "alle functies" of de uitgezette namen.
 export function featureSummary(features) {
   const off = FEATURE_ORDER.filter((k) => features?.[k] === false);
@@ -59,4 +94,8 @@ export function featureSummary(features) {
 const row = {
   display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
   borderRadius: 11, border: "1px solid var(--c-border-soft)", background: "var(--c-surface-2)",
+};
+const chip = {
+  display: "flex", alignItems: "center", gap: 7, padding: "7px 11px",
+  borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface-2)",
 };

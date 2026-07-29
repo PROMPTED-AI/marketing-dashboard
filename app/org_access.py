@@ -56,6 +56,22 @@ def _require_feature(org_id: str, feature: str) -> None:
         )
 
 
+def _require_channel(org_id: str, channel: str, user: dict | None = None) -> None:
+    """Weiger het koppelen van een kanaal dat het bureau heeft uitgezet.
+
+    Geldt voor klanten; een agency admin mag altijd (die richt de omgeving in
+    en moet bijvoorbeeld Meta of een webshop voor de klant kunnen koppelen).
+    """
+    if user and user.get("role") == "agency_admin":
+        return
+    if not models.channel_allowed(org_id, channel):
+        label = models.CHANNELS.get(channel, channel)
+        raise HTTPException(
+            status_code=403,
+            detail=f"{label} is niet beschikbaar voor deze omgeving.",
+        )
+
+
 def _safe_return(path: str | None, default: str) -> str:
     """Allow only same-site absolute paths as a post-OAuth redirect target.
 
@@ -276,12 +292,19 @@ def _effective_asset(target_org: str, kind: str, supplied):
 def _limit_assets(target_org: str, items: list, id_key: str, kind: str) -> list:
     """Beperk een lijst met bronnen tot de toegewezen bron voor een
     bureau-omgeving (zodat de keuzelijst van een klant alleen zijn eigen bedrijf
-    toont). Buiten het bureau-model blijft de volledige lijst staan."""
+    toont). Buiten het bureau-model blijft de volledige lijst staan.
+
+    Het veld `account` (de naam van het bovenliggende GA-account) wordt in een
+    bureau-omgeving weggelaten: de lijst komt uit het bureau-Google-account en
+    dat label kan de naam van een ándere klant zijn — dat hoort deze klant
+    nooit te zien.
+    """
     if not _managed(target_org):
         return items
     val = models.get_org_assets(target_org).get(kind)
     if not val:
         return []
-    picked = [i for i in items if i.get(id_key) == val]
+    picked = [{k: v for k, v in i.items() if k != "account"}
+              for i in items if i.get(id_key) == val]
     return picked or [{id_key: val}]
 
