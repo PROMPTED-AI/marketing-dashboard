@@ -80,26 +80,40 @@ def org_for_login(email: str) -> dict:
     return get_or_create_personal_org(email)
 
 
-def create_or_rename_organization(name: str, domain: str) -> dict:
-    """Admin adds a client org by domain. If the domain exists, rename it."""
+def create_or_rename_organization(name: str, domain: str, agency_id: str | None = None) -> dict:
+    """Admin adds a client org by domain. If the domain exists, rename it.
+
+    `agency_id` koppelt de klant aan het bureau dat hem klaarzet; dat bureau
+    beheert daarna als enige deze omgeving. Bij een bestaande organisatie
+    zonder bureau vullen we hem alsnog in (een losse organisatie adopteren),
+    maar we halen een klant nooit bij een ánder bureau weg.
+    """
     with db.get_conn() as conn:
-        row = conn.execute("SELECT id FROM organizations WHERE domain = %s", (domain,)).fetchone()
+        row = conn.execute(
+            "SELECT id, agency_id FROM organizations WHERE domain = %s", (domain,)
+        ).fetchone()
         if row:
             conn.execute("UPDATE organizations SET name = %s WHERE id = %s", (name, row[0]))
-            return {"id": row[0], "name": name, "domain": domain}
+            if agency_id and not row[1]:
+                conn.execute(
+                    "UPDATE organizations SET agency_id = %s WHERE id = %s", (agency_id, row[0])
+                )
+            return {"id": row[0], "name": name, "domain": domain,
+                    "agency_id": row[1] or agency_id}
         org_id = str(uuid.uuid4())
         conn.execute(
-            "INSERT INTO organizations (id, name, domain, plan, trial_ends_at) "
-            "VALUES (%s, %s, %s, 'trial', now() + interval '14 days')",
-            (org_id, name, domain),
+            "INSERT INTO organizations (id, name, domain, agency_id, plan, trial_ends_at) "
+            "VALUES (%s, %s, %s, %s, 'trial', now() + interval '14 days')",
+            (org_id, name, domain, agency_id),
         )
-        return {"id": org_id, "name": name, "domain": domain}
+        return {"id": org_id, "name": name, "domain": domain, "agency_id": agency_id}
 
 
 def get_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed, website, industry "
+            "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed, "
+            "website, industry, is_personal, is_agency, agency_id "
             "FROM organizations WHERE id = %s",
             (org_id,),
         ).fetchone()
@@ -109,6 +123,7 @@ def get_organization(org_id: str) -> dict | None:
             "business_type": row[4], "plan": row[5],
             "trial_ends_at": row[6].isoformat() if row[6] else None,
             "managed": row[7], "website": row[8], "industry": row[9],
+            "is_personal": row[10], "is_agency": row[11], "agency_id": row[12],
         }
         if row
         else None
@@ -138,10 +153,131 @@ def delete_organization(org_id: str) -> None:
     ruimen. De aanroeper controleert de rechten en de vangrails (geen demo,
     niet de eigen organisatie)."""
     with db.get_conn() as conn:
-        for table in ("framework_values", "org_assets", "billing_details",
+        for table in ("framework_values", "org_assets", "billing_details", "org_features",
                       "connections", "dashboards", "feedback", "access_tokens", "users"):
             conn.execute(f"DELETE FROM {table} WHERE organization_id = %s", (org_id,))
+        # Klanten van een verwijderd bureau blijven bestaan, maar raken hun
+        # bureau-koppeling kwijt (de foreign key mag niet naar een weg rij wijzen).
+        conn.execute("UPDATE organizations SET agency_id = NULL WHERE agency_id = %s", (org_id,))
         conn.execute("DELETE FROM organizations WHERE id = %s", (org_id,))
+
+
+# ------------------------------------------------------------- bureau (agency)
+#
+# Een bureau is zelf een organisatie met `is_agency`. De klantomgevingen die het
+# klaarzet wijzen via `agency_id` naar dat bureau, zodat elk bureau uitsluitend
+# zijn eigen klanten ziet en beheert. De platform-admin (AGENCY_ADMIN_EMAILS)
+# staat daarboven en ziet alle bureaus.
+
+
+def set_org_is_agency(org_id: str, is_agency: bool) -> None:
+    with db.get_conn() as conn:
+        conn.execute("UPDATE organizations SET is_agency = %s WHERE id = %s", (is_agency, org_id))
+
+
+def set_org_agency(org_id: str, agency_id: str | None) -> None:
+    """Zet (of wist) het bureau dat deze klantomgeving beheert."""
+    with db.get_conn() as conn:
+        conn.execute("UPDATE organizations SET agency_id = %s WHERE id = %s", (agency_id, org_id))
+
+
+def list_agencies() -> list[dict]:
+    """Alle bureaus met hun aantal klantomgevingen (voor de platform-admin)."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT a.id, a.name, a.domain,
+                   (SELECT count(*) FROM organizations c WHERE c.agency_id = a.id),
+                   (SELECT count(*) FROM users u WHERE u.organization_id = a.id
+                                                  AND u.role = 'agency_admin')
+            FROM organizations a WHERE a.is_agency ORDER BY lower(a.name)
+            """
+        ).fetchall()
+    return [
+        {"id": r[0], "name": r[1], "domain": r[2], "client_count": r[3], "admin_count": r[4]}
+        for r in rows
+    ]
+
+
+# ------------------------------------------------------ functies per omgeving
+#
+# Het bureau bepaalt per klantaccount welke onderdelen aanstaan. Alleen
+# afwijkingen staan in org_features: geen rij = aan. Zo blijven bestaande
+# omgevingen volledig werken en hoeft er bij het aanmaken niets geschreven te
+# worden.
+
+FEATURES = {
+    "signalen": "Signalen",
+    "assistant": "AI-assistent",
+    "integrations": "Integraties",
+    "framework": "Raamwerk",
+    "dashboards": "Mijn dashboards",
+}
+
+
+def default_features() -> dict:
+    return {key: True for key in FEATURES}
+
+
+def get_org_features(org_id: str) -> dict:
+    """Alle functies met hun stand voor deze omgeving (ontbrekend = aan)."""
+    out = default_features()
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT feature, enabled FROM org_features WHERE organization_id = %s",
+            (org_id,),
+        ).fetchall()
+    for feature, enabled in rows:
+        if feature in out:
+            out[feature] = enabled
+    return out
+
+
+def get_features_by_org(org_ids: list[str]) -> dict[str, dict]:
+    """De functiestand van meerdere omgevingen in één query (voor lijsten)."""
+    out = {org_id: default_features() for org_id in org_ids}
+    if not org_ids:
+        return out
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT organization_id, feature, enabled FROM org_features "
+            "WHERE organization_id = ANY(%s)",
+            (list(org_ids),),
+        ).fetchall()
+    for org_id, feature, enabled in rows:
+        if org_id in out and feature in FEATURES:
+            out[org_id][feature] = enabled
+    return out
+
+
+def set_org_features(org_id: str, values: dict) -> dict:
+    """Sla de functiestand op (alleen bekende functies) en geef het resultaat."""
+    with db.get_conn() as conn:
+        for feature, enabled in values.items():
+            if feature not in FEATURES or enabled is None:
+                continue
+            conn.execute(
+                """
+                INSERT INTO org_features (organization_id, feature, enabled, updated_at)
+                VALUES (%s, %s, %s, now())
+                ON CONFLICT (organization_id, feature)
+                DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()
+                """,
+                (org_id, feature, bool(enabled)),
+            )
+    return get_org_features(org_id)
+
+
+def feature_enabled(org_id: str, feature: str) -> bool:
+    """Staat deze functie aan voor deze omgeving? Onbekende functies: ja."""
+    if feature not in FEATURES:
+        return True
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT enabled FROM org_features WHERE organization_id = %s AND feature = %s",
+            (org_id, feature),
+        ).fetchone()
+    return True if row is None else bool(row[0])
 
 
 # ------------------------------------------------------------------ abonnement
@@ -300,16 +436,26 @@ def save_framework_values(org_id: str, month: str, values: dict) -> None:
 # ------------------------------------------------------------ gebruikersbeheer
 
 
-def list_users() -> list[dict]:
-    """Alle gebruikers met hun organisatie, voor de admin-pagina Gebruikers & rollen."""
+def list_users(agency_id: str | None = None) -> list[dict]:
+    """Alle gebruikers met hun organisatie, voor de admin-pagina Gebruikers & rollen.
+
+    Met `agency_id` alleen de gebruikers van de omgevingen van dat bureau
+    (inclusief het bureau zelf); zonder filter — de platform-admin — iedereen.
+    """
+    where, params = "", ()
+    if agency_id:
+        where = "WHERE o.agency_id = %s OR o.id = %s"
+        params = (agency_id, agency_id)
     with db.get_conn() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT u.id, u.email, u.role, u.created_at, u.password_hash IS NOT NULL,
                    o.id, o.name, o.is_demo
             FROM users u JOIN organizations o ON o.id = u.organization_id
+            {where}
             ORDER BY u.created_at DESC
-            """
+            """,
+            params,
         ).fetchall()
     return [
         {
@@ -441,7 +587,7 @@ def use_access_token(token_hash: str) -> None:
 # ------------------------------------------------------------- activiteitenfeed
 
 
-def activity_feed(limit: int = 60) -> list[dict]:
+def activity_feed(limit: int = 60, agency_id: str | None = None) -> list[dict]:
     """Recente gebeurtenissen, afgeleid uit bestaande tabellen.
 
     Geen aparte log-tabel: nieuwe klanten en gebruikers, bijgewerkte
@@ -449,26 +595,30 @@ def activity_feed(limit: int = 60) -> list[dict]:
     een tijdstempel. Samengevoegd en gesorteerd geeft dat een bruikbaar
     activiteitenoverzicht zonder overal schrijf-hooks te hoeven plaatsen.
     """
+    # Bureau-scope: alleen de eigen omgevingen (en het bureau zelf). Zonder
+    # scope — de platform-admin — blijft het platformbrede overzicht staan.
+    scope = "(o.agency_id = %s OR o.id = %s)" if agency_id else "true"
+    p: tuple = (agency_id, agency_id) if agency_id else ()
     with db.get_conn() as conn:
         rows = conn.execute(
-            """
+            f"""
             (SELECT 'org' AS kind, o.created_at AS ts, o.name, NULL, NULL
-               FROM organizations o WHERE o.is_personal = false)
+               FROM organizations o WHERE o.is_personal = false AND {scope})
             UNION ALL
             (SELECT 'user', u.created_at, o.name, u.email, u.role
-               FROM users u JOIN organizations o ON o.id = u.organization_id)
+               FROM users u JOIN organizations o ON o.id = u.organization_id WHERE {scope})
             UNION ALL
             (SELECT 'connection', c.updated_at, o.name, c.provider, c.status
-               FROM connections c JOIN organizations o ON o.id = c.organization_id)
+               FROM connections c JOIN organizations o ON o.id = c.organization_id WHERE {scope})
             UNION ALL
             (SELECT 'dashboard', d.updated_at, o.name, d.name, d.page
-               FROM dashboards d JOIN organizations o ON o.id = d.organization_id)
+               FROM dashboards d JOIN organizations o ON o.id = d.organization_id WHERE {scope})
             UNION ALL
             (SELECT 'feedback', f.created_at, COALESCE(o.name, f.user_email), f.category, f.status
-               FROM feedback f LEFT JOIN organizations o ON o.id = f.organization_id)
+               FROM feedback f LEFT JOIN organizations o ON o.id = f.organization_id WHERE {scope})
             ORDER BY ts DESC LIMIT %s
             """,
-            (limit,),
+            (*p, *p, *p, *p, *p, limit),
         ).fetchall()
     return [
         {"kind": r[0], "ts": r[1].isoformat() if r[1] else None, "org": r[2], "a": r[3], "b": r[4]}
@@ -711,12 +861,24 @@ def list_organizations_with_status() -> list[dict]:
     ]
 
 
-def list_organizations_with_connections() -> list[dict]:
-    """Admin client table: every org with its per-provider status + last sync."""
+def list_organizations_with_connections(agency_id: str | None = None) -> list[dict]:
+    """Admin client table: every org with its per-provider status + last sync.
+
+    Met `agency_id` blijft de lijst beperkt tot de omgevingen van dat bureau
+    (plus het bureau zelf, dat immers ook een eigen omgeving heeft). Zonder
+    filter — de platform-admin — komt alles terug.
+    """
+    where = "is_personal = false"
+    params: tuple = ()
+    if agency_id:
+        where += " AND (agency_id = %s OR id = %s)"
+        params = (agency_id, agency_id)
     with db.get_conn() as conn:
         orgs = conn.execute(
-            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed, website, industry "
-            "FROM organizations WHERE is_personal = false ORDER BY name"
+            "SELECT id, name, domain, business_type, is_demo, plan, trial_ends_at, package, "
+            "managed, website, industry, is_agency, agency_id "
+            f"FROM organizations WHERE {where} ORDER BY name",
+            params,
         ).fetchall()
         conns = conn.execute(
             "SELECT organization_id, provider, status, google_email, updated_at FROM connections"
@@ -733,9 +895,11 @@ def list_organizations_with_connections() -> list[dict]:
             "updated_at": updated.isoformat() if updated else None,
         }
     assets_by_org = {r[0]: dict(zip(_ASSET_FIELDS, r[1:])) for r in assets}
+    features_by_org = get_features_by_org([r[0] for r in orgs])
 
     out = []
-    for org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package, managed, website, industry in orgs:
+    for (org_id, name, domain, business_type, is_demo, plan, trial_ends_at, package,
+         managed, website, industry, is_agency, agency_id) in orgs:
         providers = by_org.get(org_id, {})
         last_sync = max(
             (p["updated_at"] for p in providers.values() if p["updated_at"]),
@@ -749,6 +913,9 @@ def list_organizations_with_connections() -> list[dict]:
                 "business_type": business_type,
                 "website": website,
                 "industry": industry,
+                "is_agency": is_agency,
+                "agency_id": agency_id,
+                "features": features_by_org.get(org_id, default_features()),
                 "providers": providers,
                 "connected_count": sum(1 for p in providers.values() if p["status"] == "connected"),
                 "last_sync": last_sync,

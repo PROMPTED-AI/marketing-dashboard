@@ -16,8 +16,8 @@ from .. import (
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _wc_creds,
+    _meta_token, _org_credentials, _previous_period, _require_feature,
+    _require_period, _resolve_org_id, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -37,6 +37,7 @@ def assistant_chat(request: Request, body: ChatBody):
     """Stream the AI assistant's answer (SSE). Tools read the active org's data."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, body.org_id)
+    _require_feature(target_org, "assistant")
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="Assistent is niet geconfigureerd.")
     if not ratelimit.allow(f"assistant|{target_org}", limit=20, window_s=60):
@@ -371,5 +372,6 @@ def insights_endpoint(
     """Proactive, rule-based insights: notable period-over-period changes per channel."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "signalen")
     return _compute_insights(target_org, start, end, property_id, site)
 

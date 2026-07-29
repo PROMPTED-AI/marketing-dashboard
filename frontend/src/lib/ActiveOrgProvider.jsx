@@ -4,6 +4,13 @@ import { useMe } from "./useMe.jsx";
 
 const Ctx = createContext(null);
 
+// Functies die een bureau per klantaccount aan of uit kan zetten. Zolang de
+// server nog niets heeft teruggegeven gaan we uit van "aan": de API is de
+// harde grens, de UI verbergt alleen wat toch niet werkt.
+export const ALL_FEATURES_ON = {
+  signalen: true, assistant: true, integrations: true, framework: true, dashboards: true,
+};
+
 // Holds the organization the dashboard is currently scoped to. Agency admins
 // can switch between all client orgs; clients only have their own.
 export function ActiveOrgProvider({ children }) {
@@ -42,7 +49,18 @@ export function ActiveOrgProvider({ children }) {
   // Company profile of the active org, drives which dashboard views/KPIs default.
   const businessType =
     activeOrg?.business_type || me?.organization?.business_type || "leadgen";
-  return <Ctx.Provider value={{ orgId, orgName, orgs, setOrg, reload, businessType }}>{children}</Ctx.Provider>;
+  // Welke onderdelen het bureau voor déze omgeving heeft geactiveerd. Bij het
+  // wisselen van klant wisselt de stand mee; valt de lijst nog niet terug, dan
+  // gelden de functies van de eigen organisatie.
+  const features = {
+    ...ALL_FEATURES_ON,
+    ...(activeOrg?.features || (!orgId || orgId === me?.organization?.id ? me?.features : null) || {}),
+  };
+  return (
+    <Ctx.Provider value={{ orgId, orgName, orgs, setOrg, reload, businessType, features }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export const useActiveOrg = () => useContext(Ctx);

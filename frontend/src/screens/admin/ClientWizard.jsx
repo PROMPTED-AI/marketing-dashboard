@@ -2,17 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, createInvitation, linkAgency, availableAssets, setOrgAssets } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
-import { IcPlug, IcUsers, IcGrid, IcStar } from "../../components/icons.jsx";
+import FeatureToggles, { FEATURE_ORDER, FEATURE_LABELS } from "./FeatureToggles.jsx";
+import { IcPlug, IcUsers, IcGrid, IcStar, IcCog } from "../../components/icons.jsx";
 
-// Klant-wizard: één vloeiende flow die de drie losse beheerstappen samenvoegt —
-// (1) een klant-organisatie aanmaken, (2) de klant uitnodigen zodat die op de
-// eigen omgeving kan inloggen, en (3) meteen kanalen inrichten (de bureau-Google-
-// koppeling hergebruiken + property/site/Ads toewijzen). Stap 2 en 3 zijn
-// optioneel: een admin kan de klant later uitnodigen of de klant zelf laten
-// koppelen. Alle endpoints bestaan al; dit bundelt ze in één scherm.
+// Klant-wizard: één vloeiende flow die de losse beheerstappen samenvoegt —
+// (1) een klant-organisatie aanmaken onder je bureau, (2) bepalen welke functies
+// dit account krijgt, (3) de klant uitnodigen zodat die op de eigen omgeving kan
+// inloggen, en (4) meteen kanalen inrichten (de bureau-Google-koppeling
+// hergebruiken + property/site/Ads toewijzen). Stap 3 en 4 zijn optioneel: een
+// admin kan de klant later uitnodigen of de klant zelf laten koppelen. Alle
+// endpoints bestaan al; dit bundelt ze in één scherm.
 
 const STEPS = [
   { key: "bedrijf", label: "Bedrijf", Icon: IcStar },
+  { key: "functies", label: "Functies", Icon: IcCog },
   { key: "toegang", label: "Toegang", Icon: IcUsers },
   { key: "kanalen", label: "Kanalen", Icon: IcPlug },
   { key: "klaar", label: "Klaar", Icon: IcGrid },
@@ -21,6 +24,9 @@ const STEPS = [
 export default function ClientWizard({ onClose, onDone }) {
   const [step, setStep] = useState(0);
   const [org, setOrg] = useState(null);      // aangemaakte organisatie
+  const [features, setFeatures] = useState(() =>
+    Object.fromEntries(FEATURE_ORDER.map((k) => [k, true])));
+  const [draft, setDraft] = useState({ name: "", domain: "" }); // vóór het aanmaken
   const [invite, setInvite] = useState(null); // { email, invite_url, emailed }
   const [assetSummary, setAssetSummary] = useState([]); // labels van toegewezen bronnen
 
@@ -50,25 +56,35 @@ export default function ClientWizard({ onClose, onDone }) {
         <div style={{ padding: 26 }}>
           {STEPS[step].key === "bedrijf" && (
             <StepBedrijf
-              onCreated={(o) => { setOrg(o); setStep(1); }}
+              draft={draft}
+              onNext={(d) => { setDraft(d); setStep(1); }}
               onCancel={onClose}
+            />
+          )}
+          {STEPS[step].key === "functies" && (
+            <StepFuncties
+              draft={draft}
+              features={features}
+              onChange={setFeatures}
+              onBack={() => setStep(0)}
+              onCreated={(o) => { setOrg(o); setStep(2); }}
             />
           )}
           {STEPS[step].key === "toegang" && (
             <StepToegang
               org={org}
-              onInvited={(inv) => { setInvite(inv); setStep(2); }}
-              onSkip={() => setStep(2)}
+              onInvited={(inv) => { setInvite(inv); setStep(3); }}
+              onSkip={() => setStep(3)}
             />
           )}
           {STEPS[step].key === "kanalen" && (
             <StepKanalen
               org={org}
-              onNext={(labels) => { setAssetSummary(labels || []); setStep(3); }}
+              onNext={(labels) => { setAssetSummary(labels || []); setStep(4); }}
             />
           )}
           {STEPS[step].key === "klaar" && (
-            <StepKlaar org={org} invite={invite} assetSummary={assetSummary} onDone={onDone} />
+            <StepKlaar org={org} invite={invite} features={features} assetSummary={assetSummary} onDone={onDone} />
           )}
         </div>
       </div>
@@ -76,42 +92,68 @@ export default function ClientWizard({ onClose, onDone }) {
   );
 }
 
-// Stap 1 — organisatie aanmaken op bedrijfsdomein.
-function StepBedrijf({ onCreated, onCancel }) {
-  const [name, setName] = useState("");
-  const [domain, setDomain] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
+// Stap 1 — bedrijfsgegevens. Aanmaken gebeurt pas in de volgende stap, samen
+// met de gekozen functies, zodat de omgeving in één keer goed staat.
+function StepBedrijf({ draft, onNext, onCancel }) {
+  const [name, setName] = useState(draft.name);
+  const [domain, setDomain] = useState(draft.domain);
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault();
-    setBusy(true); setErr(null);
-    try {
-      const d = await api("/api/admin/organizations", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), domain: domain.trim() }),
-      });
-      onCreated(d.organization);
-    } catch (e2) { setErr(e2); setBusy(false); }
+    onNext({ name: name.trim(), domain: domain.trim() });
   };
 
   return (
     <form onSubmit={submit}>
       <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>nieuwe klant</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Maak de organisatie aan. In de volgende stappen nodig je de klant uit en richt je de kanalen in.</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>De klant komt onder jouw bureau te staan. Hierna kies je de functies, nodig je de klant uit en richt je de kanalen in.</div>
       <label style={lbl}>Naam organisatie</label>
       <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
       <label style={lbl}>E-maildomein</label>
       <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="voorbeeld.nl" style={inp} />
       <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Iedereen die met dit domein inlogt, hoort bij deze klant.</div>
-      {err && <div style={errBox}>{String(err.message || err)}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
         <button type="button" className="pill-btn" onClick={onCancel} style={btnGhost}>annuleren</button>
-        <button type="submit" disabled={busy || !name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
-          {busy ? "bezig…" : "aanmaken →"}
+        <button type="submit" disabled={!name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px" }}>
+          verder →
         </button>
       </div>
     </form>
+  );
+}
+
+// Stap 2 — welke functies krijgt dit account? De organisatie wordt hier
+// aangemaakt, meteen met de gekozen stand; later aanpassen kan via Omgevingen.
+function StepFuncties({ draft, features, onChange, onBack, onCreated }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const create = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const d = await api("/api/admin/organizations", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: draft.name, domain: draft.domain, features }),
+      });
+      onCreated(d.organization);
+    } catch (e) { setErr(e); setBusy(false); }
+  };
+
+  return (
+    <div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>functies kiezen</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
+        Bepaal welke onderdelen <strong style={{ color: "var(--c-ink)" }}>{draft.name || "deze klant"}</strong> in de eigen omgeving ziet. Je kunt dit later per klant aanpassen.
+      </div>
+      <FeatureToggles features={features} onChange={onChange} disabled={busy} />
+      {err && <div style={errBox}>{String(err.message || err)}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 22 }}>
+        <button type="button" className="pill-btn" onClick={onBack} style={btnGhost}>← terug</button>
+        <button className="btn-primary" disabled={busy} onClick={create} style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
+          {busy ? "bezig…" : "aanmaken →"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -240,7 +282,7 @@ function StepKanalen({ org, onNext }) {
 // bronnen zijn toegewezen. "Omgeving bekijken" zet de klant als actieve
 // organisatie en opent het dashboard, zodat de beheerder de omgeving kan
 // controleren vóórdat de klant wordt uitgenodigd.
-function StepKlaar({ org, invite, assetSummary, onDone }) {
+function StepKlaar({ org, invite, features, assetSummary, onDone }) {
   const [copied, setCopied] = useState(false);
   const [opening, setOpening] = useState(false);
   const { reload: reloadOrgs, setOrg } = useActiveOrg();
@@ -266,6 +308,11 @@ function StepKlaar({ org, invite, assetSummary, onDone }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
         <SummaryRow label="Organisatie" value={`${org?.name} · ${org?.domain}`} ok />
+        <SummaryRow
+          label="Functies"
+          value={FEATURE_ORDER.filter((k) => features?.[k] !== false).map((k) => FEATURE_LABELS[k]).join(" · ") || "geen functies actief"}
+          ok={FEATURE_ORDER.some((k) => features?.[k] !== false)}
+        />
         <SummaryRow
           label="Uitnodiging"
           value={invite ? (invite.emailed ? `verstuurd naar ${invite.email}` : `link voor ${invite.email}`) : "overgeslagen — later uit te nodigen"}

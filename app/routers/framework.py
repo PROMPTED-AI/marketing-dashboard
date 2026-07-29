@@ -15,8 +15,8 @@ from pydantic import BaseModel
 
 from .. import analytics, auth, cache, demo, google_ads, meta, models, shopify, woocommerce
 from ..org_access import (
-    _connected, _google_data, _meta_token, _org_credentials, _resolve_org_id,
-    _shopify_creds, _wc_creds,
+    _connected, _google_data, _meta_token, _org_credentials, _require_feature,
+    _resolve_org_id, _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -311,6 +311,7 @@ def _month_payload(org_id: str, month: str, property_id: str | None,
 def framework(request: Request, months: int = 3, property_id: str | None = None, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "framework")
     months = max(1, min(int(months), MAX_MONTHS))
     month_list = _last_months(months)
     manual_by_month = models.get_framework_values(target_org, month_list)
@@ -332,6 +333,7 @@ def save_framework(request: Request, month: str, payload: FrameworkValuesIn,
                    property_id: str | None = None, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "framework")
     _month_range(month)  # valideert het formaat en weigert toekomstige maanden
     values = {}
     for k, v in payload.values.items():

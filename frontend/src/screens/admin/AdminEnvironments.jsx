@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
-import { api, linkAgency, availableAssets, getOrgAssets, setOrgAssets, deleteOrganization } from "../../lib/api.js";
+import {
+  api, linkAgency, availableAssets, getOrgAssets, setOrgAssets, deleteOrganization,
+  setOrgFeatures,
+} from "../../lib/api.js";
+import FeatureToggles, { featureSummary } from "./FeatureToggles.jsx";
 
 // Omgevingen: het bureau-model. Het bureau logt in met één manageraccount en
 // richt per bedrijf een omgeving in — de bureau-koppeling wordt hergebruikt en
-// per bedrijf wijs je toe welke property, site en Ads-klant erbij horen. De
-// klant ziet daarna alleen zijn eigen bedrijf.
+// per bedrijf wijs je toe welke property, site en Ads-klant erbij horen, en
+// welke functies dit account krijgt. De klant ziet daarna alleen zijn eigen
+// bedrijf, met alleen de functies die aanstaan.
 export default function AdminEnvironments() {
   const [orgs, setOrgs] = useState(null);
   const [error, setError] = useState(null);
@@ -38,7 +43,7 @@ export default function AdminEnvironments() {
       <div className="card" style={{ overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <div style={head}>
-            <span>Bedrijf</span><span>Type omgeving</span><span>Toegewezen bron</span><span />
+            <span>Bedrijf</span><span>Type omgeving</span><span>Toegewezen bron</span><span>Functies</span><span />
           </div>
           {orgs.map((o) => {
             const a = o.assets || {};
@@ -48,6 +53,7 @@ export default function AdminEnvironments() {
                 <div><div style={{ fontWeight: 700 }}>{o.name}</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>{o.domain}</div></div>
                 <span>{o.managed ? <span className="pill accent">bureau-omgeving</span> : <span className="pill muted">eigen koppeling</span>}</span>
                 <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{assigned.length ? assigned.join(" · ") : "—"}</span>
+                <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{featureSummary(o.features)}</span>
                 <span style={{ textAlign: "right", display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button className="btn-ghost" style={{ height: 32, padding: "0 13px", fontSize: 12.5 }} onClick={() => setEdit(o)}>Inrichten</button>
                   <button className="btn-ghost" disabled={busyDel === o.id} onClick={() => remove(o)}
@@ -71,9 +77,25 @@ function EnvModal({ org, onClose, onSaved }) {
   const [managed, setManaged] = useState(org.managed);
   const [assets, setAssets] = useState(null);      // huidige toewijzing
   const [available, setAvailable] = useState(null); // { properties, sites, ads_accounts }
+  const [features, setFeatures] = useState(org.features || {});
+  const [featBusy, setFeatBusy] = useState(false);
+  const [featSaved, setFeatSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+
+  const saveFeatures = async (next) => {
+    setFeatures(next);          // meteen zichtbaar; de server bevestigt daarna
+    setFeatBusy(true); setError(null); setFeatSaved(false);
+    try {
+      const d = await setOrgFeatures(org.id, next);
+      setFeatures(d.features);
+      setFeatSaved(true);
+    } catch (e) {
+      setError(e);
+      setFeatures(org.features || {});  // mislukt: terug naar de opgeslagen stand
+    } finally { setFeatBusy(false); }
+  };
 
   const loadAssets = () => Promise.all([getOrgAssets(org.id), availableAssets(org.id)])
     .then(([g, av]) => { setAssets(g.assets); setManaged(g.managed); setAvailable(av); })
@@ -108,7 +130,17 @@ function EnvModal({ org, onClose, onSaved }) {
       <div className="card" style={{ width: 520, maxWidth: "calc(100vw - 32px)", padding: 26, maxHeight: "90vh", overflow: "auto" }}>
         <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>omgeving · {org.name}</div>
         <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
-          Hergebruik je bureau-koppeling en wijs de juiste bronnen toe aan dit bedrijf.
+          Hergebruik je bureau-koppeling, wijs de juiste bronnen toe en bepaal welke functies dit account krijgt.
+        </div>
+
+        {/* Functies: geldt voor elke omgeving, ook zonder bureau-koppeling. */}
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
+            <span style={{ ...lbl, marginBottom: 0 }}>Functies voor deze klant</span>
+            {featBusy && <span style={{ fontSize: 11.5, color: "var(--c-muted)" }}>opslaan…</span>}
+            {!featBusy && featSaved && <span className="pill pos" style={{ fontSize: 11 }}>Opgeslagen</span>}
+          </div>
+          <FeatureToggles features={features} onChange={saveFeatures} disabled={featBusy} />
         </div>
 
         {!managed ? (
@@ -144,17 +176,18 @@ function EnvModal({ org, onClose, onSaved }) {
 
         {error && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 14 }}>{String(error.message || error)}</div>}
 
+        {/* Sluiten ververst de lijst, zodat gewijzigde functies er meteen in staan. */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-          <button className="pill-btn" onClick={onClose} style={{ height: 40, padding: "0 16px", borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 }}>Sluiten</button>
+          <button className="pill-btn" onClick={onSaved} style={{ height: 40, padding: "0 16px", borderRadius: 11, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink-soft)", cursor: "pointer", fontWeight: 600 }}>Sluiten</button>
         </div>
       </div>
     </div>
   );
 }
 
-const cols = "1.6fr 1fr 1.4fr 0.8fr";
-const head = { display: "grid", gridTemplateColumns: cols, minWidth: 720, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
-const row = { display: "grid", gridTemplateColumns: cols, minWidth: 720, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
+const cols = "1.6fr 1fr 1.3fr 1.3fr 0.9fr";
+const head = { display: "grid", gridTemplateColumns: cols, minWidth: 900, gap: 14, fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)", padding: "14px 20px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface-2)" };
+const row = { display: "grid", gridTemplateColumns: cols, minWidth: 900, gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--c-border-soft)", fontSize: 13.5 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 };
 const lbl = { display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--c-ink-soft)", marginBottom: 6 };
 const select = { width: "100%", height: 42, padding: "0 12px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "inherit" };

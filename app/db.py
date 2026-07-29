@@ -2,10 +2,13 @@
 
 Tables
 ------
-organizations  : one per client company (grouped by email domain)
+organizations  : one per client company (grouped by email domain); a bureau is
+                 an organization too (`is_agency`), its clients point back via
+                 `agency_id`
 users          : people who sign in; each belongs to one organization + role
 connections    : one GA OAuth connection per organization (encrypted, with status)
 dashboards     : user-composed widget layouts, shared within an organization
+org_features   : which product features a bureau activated per client account
 """
 from psycopg_pool import ConnectionPool
 
@@ -153,6 +156,52 @@ def init_schema() -> None:
         # e-mailadres (belangrijk voor accounts op een publiek domein zoals gmail).
         conn.execute("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS website TEXT")
         conn.execute("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS industry TEXT")
+        # Bureau-omgeving: een bureau (zoals TriplePro, met een MCC/manager-
+        # account) is zelf een organisatie met `is_agency`; de klanten die het
+        # klaarzet wijzen via `agency_id` terug naar dat bureau. Zo beheert elk
+        # bureau alleen zijn eigen klanten en kunnen meerdere bureaus naast
+        # elkaar op hetzelfde platform draaien.
+        conn.execute(
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_agency BOOLEAN NOT NULL DEFAULT false"
+        )
+        conn.execute(
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS agency_id TEXT REFERENCES organizations(id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS organizations_agency_idx ON organizations (agency_id)"
+        )
+        # Per-account functies: het bureau bepaalt per klantomgeving welke
+        # onderdelen aanstaan (signalen, AI-assistent, integraties, raamwerk,
+        # mijn dashboards). Een ontbrekende rij betekent "aan", zodat bestaande
+        # omgevingen ongewijzigd blijven werken.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS org_features (
+                organization_id  TEXT NOT NULL REFERENCES organizations(id),
+                feature          TEXT NOT NULL,
+                enabled          BOOLEAN NOT NULL DEFAULT true,
+                updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (organization_id, feature)
+            )
+            """
+        )
+        # Migratie naar het bureau-model. Elke organisatie waar een agency admin
+        # in zit, is een bureau. Bestaat er daarna precies één bureau (de situatie
+        # van elke bestaande installatie), dan zijn alle bestaande klanten van dat
+        # bureau — anders laten we de koppeling leeg en wijst de platform-admin ze
+        # zelf toe, in plaats van te gokken.
+        conn.execute(
+            "UPDATE organizations SET is_agency = true WHERE id IN "
+            "(SELECT organization_id FROM users WHERE role = 'agency_admin')"
+        )
+        conn.execute(
+            """
+            UPDATE organizations SET agency_id =
+                (SELECT id FROM organizations WHERE is_agency ORDER BY created_at LIMIT 1)
+            WHERE agency_id IS NULL AND is_personal = false AND is_agency = false
+              AND (SELECT count(*) FROM organizations WHERE is_agency) = 1
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS org_assets (

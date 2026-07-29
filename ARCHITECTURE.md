@@ -89,16 +89,46 @@ Data stroomt alleen **browser ↔ backend ↔ Google** — geen externe trackers
 
 ## Multi-tenancy & rollen
 
-- **organizations**: één per klant, gegroepeerd op (niet-publiek) e-maildomein.
-- **users**: ingelogde personen, met rol `client` of `agency_admin`
-  (`AGENCY_ADMIN_EMAILS`).
+- **organizations**: één per klant, gegroepeerd op (niet-publiek) e-maildomein. Een
+  bureau is óók een organisatie (`is_agency`); de klantomgevingen die het klaarzet
+  wijzen er via `agency_id` naar terug.
+- **users**: ingelogde personen, met rol `client` of `agency_admin`.
 - **connections**: één Google-grant per organisatie, per provider, versleuteld opgeslagen.
+- **org_features**: welke functies een bureau per klantaccount heeft geactiveerd.
 
-Isolatie: elk data-endpoint draait via `_resolve_org_id` (`app/main.py`) — een client is
-vastgepind op de eigen organisatie; een agency-admin kan tussen alle klant-organisaties
-wisselen. **Invite-only**: nieuwe gebruikers op een gedeeld/publiek domein (gmail e.d.)
-of een nog onbekend domein krijgen een geïsoleerde persoonlijke org, zodat onbekenden
-nooit in dezelfde org belanden.
+Isolatie: elk data-endpoint draait via `_resolve_org_id` (`app/org_access.py`) — een
+client is vastgepind op de eigen organisatie; een agency-admin kan wisselen tussen de
+omgevingen van het **eigen bureau**. **Invite-only**: nieuwe gebruikers op een
+gedeeld/publiek domein (gmail e.d.) of een nog onbekend domein krijgen een geïsoleerde
+persoonlijke org, zodat onbekenden nooit in dezelfde org belanden.
+
+### Bureaus (agencies)
+
+Een bureau zoals TriplePro — met een MCC/manager-account — heeft een eigen omgeving:
+het zet klantaccounts klaar (klant-wizard), hergebruikt zijn Google-koppeling per klant
+(`link-agency` + toegewezen property/site/Ads-klant) en beheert uitsluitend zijn eigen
+klanten. Drie niveaus:
+
+| Rol | Bepaald door | Ziet en beheert |
+|-----|--------------|-----------------|
+| `client` | standaard | alleen de eigen organisatie |
+| `agency_admin` | uitnodiging met rol, of `AGENCY_ADMIN_EMAILS` | de klantomgevingen van het eigen bureau |
+| platform-admin | e-mail in `AGENCY_ADMIN_EMAILS` | alle bureaus en alle organisaties |
+
+`auth.admin_agency_id()` bepaalt de scope (None = platform-breed) en `auth.can_admin_org()`
+of een admin een organisatie mag aanraken; elk `/api/admin/...`-endpoint gaat daar langs.
+Bij de migratie worden bestaande klanten aan het enige bestaande bureau gehangen; zijn er
+meerdere bureaus, dan wijst de platform-admin ze toe (beheerscherm **Bureaus**).
+
+### Functies per account
+
+Het bureau bepaalt per klantomgeving welke onderdelen aanstaan: **Signalen**,
+**AI-assistent**, **Integraties**, **Raamwerk** en **Mijn dashboards** (te zetten in de
+klant-wizard en op **Omgevingen**). Alleen afwijkingen staan in `org_features`; geen rij
+= aan, dus bestaande omgevingen blijven ongewijzigd. De frontend verbergt uitgeschakelde
+onderdelen (sidebar, routes, notificatiebel), maar de grens ligt server-side:
+`_require_feature()` weigert de bijbehorende endpoints met een 403, zodat een directe
+URL niets extra's opent.
 
 ## Verzoek-flow (voorbeeld: Overzicht)
 

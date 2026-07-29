@@ -16,8 +16,8 @@ from .. import (
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _wc_creds,
+    _meta_token, _org_credentials, _previous_period, _require_feature,
+    _require_period, _resolve_org_id, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -76,6 +76,7 @@ def list_dashboards(request: Request, page: str = "overview", org_id: str | None
     """Dashboards the user may see (their own + shared ones), names only."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     return {
         "org_id": target_org,
         "dashboards": models.list_dashboards(target_org, user["email"], page),
@@ -87,6 +88,7 @@ def get_dashboard(request: Request, dashboard_id: str, org_id: str | None = None
     """One dashboard with its full widget layout (owner or shared only)."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     dash = models.get_dashboard(target_org, dashboard_id, user["email"])
     if not dash:
         raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
@@ -98,6 +100,7 @@ def create_dashboard(request: Request, payload: DashboardIn, org_id: str | None 
     """Create a new dashboard owned by the signed-in user."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Naam is vereist")
@@ -122,6 +125,7 @@ def update_dashboard(
     """Update an owned dashboard's name, layout, visibility, and/or default flag."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     name = payload.name.strip() if payload.name is not None else None
     if name == "":
         raise HTTPException(status_code=400, detail="Naam mag niet leeg zijn")
@@ -152,6 +156,7 @@ def delete_dashboard(request: Request, dashboard_id: str, org_id: str | None = N
     """Delete an owned dashboard."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     existing = models.get_dashboard(target_org, dashboard_id, user["email"])
     if not existing:
         raise HTTPException(status_code=404, detail="Dashboard niet gevonden")
@@ -250,6 +255,7 @@ def generate_dashboard_endpoint(request: Request, payload: DashboardGenerateIn, 
     """Stel met AI een dashboard-indeling samen uit de meegestuurde catalogus."""
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
+    _require_feature(target_org, "dashboards")
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="De AI-assistent is niet geconfigureerd.")
     if not ratelimit.allow(f"dashgen|{target_org}", limit=10, window_s=60):

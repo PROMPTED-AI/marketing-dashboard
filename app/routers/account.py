@@ -16,8 +16,8 @@ from .. import (
 )
 from ..org_access import (
     _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_period,
-    _resolve_org_id, _safe_return, _wc_creds,
+    _meta_token, _org_credentials, _previous_period, _require_feature,
+    _require_period, _resolve_org_id, _safe_return, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -29,22 +29,21 @@ def me(request: Request):
     user = auth.current_user(request)
     org = models.get_organization(user["organization_id"])
     subscription = models.subscription_info(org)
-    if org and org.get("is_demo"):
-        return {
-            "email": user["email"],
-            "role": user["role"],
-            "organization": org,
-            "subscription": subscription,
-            "connection_status": "connected",
-        }
-    conn = models.get_connection(user["organization_id"])
-    return {
+    # `features` is de functiestand van de eigen omgeving (het bureau zet ze per
+    # account aan of uit); `is_platform_admin` onderscheidt de platformbeheerder
+    # van een bureau-admin, die alleen zijn eigen klanten beheert.
+    base = {
         "email": user["email"],
         "role": user["role"],
+        "is_platform_admin": auth.is_platform_admin(user["email"]),
         "organization": org,
+        "features": models.get_org_features(user["organization_id"]),
         "subscription": subscription,
-        "connection_status": conn["status"] if conn else "not_connected",
     }
+    if org and org.get("is_demo"):
+        return {**base, "connection_status": "connected"}
+    conn = models.get_connection(user["organization_id"])
+    return {**base, "connection_status": conn["status"] if conn else "not_connected"}
 
 
 class PasswordLoginIn(BaseModel):
@@ -89,6 +88,10 @@ def connect(request: Request, providers: str, return_to: str = "/app/integration
     """Incremental authorization: connect one or more tools for the signed-in user."""
     if not request.session.get("user_id"):
         return RedirectResponse("/login")
+    # De koppeling landt op de eigen organisatie, dus daar geldt de functiestand:
+    # heeft het bureau Integraties uitgezet, dan koppelt deze omgeving niet zelf.
+    user = auth.current_user(request)
+    _require_feature(user["organization_id"], "integrations")
     requested = [p for p in providers.split(",") if p in config.GOOGLE_PROVIDERS]
     if not requested:
         raise HTTPException(status_code=400, detail="No valid providers")
@@ -124,9 +127,23 @@ def callback(request: Request):
     # Identify the user and place them in an organization. Invite-only: a user
     # only joins a shared org when an admin pre-provisioned their company domain;
     # public/shared domains and unknown domains get an isolated personal org.
+    #
+    # Bestaat de gebruiker al in een echte (niet-persoonlijke) organisatie, dan
+    # blijft die staan, inclusief de rol. Anders zou een bureau-admin die via een
+    # uitnodiging is aangemaakt bij elke Google-login terugvallen naar 'client'
+    # en naar de organisatie van zijn e-maildomein. Wie nog in een persoonlijke
+    # org zit, wordt wél opnieuw opgehaald: zo landt hij alsnog in de klant-org
+    # zodra het bureau zijn bedrijfsdomein heeft klaargezet.
     email = oauth.fetch_user_email(creds).lower()
-    org = models.org_for_login(email)
-    user = models.upsert_user(email, org["id"], auth.role_for(email))
+    existing = models.get_user_by_email(email)
+    current = models.get_organization(existing["organization_id"]) if existing else None
+    if current and not current.get("is_personal"):
+        org, role = current, existing["role"]
+    else:
+        org, role = models.org_for_login(email), (existing or {}).get("role", "client")
+    if auth.is_platform_admin(email):
+        role = "agency_admin"
+    user = models.upsert_user(email, org["id"], role)
     request.session["user_id"] = user["id"]
 
     # On a "connect" flow, store the tool connection(s) that were just granted.
@@ -178,7 +195,7 @@ def create_invitation(request: Request, payload: InviteIn):
     verstuurd. E-mail gaat alleen als SMTP geconfigureerd is; anders deelt de
     admin de link zelf.
     """
-    admin = auth.require_admin(request)
+    admin = auth.require_admin_org(request, payload.org_id)
     email = payload.email.strip().lower()
     if "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Voer een geldig e-mailadres in.")
@@ -296,7 +313,7 @@ class OrgRename(BaseModel):
 @router.patch("/api/organizations/{org_id}")
 def rename_organization(request: Request, org_id: str, payload: OrgRename):
     """Rename an organization and/or set its profile (agency admins only)."""
-    auth.require_admin(request)
+    auth.require_admin_org(request, org_id)
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Naam is vereist")
@@ -366,23 +383,29 @@ def set_own_business_type(request: Request, payload: BusinessTypeIn):
 
 @router.get("/api/organizations")
 def organizations(request: Request):
-    """Organizations the user may view/switch to (admins: all; clients: own)."""
+    """Organisaties waartussen de gebruiker mag wisselen.
+
+    Een bureau-admin ziet de omgevingen van het eigen bureau (de platform-admin
+    alle), een klant alleen zijn eigen organisatie. `features` gaat mee zodat de
+    app bij het wisselen meteen de juiste onderdelen toont, en `subscription`
+    zodat een verlopen proefperiode hetzelfde verloopscherm geeft dat de klant
+    zelf ziet.
+    """
     user = auth.current_user(request)
     if user["role"] == "agency_admin":
-        orgs = models.list_organizations_with_connections()
-        # subscription gaat mee zodat de app bij het wisselen naar een klant
-        # met een verlopen proefperiode hetzelfde verloopscherm kan tonen dat
-        # de klant zelf ziet.
+        orgs = models.list_organizations_with_connections(auth.admin_agency_id(user))
         return {"organizations": [
             {"id": o["id"], "name": o["name"], "domain": o["domain"],
              "business_type": o.get("business_type"), "website": o.get("website"),
-             "industry": o.get("industry"), "subscription": o.get("subscription")}
+             "industry": o.get("industry"), "subscription": o.get("subscription"),
+             "features": o.get("features"), "is_agency": o.get("is_agency")}
             for o in orgs
         ]}
     org = models.get_organization(user["organization_id"])
     return {"organizations": [
         {"id": org["id"], "name": org["name"], "domain": org["domain"],
          "business_type": org.get("business_type"), "website": org.get("website"),
-         "industry": org.get("industry"), "subscription": models.subscription_info(org)}
+         "industry": org.get("industry"), "subscription": models.subscription_info(org),
+         "features": models.get_org_features(org["id"]), "is_agency": org.get("is_agency")}
     ] if org else []}
 

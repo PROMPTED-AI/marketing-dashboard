@@ -15,9 +15,11 @@ import {
 // `provider`-key: alleen kanalen met een actieve koppeling verschijnen in het
 // menu (extra kanalen koppel je via Integraties; META Organisch deelt de
 // META-koppeling). Items zonder `provider` zijn altijd zichtbaar.
+// Items met een `feature`-key verdwijnen zodra het bureau die functie voor deze
+// klantomgeving heeft uitgezet (de API weigert ze dan ook).
 const NAV = [
-  { to: "/app/assistant", label: "Assistent", Icon: IcChat },
-  { to: "/app/signalen", label: "Signalen", Icon: IcBell },
+  { to: "/app/assistant", label: "Assistent", Icon: IcChat, feature: "assistant" },
+  { to: "/app/signalen", label: "Signalen", Icon: IcBell, feature: "signalen" },
   {
     group: "Marketing", Icon: IcMegaphone, children: [
       { to: "/app/analytics", label: "Analytics", Icon: GaGlyph, provider: "google_analytics" },
@@ -33,19 +35,19 @@ const NAV = [
       { to: "/app/shopify", label: "Shopify", Icon: ShopifyGlyph, provider: "shopify" },
     ],
   },
-  { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid },
-  { to: "/app/framework", label: "Raamwerk", Icon: IcDoc },
-  { to: "/app/integrations", label: "Integraties", Icon: IcPlug },
+  { to: "/app/dashboards", label: "Mijn dashboards", Icon: IcGrid, feature: "dashboards" },
+  { to: "/app/framework", label: "Raamwerk", Icon: IcDoc, feature: "framework" },
+  { to: "/app/integrations", label: "Integraties", Icon: IcPlug, feature: "integrations" },
   { to: "/app/settings", label: "Instellingen", Icon: IcCog },
 ];
 
 // Filter de navigatie op actieve koppelingen. Zolang de status onbekend is
 // (eerste load, geen cache) tonen we alles — daarna klapt het menu netjes
 // terug naar alleen de gekoppelde kanalen. Groepen zonder kanalen verdwijnen.
-function navForConnections(active) {
-  if (!active) return NAV;
+function navForConnections(active, features) {
   return NAV.map((item) => {
-    if (!item.group) return item;
+    if (!item.group) return item.feature && features[item.feature] === false ? null : item;
+    if (!active) return item;
     const children = item.children.filter((c) => !c.provider || active.has(c.provider));
     return children.length ? { ...item, children } : null;
   }).filter(Boolean);
@@ -57,9 +59,9 @@ function initials(name = "") {
 }
 
 export default function Sidebar({ user, connected = 0, total = 4, open = false, onNavigate }) {
-  const { orgs, orgId, orgName, setOrg } = useActiveOrg();
+  const { orgs, orgId, orgName, setOrg, features } = useActiveOrg();
   const { data: connData } = useConnections();
-  const nav = navForConnections(connectedProviders(connData));
+  const nav = navForConnections(connectedProviders(connData), features);
   const pct = Math.round((connected / total) * 100);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
