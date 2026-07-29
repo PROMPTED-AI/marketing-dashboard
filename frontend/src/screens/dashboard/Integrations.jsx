@@ -147,13 +147,13 @@ export default function Integrations() {
   const [wooOpen, setWooOpen] = useState(false);
   const [shopifyOpen, setShopifyOpen] = useState(false);
   if (loading) return <TabState loading />;
-  // Alleen de kanalen die het bureau voor deze omgeving heeft toegestaan; een
-  // admin ziet alles (die moet bijvoorbeeld Meta of een webshop voor de klant
-  // kunnen koppelen — de server staat dat voor admins ook toe).
+  // Kanalen die het bureau voor deze omgeving heeft uitgezet: voor de klant
+  // helemaal weg, voor een beheerder zichtbaar met een label "uit voor klant".
+  // De beheerder moet ze immers nog kunnen koppelen (de server staat dat toe),
+  // maar zonder label lijkt een uitgezet kanaal gewoon actief.
   const isAdmin = me?.role === "agency_admin";
-  const items = (data?.connections || []).filter(
-    (c) => isAdmin || channels[c.provider] !== false,
-  );
+  const hiddenFor = (provider) => channels[provider] === false;
+  const items = (data?.connections || []).filter((c) => isAdmin || !hiddenFor(c.provider));
   // Een admin die de omgeving van een klánt bekijkt: de gewone Google-connect
   // koppelt altijd de eigen organisatie van de ingelogde gebruiker, dus die
   // knop zou hier stilletjes het verkeerde doen. Voor Google-kanalen is de
@@ -177,8 +177,9 @@ export default function Integrations() {
         {items.map((c) => {
           const m = META[c.provider] || {};
           const canConnect = c.status === "not_connected" || c.status === "revoked";
+          const hidden = hiddenFor(c.provider);
           return (
-            <div key={c.provider} className="card" style={{ padding: 22 }}>
+            <div key={c.provider} className="card" style={{ padding: 22, opacity: hidden ? 0.72 : 1 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
                   {m.Glyph && <m.Glyph s={26} />}
@@ -188,7 +189,15 @@ export default function Integrations() {
                   <div style={{ fontSize: 13, color: "var(--c-muted)", marginTop: 2 }}>{m.desc}</div>
                   {c.google_email && <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>{c.google_email}</div>}
                 </div>
-                <StatusPill status={c.status} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flex: "none" }}>
+                  <StatusPill status={c.status} />
+                  {hidden && (
+                    <span className="pill muted" style={{ fontSize: 11 }}
+                      title="Dit kanaal staat uit voor deze klant: het is niet zichtbaar in zijn menu en op zijn Integraties. Aan te zetten via Klantenbeheer → Omgevingen.">
+                      uit voor klant
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                 {canConnect && (c.provider === "woocommerce" ? (
