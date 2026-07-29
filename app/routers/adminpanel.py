@@ -315,6 +315,10 @@ def admin_set_features(request: Request, org_id: str, payload: FeaturesIn):
         models.set_org_features(org_id, payload.features)
     if payload.channels:
         models.set_org_channels(org_id, payload.channels)
+    # Raamwerk- en signalencijfers zijn per omgeving gecachet en rekenen met de
+    # kanaalstand; zonder invalidatie blijft data van een net uitgevinkt kanaal
+    # nog tot 24 uur zichtbaar staan.
+    cache.invalidate_org(org_id)
     return {"features": models.get_org_features(org_id),
             "channels": models.get_org_channels(org_id)}
 

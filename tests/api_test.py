@@ -576,6 +576,13 @@ def test_account_features(admin):
     # De admin mag het kanaal nog wél koppelen voor deze klant.
     assert admin.post(f"{BASE}/api/woocommerce/connect-demo?org_id={oid}").status_code == 200
 
+    # Een uitgevinkt kanaal telt ook in de aggregaties (raamwerk, signalen) als
+    # niet gekoppeld: er is nu een Woo-koppeling, maar het kanaal staat uit.
+    from app import models, org_access
+    assert org_access._connected(oid, "woocommerce") is False
+    models.set_org_channels(oid, {"woocommerce": True})
+    assert org_access._connected(oid, "woocommerce") is True
+
     admin.delete(f"{BASE}/api/admin/organizations/{oid}")
     print("functies per account: aanmaken, instellen, kanalen en autorisatie slagen")
 

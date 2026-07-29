@@ -259,6 +259,15 @@ def _previous_period(start: str, end: str) -> tuple[str, str]:
 
 
 def _connected(target_org: str, provider: str) -> bool:
+    """Telt dit kanaal mee voor deze omgeving? Koppeling actief én toegestaan.
+
+    De kanaal-allowlist telt hier bewust mee: een kanaal dat het bureau voor
+    dit account heeft uitgevinkt bestaat voor de klant niet — dus ook niet in
+    afgeleide cijfers zoals het raamwerk en de signalen. Anders lekt er data
+    van een verborgen kanaal ("waar komen die bezoekers vandaan?").
+    """
+    if not models.channel_allowed(target_org, provider):
+        return False
     conn = models.get_connection(target_org, provider=provider)
     return bool(conn and conn["status"] == "connected")
 
