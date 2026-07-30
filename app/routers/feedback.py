@@ -64,10 +64,28 @@ def submit_feedback(request: Request, body: FeedbackIn):
     return {"ok": True, "id": created["id"]}
 
 
+def _feedback_in_scope(admin: dict, item: dict) -> dict:
+    """Geef de feedback terug als deze admin hem mag zien, anders 403.
+
+    Feedback hangt aan de organisatie van de inzender, dus de bureau-scope van
+    de admin bepaalt of hij erbij mag. Feedback zonder organisatie (inzender
+    zonder herleidbare omgeving) is voorbehouden aan de platform-admin.
+    """
+    org_id = item.get("organization_id")
+    if org_id is None:
+        if auth.admin_agency_id(admin) is not None:
+            raise HTTPException(status_code=403, detail="Deze feedback hoort niet bij jouw bureau.")
+        return item
+    if not auth.can_admin_org(admin, org_id):
+        raise HTTPException(status_code=403, detail="Deze feedback hoort niet bij jouw bureau.")
+    return item
+
+
 @router.get("/api/admin/feedback")
 def admin_feedback(request: Request):
-    auth.require_admin(request)
-    return {"feedback": models.list_feedback()}
+    """Het feedbackbord, beperkt tot de eigen klantomgevingen (platform: alle)."""
+    admin = auth.require_admin(request)
+    return {"feedback": models.list_feedback(auth.admin_agency_id(admin))}
 
 
 class FeedbackStatusIn(BaseModel):
@@ -76,11 +94,13 @@ class FeedbackStatusIn(BaseModel):
 
 @router.patch("/api/admin/feedback/{feedback_id}")
 def admin_feedback_status(request: Request, feedback_id: str, body: FeedbackStatusIn):
-    auth.require_admin(request)
+    admin = auth.require_admin(request)
     if body.status not in FEEDBACK_STATUSES:
         raise HTTPException(status_code=400, detail="Onbekende status.")
-    if not models.get_feedback(feedback_id):
+    item = models.get_feedback(feedback_id)
+    if not item:
         raise HTTPException(status_code=404, detail="Feedback niet gevonden.")
+    _feedback_in_scope(admin, item)
     models.set_feedback_status(feedback_id, body.status)
     return {"ok": True}
 
@@ -94,12 +114,13 @@ def admin_feedback_analyze(request: Request, feedback_id: str):
     de start van de stream komen als "error"-event; alleen configuratie- en
     invoerfouten geven nog een HTTP-status.
     """
-    auth.require_admin(request)
+    admin = auth.require_admin(request)
     if not config.EUROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="De AI-uitwerking is niet geconfigureerd (EUROUTER_API_KEY ontbreekt).")
     item = models.get_feedback(feedback_id)
     if not item:
         raise HTTPException(status_code=404, detail="Feedback niet gevonden.")
+    _feedback_in_scope(admin, item)
     stream = assistant.stream_feedback_analysis(
         item, api_key=config.EUROUTER_API_KEY,
         base_url=config.EUROUTER_BASE_URL, model=config.EUROUTER_MODEL,

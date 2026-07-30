@@ -332,7 +332,7 @@ def shopify_callback(request: Request):
         org_id = org["id"]
         login_email = f"owner@{shop}"
         user = models.upsert_user(login_email, org_id, auth.role_for(login_email))
-        request.session["user_id"] = user["id"]
+        auth.start_session(request, user)
         return_to = "/app/shopify"
 
     models.save_connection(org_id, shop, creds, provider="shopify")

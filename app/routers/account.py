@@ -47,28 +47,81 @@ def me(request: Request):
     return {**base, "connection_status": conn["status"] if conn else "not_connected"}
 
 
+def _client_ip(request: Request) -> str:
+    """Beste schatting van het client-IP achter de Cloud Run-proxy.
+
+    De load balancer zet het echte client-IP als één-na-laatste entry in
+    X-Forwarded-For; wat een client zelf meestuurt komt daarvóór en is dus niet
+    te vertrouwen. Zonder header valt dit terug op de socket. Het IP is een
+    aanvullende sleutel: de rem per account is de harde grens, want een IP is
+    te roteren.
+    """
+    xff = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    if len(xff) >= 2:
+        return xff[-2]
+    if xff:
+        return xff[0]
+    return request.client.host if request.client else "onbekend"
+
+
+def _throttle(*buckets: tuple[str, int, int], message: str) -> None:
+    """Pas alle meegegeven vensters toe; één vol venster geeft 429.
+
+    Elke gevoelige flow krijgt een sleutel per account en per IP naast een
+    globale backstop. Zonder de eerste twee zou één globale teller zowel een
+    slappe brute-force-rem zijn als een manier om ándermans login te blokkeren.
+    """
+    for key, limit, window_s in buckets:
+        if not ratelimit.allow(key, limit=limit, window_s=window_s):
+            raise HTTPException(status_code=429, detail=message)
+
+
 class PasswordLoginIn(BaseModel):
     email: str
     password: str
 
 
+_LOGIN_FAILS_PER_ACCOUNT = (10, 900)   # 10 mislukte pogingen per 15 minuten
+_LOGIN_FAILS_PER_IP = (50, 900)
+
+
 @router.post("/api/auth/login")
 def password_login(request: Request, payload: PasswordLoginIn):
-    """Sign in with email + password (next to the Google flow)."""
-    if not ratelimit.allow("password-login", limit=60, window_s=60):
-        raise HTTPException(status_code=429, detail="Te veel inlogpogingen - probeer het zo weer.")
+    """Sign in with email + password (next to the Google flow).
+
+    De rem telt alleen mislukte pogingen, per account en per IP: brute force
+    loopt vast terwijl iemand die zijn wachtwoord gewoon goed heeft nooit tegen
+    een limiet aanloopt. Er wordt geteld op het ingevoerde adres, ook als dat
+    account niet bestaat — anders zou een 429 verraden welke adressen bestaan.
+    """
     email = payload.email.strip().lower()
+    ip = _client_ip(request)
+    account_key, ip_key = f"login-fail|{email}", f"login-fail-ip|{ip}"
+    too_many = (
+        not ratelimit.peek(account_key, *_LOGIN_FAILS_PER_ACCOUNT)
+        or not ratelimit.peek(ip_key, *_LOGIN_FAILS_PER_IP)
+        # Globale backstop tegen een gedistribueerde poging; ruim genoeg om
+        # normaal gebruik nooit te raken.
+        or not ratelimit.allow("login", limit=300, window_s=60)
+    )
+    if too_many:
+        raise HTTPException(
+            status_code=429,
+            detail="Te veel mislukte inlogpogingen - probeer het over een kwartier weer.",
+        )
     user = models.get_user_by_email(email) if email else None
     if (
         not user
         or not user.get("password_hash")
         or not auth.verify_password(payload.password, user["password_hash"])
     ):
+        ratelimit.allow(account_key, *_LOGIN_FAILS_PER_ACCOUNT)
+        ratelimit.allow(ip_key, *_LOGIN_FAILS_PER_IP)
         raise HTTPException(
             status_code=401,
             detail="Onjuiste combinatie van e-mailadres en wachtwoord",
         )
-    request.session["user_id"] = user["id"]
+    auth.start_session(request, user)
     return {"email": user["email"], "role": user["role"]}
 
 
@@ -128,6 +181,13 @@ def callback(request: Request):
         code_verifier=request.session.get("code_verifier"),
     )
 
+    # Lees de flow-gegevens vóórdat de sessie wordt vernieuwd: start_session
+    # leegt de sessie (geen resten van een vorige login), dus daarna zijn deze
+    # waarden weg.
+    mode = request.session.pop("oauth_mode", "login")
+    providers = request.session.pop("oauth_providers", [])
+    return_to = request.session.pop("oauth_return", "/app")
+
     # Identify the user and place them in an organization. Invite-only: a user
     # only joins a shared org when an admin pre-provisioned their company domain;
     # public/shared domains and unknown domains get an isolated personal org.
@@ -148,12 +208,10 @@ def callback(request: Request):
     if auth.is_platform_admin(email):
         role = "agency_admin"
     user = models.upsert_user(email, org["id"], role)
-    request.session["user_id"] = user["id"]
+    auth.start_session(request, user)
 
     # On a "connect" flow, store the tool connection(s) that were just granted.
-    if request.session.pop("oauth_mode", "login") == "connect":
-        providers = request.session.pop("oauth_providers", [])
-        return_to = request.session.pop("oauth_return", "/app")
+    if mode == "connect":
         creds_dict = oauth.credentials_to_dict(creds)
         for provider in providers:
             models.save_connection(org["id"], email, creds_dict, provider=provider)
@@ -236,8 +294,11 @@ class SetPasswordIn(BaseModel):
 @router.post("/api/invitations/{token}/accept")
 def accept_invitation(request: Request, token: str, payload: SetPasswordIn):
     """Wachtwoord instellen via een uitnodiging en meteen inloggen (publiek)."""
-    if not ratelimit.allow("invite-accept", limit=30, window_s=60):
-        raise HTTPException(status_code=429, detail="Te veel pogingen - probeer het zo weer.")
+    _throttle(
+        (f"invite-accept-ip|{_client_ip(request)}", 20, 600),
+        ("invite-accept", 120, 60),
+        message="Te veel pogingen - probeer het zo weer.",
+    )
     token_hash = auth.hash_token(token)
     data = models.get_access_token(token_hash, "invite")
     if not data:
@@ -248,7 +309,7 @@ def accept_invitation(request: Request, token: str, payload: SetPasswordIn):
     user = models.upsert_user(data["email"], data["organization_id"], data["role"] or "client")
     models.set_user_password(data["email"], auth.hash_password(payload.password))
     models.use_access_token(token_hash)
-    request.session["user_id"] = user["id"]
+    auth.start_session(request, user)
     return {"email": user["email"], "role": user["role"]}
 
 
@@ -265,8 +326,9 @@ def forgot_password(request: Request, payload: ForgotIn):
     """
     email = payload.email.strip().lower()
     per_email = ratelimit.allow(f"forgot|{email}", limit=3, window_s=900)
-    globally = ratelimit.allow("forgot", limit=60, window_s=60)
-    if email and per_email and globally:
+    per_ip = ratelimit.allow(f"forgot-ip|{_client_ip(request)}", limit=10, window_s=900)
+    globally = ratelimit.allow("forgot", limit=120, window_s=60)
+    if email and per_email and per_ip and globally:
         user = models.get_user_by_email(email)
         if user:
             raw, token_hash = auth.generate_token()
@@ -289,8 +351,11 @@ def reset_info(token: str):
 @router.post("/api/auth/reset/{token}")
 def reset_password(request: Request, token: str, payload: SetPasswordIn):
     """Stel een nieuw wachtwoord in via een resetlink en log in (publiek)."""
-    if not ratelimit.allow("reset", limit=30, window_s=60):
-        raise HTTPException(status_code=429, detail="Te veel pogingen - probeer het zo weer.")
+    _throttle(
+        (f"reset-ip|{_client_ip(request)}", 20, 600),
+        ("reset", 120, 60),
+        message="Te veel pogingen - probeer het zo weer.",
+    )
     token_hash = auth.hash_token(token)
     data = models.get_access_token(token_hash, "reset")
     if not data:
@@ -302,7 +367,7 @@ def reset_password(request: Request, token: str, payload: SetPasswordIn):
     models.use_access_token(token_hash)
     user = models.get_user_by_email(data["email"])
     if user:
-        request.session["user_id"] = user["id"]
+        auth.start_session(request, user)
     return {"ok": True}
 
 

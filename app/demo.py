@@ -15,14 +15,17 @@ connection row pointing at it, so that dashboard fills via the normal path.
 """
 import hashlib
 import time
+import logging
+import secrets
 from datetime import date, datetime, timedelta
 
-from . import auth, models, shopify, woocommerce
+from . import auth, config, models, shopify, woocommerce
+
+log = logging.getLogger("dashboard")
 
 DEMO_ORG_NAME = "Janssen"
 DEMO_ORG_DOMAIN = "janssen.nl"
 DEMO_EMAIL = "info@janssen.nl"
-DEMO_PASSWORD = "janssen123"
 DEMO_SITE = "https://www.janssen.nl/"
 
 DEMO_PROPERTIES = [
@@ -50,6 +53,33 @@ DEMO_META_ASSETS = {
 # --------------------------------------------------------------------- seeding
 
 
+def _seed_demo_password() -> None:
+    """Zet het wachtwoord van het demo-account uit de omgeving.
+
+    Het wachtwoord staat bewust niet in de code: een vast, in het repo bekend
+    wachtwoord is een openstaande login op productie (inclusief gebruik van de
+    AI-assistent). Is DEMO_PASSWORD gezet, dan geldt dat wachtwoord. Is het
+    niet gezet, dan krijgt het account bij elke start een willekeurig
+    wachtwoord: het demo-account bestaat dan wel (met zijn voorbeelddata), maar
+    er is niet met een bekend wachtwoord op in te loggen.
+    """
+    user = models.get_user_by_email(DEMO_EMAIL) or {}
+    stored = user.get("password_hash")
+    if config.DEMO_PASSWORD:
+        # Alleen schrijven als het wachtwoord echt verandert: set_user_password
+        # verhoogt de sessieteller, en dat zou het demo-account bij elke deploy
+        # uitloggen.
+        if not (stored and auth.verify_password(config.DEMO_PASSWORD, stored)):
+            models.set_user_password(DEMO_EMAIL, auth.hash_password(config.DEMO_PASSWORD))
+        return
+    models.set_user_password(DEMO_EMAIL, auth.hash_password(secrets.token_urlsafe(32)))
+    log.warning(
+        "DEMO_PASSWORD niet gezet: het demo-account (%s) heeft een willekeurig "
+        "wachtwoord gekregen en is niet met wachtwoord bereikbaar. Zet DEMO_PASSWORD "
+        "om de demo-login te gebruiken.", DEMO_EMAIL,
+    )
+
+
 def seed() -> None:
     """Create the demo org + user (email/password) and connect the demo shop.
 
@@ -63,9 +93,7 @@ def seed() -> None:
     # deploy of herstart).
     models.start_trial(org["id"], models.TRIAL_DAYS)
     models.upsert_user(DEMO_EMAIL, org["id"], auth.role_for(DEMO_EMAIL))
-    user = models.get_user_by_email(DEMO_EMAIL)
-    if user and not user.get("password_hash"):
-        models.set_user_password(DEMO_EMAIL, auth.hash_password(DEMO_PASSWORD))
+    _seed_demo_password()
     # Wire up the built-in WooCommerce demo store so that dashboard fills too.
     if not models.get_connection(org["id"], provider="woocommerce"):
         models.save_connection(
