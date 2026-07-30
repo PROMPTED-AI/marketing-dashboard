@@ -65,7 +65,11 @@ SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET", "")
 SHOPIFY_REDIRECT_URI = os.environ.get("SHOPIFY_REDIRECT_URI", "")
 # Alleen leesrechten voor de dashboards.
 SHOPIFY_SCOPES = os.environ.get("SHOPIFY_SCOPES", "read_orders,read_products")
-SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10")
+# Shopify ondersteunt een API-versie twaalf maanden na release; een verlopen
+# versie wordt niet meer geserveerd en elke Admin-call faalt dan. Hou deze dus
+# gelijk aan de `api_version` in shopify.app.toml en loop hem mee met de
+# kwartaalreleases - dit is geen "zet en vergeet"-waarde.
+SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2026-07")
 
 # Google Ads needs an approved developer token (set on the Cloud Run service,
 # never in the repo). Optional login_customer_id is the manager (MCC) account id
