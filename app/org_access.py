@@ -12,7 +12,7 @@ from google.api_core.exceptions import PermissionDenied, Unauthenticated
 from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 
-from . import auth, config, meta_oauth, models, oauth
+from . import auth, cache, config, meta_oauth, models, oauth
 
 log = logging.getLogger("dashboard")
 
@@ -279,21 +279,64 @@ def _managed(target_org: str) -> bool:
     return bool(org and org.get("managed"))
 
 
-def _effective_asset(target_org: str, kind: str, supplied):
+def _effective_asset(target_org: str, kind: str, supplied, required: bool = True):
     """De bron (property/site/Ads-klant) die voor dit bedrijf gebruikt mag worden.
 
     Voor een bureau-omgeving telt uitsluitend de toegewezen bron, zodat een
     klant nooit een ander bedrijf kan opvragen dan aan zijn omgeving is
     toegewezen. Buiten het bureau-model geldt gewoon de meegegeven waarde.
     ``kind`` is een veld uit org_assets (ga_property_id/gsc_site_url/ads_customer_id).
+
+    `required=False` voor overzichten die meerdere kanalen combineren (raamwerk,
+    signalen): daar mag een ontbrekende toewijzing niet de hele pagina breken,
+    het betreffende kanaal valt dan simpelweg weg.
     """
     if not _managed(target_org):
         return supplied
     val = models.get_org_assets(target_org).get(kind)
     if not val:
+        if not required:
+            return None
         raise HTTPException(
             status_code=409,
             detail="Deze omgeving is nog niet ingericht. De beheerder wijst eerst de juiste bron toe.",
+        )
+    return val
+
+
+# Per bron-veld: de cachesleutel van de lijst, de sleutel in die payload en het
+# id-veld per item. Gebruikt om een meegegeven bron te toetsen aan de lijst die
+# deze omgeving mag zien.
+_ASSET_LISTS = {
+    "ga_property_id": ("props", "properties", "property_id"),
+    "gsc_site_url": ("gscsites", "sites", "site_url"),
+    "ads_customer_id": ("adsaccounts", "accounts", "customer_id"),
+}
+
+
+def _checked_asset(target_org: str, kind: str, supplied, required: bool = True):
+    """Effectieve bron plus een toets tegen de bekende lijst van deze omgeving.
+
+    Bovenop `_effective_asset` (bureau-omgeving: alleen de toegewezen bron)
+    weigert dit een id dat niet in de al gecachete lijst van deze omgeving
+    voorkomt. Dat sluit een goedkope misbruikroute: de meegegeven waarde zit in
+    de cachesleutel, dus met willekeurige id's kan iemand onbeperkt
+    cache-misses en dus echte API-calls uitlokken. Staat de lijst nog niet in de
+    cache, dan slaan we de toets over — er is dan geen goedkope bron van
+    waarheid en de kanaal-API mag het zeggen.
+    """
+    val = _effective_asset(target_org, kind, supplied, required=required)
+    if not val or kind not in _ASSET_LISTS:
+        return val
+    cache_key, payload_key, id_key = _ASSET_LISTS[kind]
+    cached = cache.get(f"{target_org}|{cache_key}")
+    if not cached:
+        return val
+    known = {str(i.get(id_key)) for i in (cached.get(payload_key) or [])}
+    if known and str(val) not in known:
+        raise HTTPException(
+            status_code=400,
+            detail="Deze bron hoort niet bij deze omgeving.",
         )
     return val
 

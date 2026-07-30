@@ -17,7 +17,7 @@ from .. import (
     woocommerce,
 )
 from ..org_access import (
-    _compact, _connected, _effective_asset, _google_data, _GOOGLE_TRANSIENT_MSG,
+    _checked_asset, _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG,
     _is_grant_revoked, _limit_assets, _meta_token, _org_credentials,
     _previous_period, _require_channel, _require_feature, _require_period,
     _resolve_org_id, _safe_return, _shopify_creds, _wc_creds,
@@ -49,7 +49,7 @@ def report(request: Request, property_id: str, org_id: str | None = None):
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_channel(target_org, "google_analytics", user)
-    property_id = _effective_asset(target_org, "ga_property_id", property_id)
+    property_id = _checked_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"org_id": target_org, "property_id": property_id, "rows": demo.basic_report()}
     creds = _org_credentials(target_org)
@@ -71,7 +71,7 @@ def analytics_overview(
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     _require_channel(target_org, "google_analytics", user)
-    property_id = _effective_asset(target_org, "ga_property_id", property_id)
+    property_id = _checked_asset(target_org, "ga_property_id", property_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.overview(start, end, compare)
@@ -92,7 +92,7 @@ def analytics_realtime(request: Request, property_id: str, org_id: str | None = 
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_channel(target_org, "google_analytics", user)
-    property_id = _effective_asset(target_org, "ga_property_id", property_id)
+    property_id = _checked_asset(target_org, "ga_property_id", property_id)
     if models.is_demo_org(target_org):
         return {"property_id": property_id, **demo.realtime()}
     creds = _org_credentials(target_org)
@@ -194,7 +194,7 @@ def gsc_report(
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     _require_channel(target_org, "search_console", user)
-    site = _effective_asset(target_org, "gsc_site_url", site)
+    site = _checked_asset(target_org, "gsc_site_url", site)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.gsc_report(start, end, compare)
@@ -561,7 +561,7 @@ def ads_report(
     _require_period(start, end, compare_start, compare_end)
     target_org = _resolve_org_id(user, org_id)
     _require_channel(target_org, "google_ads", user)
-    customer_id = _effective_asset(target_org, "ads_customer_id", customer_id)
+    customer_id = _checked_asset(target_org, "ads_customer_id", customer_id)
     compare = (compare_start, compare_end) if compare_start and compare_end else None
     if models.is_demo_org(target_org):
         data = demo.ads_overview(start, end, compare)

@@ -17,8 +17,8 @@ from pydantic import BaseModel
 
 from .. import analytics, auth, cache, demo, google_ads, meta, models, shopify, woocommerce
 from ..org_access import (
-    _connected, _google_data, _meta_token, _org_credentials, _require_feature,
-    _resolve_org_id, _shopify_creds, _wc_creds,
+    _checked_asset, _connected, _google_data, _meta_token, _org_credentials,
+    _require_feature, _resolve_org_id, _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -365,6 +365,11 @@ def framework(request: Request, months: int = DEFAULT_MONTHS,
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "framework")
+    # Normaliseer de bron vóór de cachesleutels: de meegegeven property zit in
+    # die sleutels, dus zonder deze toets kan een willekeurige waarde onbeperkt
+    # cache-misses (en dus echte API-calls) uitlokken. Niet verplicht: ontbreekt
+    # de toewijzing, dan valt alleen het GA-kanaal weg.
+    property_id = _checked_asset(target_org, "ga_property_id", property_id, required=False)
     months = max(1, min(int(months), MAX_MONTHS))
     month_list = _last_months(months)
     manual_by_month = models.get_framework_values(target_org, month_list)
@@ -389,6 +394,7 @@ def save_framework(request: Request, month: str, payload: FrameworkValuesIn,
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "framework")
+    property_id = _checked_asset(target_org, "ga_property_id", property_id, required=False)
     _month_range(month)  # valideert het formaat en weigert toekomstige maanden
     values = {}
     for k, v in payload.values.items():

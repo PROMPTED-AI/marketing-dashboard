@@ -38,6 +38,23 @@ def init_schema() -> None:
             )
             """
         )
+        # Verlopen rijen werden nooit opgeruimd: `get` filtert ze er alleen uit,
+        # dus de tabel groeide onbeperkt door (elke periode, elk kanaal, elke
+        # klant). De index maakt zowel het opruimen als dat filteren goedkoop.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS report_cache_expires_idx ON report_cache (expires_at)"
+        )
+    purge_expired()
+
+
+def purge_expired() -> int:
+    """Verwijder verlopen cache-rijen. Best effort: nooit fataal."""
+    try:
+        with db.get_conn() as conn:
+            cur = conn.execute("DELETE FROM report_cache WHERE expires_at <= now()")
+            return cur.rowcount or 0
+    except Exception:  # noqa: BLE001 - opruimen mag een request nooit breken
+        return 0
 
 
 def ttl_for_range(end: str) -> int:
@@ -82,12 +99,23 @@ def get(key: str):
     return payload
 
 
+_PURGE_EVERY = 200
+_writes = 0
+
+
 def set(key: str, payload: dict, ttl: int) -> None:
     """Store a payload in both layers (best-effort for Postgres)."""
+    global _writes
     exp = time.time() + ttl
     _mem[key] = (exp, payload)
     if len(_mem) > _MEM_MAX:
         _evict()
+    # Af en toe meeliften op een schrijfactie om verlopen rijen op te ruimen.
+    # Een instance die dagen doorloopt houdt de tabel zo ook zonder herstart
+    # klein, zonder aparte cron of achtergrondtaak.
+    _writes += 1
+    if _writes % _PURGE_EVERY == 0:
+        purge_expired()
     try:
         with db.get_conn() as conn:
             conn.execute(

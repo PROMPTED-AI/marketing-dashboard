@@ -15,9 +15,9 @@ from .. import (
     meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
 )
 from ..org_access import (
-    _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_feature,
-    _require_period, _resolve_org_id, _wc_creds,
+    _checked_asset, _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG,
+    _is_grant_revoked, _meta_token, _org_credentials, _previous_period,
+    _require_feature, _require_period, _resolve_org_id, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -373,5 +373,10 @@ def insights_endpoint(
     user = auth.current_user(request)
     target_org = _resolve_org_id(user, org_id)
     _require_feature(target_org, "signalen")
+    _require_period(start, end)
+    # Zelfde reden als bij het raamwerk: property en site zitten in de
+    # cachesleutel, dus ze worden eerst genormaliseerd en getoetst.
+    property_id = _checked_asset(target_org, "ga_property_id", property_id, required=False)
+    site = _checked_asset(target_org, "gsc_site_url", site, required=False)
     return _compute_insights(target_org, start, end, property_id, site)
 

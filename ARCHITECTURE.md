@@ -176,6 +176,24 @@ deze variabele leeg, dan krijgt het demo-account bij elke start een willekeurig
 wachtwoord — de omgeving met voorbeelddata bestaat dan wel, maar er is niet met een
 bekend wachtwoord op in te loggen. Zet de variabele als je de demo-login gebruikt.
 
+## Hardening
+
+- **Security-headers** op elke respons (`app/security_headers.py`): een CSP die scripts
+  en verbindingen op de eigen origin houdt (lettertypen van Google Fonts toegestaan),
+  plus `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` en
+  `Cross-Origin-Opener-Policy`. HSTS alleen waar de app op https draait. Bewust een
+  pure ASGI-middleware: `BaseHTTPMiddleware` kan de SSE-streams van de assistent
+  bufferen.
+- **Cache-opruiming**: `report_cache` heeft een index op `expires_at` en verlopen rijen
+  worden opgeruimd bij het opstarten en periodiek tijdens het schrijven. Daarvoor
+  groeide die tabel onbeperkt.
+- **Bron-validatie**: property/site/Ads-klant zit in de cachesleutel, dus een
+  meegegeven waarde wordt getoetst aan de lijst die deze omgeving mag zien
+  (`_checked_asset`). Zonder die toets kan een willekeurige waarde onbeperkt
+  cache-misses en dus echte API-calls uitlokken.
+- **Container** draait als niet-root gebruiker en de Python-dependencies staan op
+  vaste versies, zodat een build reproduceerbaar is.
+
 ## Sessies
 
 Een sessie is een ondertekende cookie (`SameSite=Lax`, `Secure` in productie) met
