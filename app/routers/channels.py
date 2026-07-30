@@ -292,6 +292,41 @@ def shopify_callback(request: Request):
     params = dict(request.query_params)
     stored_state = request.session.get("shopify_oauth_state")
     if not stored_state or stored_state != params.get("state"):
+        # De state hoort bij de sessie waarin we de install startten. Raakt die
+        # onderweg kwijt - cookie verlopen, install in een ander browservenster
+        # afgemaakt, of Shopify die de app-launch overslaat - dan liep dit dood
+        # op een 400 waar de merchant niets mee kon. De HMAC bewijst wél dat het
+        # verzoek van Shopify komt, dus starten we de install in dat geval
+        # gewoon opnieuw. De meegestuurde `code` gebruiken we niet: die zou bij
+        # een ontbrekende state niet aan deze browser gebonden zijn, en we
+        # wisselen hem dus niet in maar gooien hem weg voor een verse flow.
+        #
+        # De redirect-URI moet teken voor teken gelijk blijven aan wat bij
+        # Shopify staat, dus een `retry`-vlag in de URL kan niet en een marker
+        # in de sessie helpt niet als juist de cookie het probleem is. Daarom
+        # remt een teller per shop: één herstart per shop per tien minuten.
+        raw_shop = params.get("shop")
+        if raw_shop and shopify_oauth.is_configured() and shopify_oauth.verify_hmac(params):
+            try:
+                shop = shopify_oauth.normalize_shop(raw_shop)
+            except shopify_oauth.ShopifyError:
+                raise HTTPException(status_code=400, detail="Ongeldig Shopify-adres")
+            if not ratelimit.allow(f"shopify-restart:{shop}", 1, 600):
+                log.error("shopify install blijft zonder state terugkomen shop=%s", shop)
+                raise HTTPException(
+                    status_code=400,
+                    detail="Koppelen met Shopify lukt niet omdat je browser onze "
+                           "cookie niet bewaart. Sta cookies toe voor dit domein "
+                           "of probeer het in een gewoon venster (geen incognito).",
+                )
+            state = uuid.uuid4().hex
+            request.session["shopify_oauth_state"] = state
+            request.session["shopify_oauth_shop"] = shop
+            request.session["shopify_oauth_merchant"] = True
+            request.session["shopify_oauth_return"] = "/app/shopify"
+            request.session.pop("shopify_oauth_org", None)
+            log.warning("shopify callback zonder geldige state; install herstart shop=%s", shop)
+            return RedirectResponse(shopify_oauth.build_install_url(shop, state))
         raise HTTPException(status_code=400, detail="Ongeldige Shopify OAuth-state")
     if not shopify_oauth.verify_hmac(params):
         raise HTTPException(status_code=400, detail="Ongeldige Shopify-handtekening")

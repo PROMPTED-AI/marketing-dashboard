@@ -7,6 +7,7 @@ als taalmodel, en een database die met tests/seed.py geseed is. De demo-org
 import json
 import os
 import sys
+import uuid
 
 import requests
 
@@ -211,6 +212,49 @@ def test_shopify_app_launch(demo):
     bad = demo.get(f"{BASE}/", params={**params, "hmac": "fout"}, allow_redirects=False)
     assert "oauth/authorize" not in bad.headers.get("location", ""), bad.headers.get("location")
     print("shopify-launch: geldige App URL-launch redirect naar OAuth, ongeldige HMAC niet")
+
+
+def test_shopify_callback_without_state():
+    """Callback zonder bruikbare state: met een geldige HMAC herstart de install
+    (in plaats van dood te lopen), zonder HMAC blijft het een 400. De code uit
+    zo'n verzoek mag nooit ingewisseld worden - alleen een verse flow starten."""
+    import hashlib
+    import hmac as hmaclib
+    from app import config
+
+    # Unieke shop per run: de herstart-rem loopt per shop over tien minuten, dus
+    # een vaste naam zou een tweede run binnen dat venster laten struikelen.
+    shop = f"staatloos-{uuid.uuid4().hex[:8]}.myshopify.com"
+    params = {"shop": shop, "code": "nepcode", "state": "vanuit-een-andere-sessie",
+              "timestamp": "1700000000"}
+    pairs = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+    params["hmac"] = hmaclib.new(
+        config.SHOPIFY_API_SECRET.encode(), pairs.encode(), hashlib.sha256).hexdigest()
+
+    # Verse sessie (geen cookie met state) + geldige HMAC -> herstart de install.
+    fresh = requests.Session()
+    r = fresh.get(f"{BASE}/api/auth/shopify/callback", params=params, allow_redirects=False)
+    assert r.status_code in (302, 307), (r.status_code, r.text[:200])
+    loc = r.headers.get("location", "")
+    assert f"{shop}/admin/oauth/authorize" in loc, loc
+    # De herstart draagt de oude state niet mee; er staat een nieuwe in de URL.
+    assert "vanuit-een-andere-sessie" not in loc, loc
+
+    # Tweede poging binnen het venster wordt geremd (geen eindeloze lus) met een
+    # uitleg over cookies in plaats van een kale state-fout.
+    again = requests.Session().get(f"{BASE}/api/auth/shopify/callback", params=params,
+                                   allow_redirects=False)
+    assert again.status_code == 400, (again.status_code, again.text[:200])
+    assert "cookie" in again.text.lower(), again.text[:200]
+
+    # Zonder geldige HMAC blijft het onveranderd een state-fout: een willekeurig
+    # bezoek aan de callback-URL mag nooit een install starten.
+    bad = requests.Session().get(f"{BASE}/api/auth/shopify/callback",
+                                 params={**params, "hmac": "fout"}, allow_redirects=False)
+    assert bad.status_code == 400, (bad.status_code, bad.text[:200])
+    assert "oauth/authorize" not in bad.headers.get("location", "")
+    print("shopify-callback: geldige HMAC zonder state herstart de install, geremd na 1x, "
+          "ongeldige HMAC blijft geweigerd")
 
 
 def test_shopify_demo(demo):
@@ -961,6 +1005,8 @@ if __name__ == "__main__":
     test_meta_login_redirect(demo)
     test_meta_data_no_crash()
     test_shopify_flow(demo)
+    test_shopify_app_launch(demo)
+    test_shopify_callback_without_state()
     test_shopify_demo(demo)
     test_shopify_webhook_hmac()
     test_shopify_webhooks(demo, tk_org_id)
