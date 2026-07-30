@@ -811,6 +811,68 @@ def test_session_hardening():
         models.delete_organization(org["id"])
 
 
+def test_security_headers():
+    """Elke respons draagt de security-headers, ook de SPA en een API-fout."""
+    for url in (f"{BASE}/login", f"{BASE}/api/me"):
+        h = requests.get(url).headers
+        csp = h.get("content-security-policy", "")
+        assert "default-src 'self'" in csp and "script-src 'self'" in csp, (url, csp)
+        assert "frame-ancestors 'none'" in csp, (url, csp)
+        # Het lettertype komt van Google Fonts; dat moet toegestaan blijven.
+        assert "https://fonts.gstatic.com" in csp, csp
+        assert h.get("x-content-type-options") == "nosniff", url
+        assert h.get("x-frame-options") == "DENY", url
+        assert h.get("referrer-policy") == "strict-origin-when-cross-origin", url
+        # SESSION_COOKIE_SECURE staat in de tests op false, dus geen HSTS.
+        assert "strict-transport-security" not in h, url
+    print("security-headers: CSP, nosniff, frame-options en referrer-policy staan op elke respons")
+
+
+def test_cache_purge():
+    """Verlopen cache-rijen worden opgeruimd in plaats van eeuwig te blijven."""
+    from app import cache as app_cache, db
+
+    app_cache.set("purge-test|vers", {"x": 1}, 300)
+    app_cache.set("purge-test|oud", {"x": 2}, -10)  # al verlopen
+    assert app_cache.get("purge-test|oud") is None  # niet zichtbaar
+    with db.get_conn() as conn:
+        aanwezig = conn.execute(
+            "SELECT count(*) FROM report_cache WHERE cache_key = 'purge-test|oud'"
+        ).fetchone()[0]
+    assert aanwezig == 1, "verlopen rij hoort er nog te staan vóór het opruimen"
+    app_cache.purge_expired()
+    with db.get_conn() as conn:
+        weg = conn.execute(
+            "SELECT count(*) FROM report_cache WHERE cache_key = 'purge-test|oud'"
+        ).fetchone()[0]
+        blijft = conn.execute(
+            "SELECT count(*) FROM report_cache WHERE cache_key = 'purge-test|vers'"
+        ).fetchone()[0]
+    assert weg == 0 and blijft == 1, (weg, blijft)
+    print("cache-opruiming: verlopen rijen verdwijnen, geldige blijven staan")
+
+
+def test_asset_validation(demo):
+    """Een bron die niet bij de omgeving hoort wordt geweigerd (cachesleutel-misbruik)."""
+    # De demo-org serveert voorbeelddata en cachet geen property-lijst, dus de
+    # toets grijpt daar niet aan; op de testklant (met een gecachete lijst) wel.
+    from app import cache as app_cache, models
+
+    org = models.create_or_rename_organization("Bron BV", "bron-test.nl")
+    try:
+        app_cache.set(f"{org['id']}|props", {"properties": [{"property_id": "111"}]}, 300)
+        from app import org_access
+        assert org_access._checked_asset(org["id"], "ga_property_id", "111") == "111"
+        try:
+            org_access._checked_asset(org["id"], "ga_property_id", "999")
+            assert False, "verwachtte een 400 voor een onbekende property"
+        except Exception as e:
+            assert getattr(e, "status_code", None) == 400, e
+        print("bron-validatie: onbekende property geweigerd, bekende toegestaan")
+    finally:
+        models.delete_organization(org["id"])
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -851,6 +913,9 @@ if __name__ == "__main__":
     test_agency_promotion(admin)
     test_feedback_scope(admin)
     test_session_hardening()
+    test_security_headers()
+    test_cache_purge()
+    test_asset_validation(demo)
     test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

@@ -32,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import cache, config, db, demo, shopify_oauth
+from .security_headers import SecurityHeadersMiddleware
 
 # Zonder basisconfiguratie hebben de app-loggers geen handler onder uvicorn en
 # verdwijnen INFO-regels (zoals de assistent-telemetrie) stilletjes. Uvicorns
@@ -74,6 +75,9 @@ app.add_middleware(
     same_site="lax",
     max_age=config.SESSION_MAX_AGE,
 )
+# HSTS alleen waar de app ook echt op https draait; dezelfde vlag bepaalt of de
+# sessiecookie Secure is, dus die staat voor "productie".
+app.add_middleware(SecurityHeadersMiddleware, hsts=config.SESSION_COOKIE_SECURE)
 
 # Serve the built SPA's static assets (present in production / after a build).
 if (SPA_DIR / "assets").is_dir():

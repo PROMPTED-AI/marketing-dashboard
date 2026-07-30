@@ -22,6 +22,12 @@ COPY app ./app
 # Built SPA from stage 1 -> served by FastAPI at app/static_spa
 COPY --from=frontend /fe/dist ./app/static_spa
 
+# Niet als root draaien: de app schrijft niets naar schijf, dus een gebruiker
+# zonder rechten is genoeg en beperkt wat een lek in een dependency kan doen.
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 # Cloud Run provides the port to listen on via $PORT (defaults to 8080).
 ENV PORT=8080
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
