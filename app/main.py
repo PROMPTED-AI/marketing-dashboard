@@ -117,6 +117,23 @@ def spa(full_path: str, request: Request):
     # verifieren de HMAC zodat alleen echte Shopify-launches deze redirect krijgen;
     # de callback richt vervolgens de winkel-organisatie in (merchant-onboarding).
     params = dict(request.query_params)
+    if params.get("shop") and params.get("hmac"):
+        # Een launch die we niet kunnen afhandelen valt hieronder terug op de SPA
+        # en de bezoeker ziet een inlogscherm. Dat is precies wat een reviewer
+        # van Shopify als afwijzing terugstuurt, dus laat het niet stil gebeuren:
+        # zonder deze regels is het verschil tussen "sleutels niet gezet" en
+        # "secret klopt niet" vanaf de buitenkant niet te zien.
+        if not shopify_oauth.is_configured():
+            log.error(
+                "shopify app-launch genegeerd: SHOPIFY_API_KEY/SECRET/REDIRECT_URI "
+                "niet gezet op deze omgeving (shop=%s)", params.get("shop"),
+            )
+        elif not shopify_oauth.verify_hmac(params):
+            log.warning(
+                "shopify app-launch geweigerd: HMAC klopt niet (shop=%s) - staat "
+                "SHOPIFY_API_SECRET gelijk aan de client secret van de app?",
+                params.get("shop"),
+            )
     if params.get("shop") and params.get("hmac") and shopify_oauth.is_configured() \
             and shopify_oauth.verify_hmac(params):
         try:
