@@ -30,6 +30,21 @@ def allow(key: str, limit: int, window_s: float) -> bool:
         return True
 
 
+def peek(key: str, limit: int, window_s: float) -> bool:
+    """Zoals `allow`, maar zonder de teller te verhogen.
+
+    Voor pogingen die je alleen wilt tellen als ze mislukken (inloggen): eerst
+    peeken of het venster nog ruimte heeft, en pas bij een verkeerde poging
+    `allow` aanroepen. Zo verbruikt een geslaagde login geen budget.
+    """
+    now = time.time()
+    with _lock:
+        bucket = _windows.get(key)
+        if bucket is None or bucket[0] <= now:
+            return True
+        return bucket[1] < limit
+
+
 def _prune(now: float) -> None:
     """Verwijder verlopen vensters (aangeroepen onder de lock)."""
     for k in [k for k, b in _windows.items() if b[0] <= now]:

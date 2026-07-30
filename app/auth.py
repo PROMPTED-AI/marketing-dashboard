@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import secrets
+import time
 
 from fastapi import HTTPException, Request
 
@@ -78,14 +79,48 @@ def role_for(email: str) -> str:
     return "agency_admin" if is_platform_admin(email) else "client"
 
 
+def start_session(request: Request, user: dict) -> dict:
+    """Begin een sessie voor deze gebruiker (het enige punt dat dat doet).
+
+    Naast het gebruikers-id gaan de sessieteller (voor invalidatie bij een
+    wachtwoordwijziging) en het tijdstip van laatste activiteit mee, zodat een
+    vergeten sessie niet eeuwig blijft werken. De sessie wordt eerst geleegd:
+    een nieuwe login mag nooit resten van de vorige meenemen.
+    """
+    fresh = models.get_user(user["id"]) or user
+    request.session.clear()
+    request.session["user_id"] = fresh["id"]
+    request.session["epoch"] = fresh.get("session_epoch") or 0
+    request.session["seen"] = int(time.time())
+    return fresh
+
+
 def current_user(request: Request) -> dict:
-    """Return the signed-in user, or raise 401."""
+    """Return the signed-in user, or raise 401.
+
+    Weigert ook een sessie die is gestart vóór de laatste wachtwoordwijziging
+    en een sessie die te lang stil heeft gelegen. Beide gevallen leveren een
+    gewone 401 op, waarna de app het loginscherm toont.
+    """
     user_id = request.session.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Not signed in")
     user = models.get_user(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="Unknown session")
+    if int(request.session.get("epoch", 0)) != int(user.get("session_epoch") or 0):
+        request.session.clear()
+        raise HTTPException(status_code=401, detail="Sessie verlopen - log opnieuw in")
+    now = int(time.time())
+    seen = int(request.session.get("seen") or 0)
+    if seen and now - seen > config.SESSION_IDLE_MAX:
+        request.session.clear()
+        raise HTTPException(status_code=401, detail="Sessie verlopen - log opnieuw in")
+    # Niet bij elk verzoek herschrijven: dat zou op elke request een nieuwe
+    # Set-Cookie opleveren. Een minuut granulariteit is voor een idle-timeout
+    # van uren ruim genoeg.
+    if now - seen > 60:
+        request.session["seen"] = now
     return user
 
 

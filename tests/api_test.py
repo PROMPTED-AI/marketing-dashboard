@@ -724,6 +724,93 @@ def test_org_profile_and_delete(admin, tk_org_id, demo_org_id):
     print("bedrijfsprofiel + verwijderen: eigen/admin-profiel, publiek-domein-blokkade en vangrails slagen")
 
 
+def test_feedback_scope(admin):
+    """Feedback is per bureau afgeschermd, ook wijzigen en AI-analyse."""
+    from app import auth as app_auth, models
+
+    # Tweede bureau met een eigen klant, een eigen admin en eigen feedback.
+    ander = models.create_or_rename_organization("Bureau Feedback", "bureau-fb-test.nl")
+    models.set_org_is_agency(ander["id"], True)
+    models.upsert_user("baas@bureau-fb-test.nl", ander["id"], "agency_admin")
+    models.set_user_password("baas@bureau-fb-test.nl", app_auth.hash_password("geheim123"))
+    klant = models.create_or_rename_organization("Klant FB", "klant-fb-test.nl", agency_id=ander["id"])
+    models.upsert_user("info@klant-fb-test.nl", klant["id"], "client")
+    models.set_user_password("info@klant-fb-test.nl", app_auth.hash_password("geheim123"))
+    try:
+        klant_sessie = login("info@klant-fb-test.nl", "geheim123")
+        assert klant_sessie.post(f"{BASE}/api/feedback", json={
+            "category": "bug", "message": "Vertrouwelijk: onze omzetcijfers kloppen niet.",
+        }).status_code == 200
+
+        # De eigen bureau-admin ziet hem wel.
+        andere_admin = login("baas@bureau-fb-test.nl", "geheim123")
+        eigen = andere_admin.get(f"{BASE}/api/admin/feedback").json()["feedback"]
+        item = next(f for f in eigen if "Vertrouwelijk" in f["message"])
+
+        # De platform-admin van een ánder bureau ziet hem niet in zijn lijst en
+        # kan hem niet wijzigen of laten analyseren.
+        tp_admin = login("admin@prompted-ai.nl", "admin123")
+        # (admin@prompted-ai.nl is platform-admin en ziet dus wél alles)
+        assert any("Vertrouwelijk" in f["message"] for f in tp_admin.get(f"{BASE}/api/admin/feedback").json()["feedback"])
+
+        # Andersom: de bureau-admin van bureau-fb ziet de feedback van het
+        # demo-account (ander bureau) niet, en raakt die ook niet aan.
+        demo_items = [f for f in tp_admin.get(f"{BASE}/api/admin/feedback").json()["feedback"]
+                      if f["org_name"] == "Janssen"]
+        assert demo_items, "verwacht demo-feedback uit een eerdere test"
+        vreemd = demo_items[0]["id"]
+        assert not any(f["id"] == vreemd for f in eigen), "feedback van een ander bureau lekt"
+        assert andere_admin.patch(f"{BASE}/api/admin/feedback/{vreemd}",
+                                  json={"status": "done"}).status_code == 403
+        assert andere_admin.post(f"{BASE}/api/admin/feedback/{vreemd}/analyze").status_code == 403
+        # Eigen feedback mag hij wel bijwerken.
+        assert andere_admin.patch(f"{BASE}/api/admin/feedback/{item['id']}",
+                                  json={"status": "done"}).status_code == 200
+        print("feedback-scope: eigen feedback beheerbaar, andermans feedback onzichtbaar en 403")
+    finally:
+        models.delete_organization(klant["id"])
+        models.delete_organization(ander["id"])
+
+
+def test_session_hardening():
+    """Sessies vervallen bij een wachtwoordwijziging; login is per account geremd."""
+    from app import auth as app_auth, models
+
+    org = models.create_or_rename_organization("Sessie BV", "sessie-test.nl")
+    models.upsert_user("gebruiker@sessie-test.nl", org["id"], "client")
+    models.set_user_password("gebruiker@sessie-test.nl", app_auth.hash_password("eerste123"))
+    try:
+        s = login("gebruiker@sessie-test.nl", "eerste123")
+        assert s.get(f"{BASE}/api/me").status_code == 200
+
+        # Wachtwoord wijzigen (zoals bij een reset) maakt de oude sessie ongeldig.
+        models.set_user_password("gebruiker@sessie-test.nl", app_auth.hash_password("tweede123"))
+        assert s.get(f"{BASE}/api/me").status_code == 401
+
+        # Met het nieuwe wachtwoord werkt inloggen weer.
+        s2 = login("gebruiker@sessie-test.nl", "tweede123")
+        assert s2.get(f"{BASE}/api/me").json()["email"] == "gebruiker@sessie-test.nl"
+
+        # Rem per account op mislukte pogingen: na tien keer fout volgt 429.
+        codes = [
+            requests.post(f"{BASE}/api/auth/login",
+                          json={"email": "gebruiker@sessie-test.nl", "password": "fout"}).status_code
+            for _ in range(12)
+        ]
+        assert 429 in codes, codes
+        # Zelfs het juiste wachtwoord komt er nu niet meer door (account op slot).
+        assert requests.post(f"{BASE}/api/auth/login",
+                             json={"email": "gebruiker@sessie-test.nl", "password": "tweede123"}).status_code == 429
+        # Een ánder account is niet geblokkeerd door die pogingen, en geslaagde
+        # logins verbruiken zelf geen budget (anders liepen demo's en tests vast).
+        for _ in range(15):
+            assert requests.post(f"{BASE}/api/auth/login",
+                                 json={"email": "test@testklant.nl", "password": "test123"}).status_code == 200
+        print("sessies: oude sessie vervalt na wachtwoordwijziging, loginrem geldt per account en alleen op fouten")
+    finally:
+        models.delete_organization(org["id"])
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -762,6 +849,8 @@ if __name__ == "__main__":
     test_account_features(admin)
     test_agency_scope(admin)
     test_agency_promotion(admin)
+    test_feedback_scope(admin)
+    test_session_hardening()
     test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

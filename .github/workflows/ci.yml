@@ -38,6 +38,9 @@ jobs:
       SESSION_SECRET: ci-session-secret
       SESSION_COOKIE_SECURE: "false"
       AGENCY_ADMIN_EMAILS: admin@prompted-ai.nl
+      # Het demo-wachtwoord komt uit de omgeving (staat niet in de code); de
+      # tests loggen met deze waarde in op het demo-account.
+      DEMO_PASSWORD: janssen123
       EUROUTER_API_KEY: fake-ci-key
       EUROUTER_MODEL: fake
       EUROUTER_BASE_URL: http://127.0.0.1:9099/v1

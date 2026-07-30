@@ -72,6 +72,7 @@ app.add_middleware(
     secret_key=config.SESSION_SECRET,
     https_only=config.SESSION_COOKIE_SECURE,
     same_site="lax",
+    max_age=config.SESSION_MAX_AGE,
 )
 
 # Serve the built SPA's static assets (present in production / after a build).

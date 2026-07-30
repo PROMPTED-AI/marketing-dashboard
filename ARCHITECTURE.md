@@ -167,5 +167,27 @@ aangevinkt (`_require_channel()`, admins mogen altijd koppelen).
 
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `SESSION_SECRET`,
 `DATABASE_URL` (Neon), `TOKEN_ENCRYPTION_KEY` (Fernet), `AGENCY_ADMIN_EMAILS`,
-optioneel `PUBLIC_EMAIL_DOMAINS`. Worden op de Cloud Run-service gezet en blijven
-behouden over revisies heen.
+optioneel `PUBLIC_EMAIL_DOMAINS`, `SESSION_MAX_AGE` / `SESSION_IDLE_MAX` (standaard
+14 dagen / 12 uur) en `DEMO_PASSWORD`. Worden op de Cloud Run-service gezet en
+blijven behouden over revisies heen.
+
+**`DEMO_PASSWORD`**: het wachtwoord van het demo-account staat niet in de code. Is
+deze variabele leeg, dan krijgt het demo-account bij elke start een willekeurig
+wachtwoord — de omgeving met voorbeelddata bestaat dan wel, maar er is niet met een
+bekend wachtwoord op in te loggen. Zet de variabele als je de demo-login gebruikt.
+
+## Sessies
+
+Een sessie is een ondertekende cookie (`SameSite=Lax`, `Secure` in productie) met
+alleen het gebruikers-id, de sessieteller en het tijdstip van laatste activiteit.
+`auth.start_session()` is het enige punt dat een sessie begint; die leegt de sessie
+eerst, zodat er nooit resten van een vorige login in blijven staan. `current_user()`
+weigert een sessie waarvan de teller niet meer klopt (dat gebeurt bij elke
+wachtwoordwijziging of -reset, zodat een gestolen sessie vervalt) en een sessie die
+langer dan `SESSION_IDLE_MAX` stil heeft gelegen.
+
+Inloggen is geremd op **mislukte** pogingen — per account en per IP, met een globale
+backstop. Een geslaagde login verbruikt geen budget, dus wie zijn wachtwoord gewoon
+goed heeft loopt nooit tegen een limiet aan. De rem is per Cloud Run-instance
+(in-process, geen Redis nodig); voor een harde gedeelde limiet is een externe store
+vereist.

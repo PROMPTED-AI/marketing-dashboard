@@ -144,6 +144,14 @@ def init_schema() -> None:
         conn.execute(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"
         )
+        # Sessieteller: elke sessie draagt de stand die bij het inloggen gold.
+        # Bij een wachtwoordwijziging of -reset gaat de teller omhoog, waardoor
+        # alle bestaande sessies elders ongeldig worden. Zonder dit blijft een
+        # gestolen sessie geldig, ook nadat het slachtoffer zijn wachtwoord
+        # heeft veranderd.
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS session_epoch INTEGER NOT NULL DEFAULT 0"
+        )
         # Bureau-model: een 'managed' organisatie krijgt zijn data via de
         # bureau-koppeling (het manageraccount), en de admin wijst per bedrijf
         # toe welke property/site/Ads-klant erbij hoort. De toewijzing wordt

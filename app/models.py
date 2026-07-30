@@ -819,19 +819,20 @@ def upsert_user(email: str, organization_id: str, role: str) -> dict:
 def get_user(user_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, email, organization_id, role FROM users WHERE id = %s",
+            "SELECT id, email, organization_id, role, session_epoch FROM users WHERE id = %s",
             (user_id,),
         ).fetchone()
     if not row:
         return None
-    return {"id": row[0], "email": row[1], "organization_id": row[2], "role": row[3]}
+    return {"id": row[0], "email": row[1], "organization_id": row[2], "role": row[3],
+            "session_epoch": row[4]}
 
 
 def get_user_by_email(email: str) -> dict | None:
     """User lookup for password sign-in (includes the stored hash)."""
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT id, email, organization_id, role, password_hash "
+            "SELECT id, email, organization_id, role, password_hash, session_epoch "
             "FROM users WHERE email = %s",
             (email.lower(),),
         ).fetchone()
@@ -843,13 +844,20 @@ def get_user_by_email(email: str) -> dict | None:
         "organization_id": row[2],
         "role": row[3],
         "password_hash": row[4],
+        "session_epoch": row[5],
     }
 
 
 def set_user_password(email: str, password_hash: str) -> None:
+    """Zet een nieuw wachtwoord en verklaar bestaande sessies ongeldig.
+
+    De sessieteller gaat omhoog, zodat sessies die met het oude wachtwoord zijn
+    gestart niet blijven werken (denk aan een gestolen sessie na een reset).
+    """
     with db.get_conn() as conn:
         conn.execute(
-            "UPDATE users SET password_hash = %s WHERE email = %s",
+            "UPDATE users SET password_hash = %s, session_epoch = session_epoch + 1 "
+            "WHERE email = %s",
             (password_hash, email.lower()),
         )
 
@@ -1259,9 +1267,21 @@ _FEEDBACK_SELECT = (
 )
 
 
-def list_feedback() -> list[dict]:
+def list_feedback(agency_id: str | None = None) -> list[dict]:
+    """Feedback voor het beheerbord.
+
+    Met `agency_id` alleen de feedback van de omgevingen van dat bureau (en het
+    bureau zelf). Feedback zonder herleidbare organisatie blijft dan buiten de
+    lijst: die is niet aan een bureau toe te wijzen en hoort bij het platform.
+    """
+    where, params = "", ()
+    if agency_id:
+        where = "WHERE o.agency_id = %s OR o.id = %s "
+        params = (agency_id, agency_id)
     with db.get_conn() as conn:
-        rows = conn.execute(_FEEDBACK_SELECT + "ORDER BY f.created_at DESC").fetchall()
+        rows = conn.execute(
+            _FEEDBACK_SELECT + where + "ORDER BY f.created_at DESC", params
+        ).fetchall()
     return [_feedback_row(r) for r in rows]
 
 

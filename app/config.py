@@ -86,6 +86,16 @@ SESSION_SECRET = os.environ["SESSION_SECRET"]
 # Session cookie is Secure (HTTPS-only) by default. Set SESSION_COOKIE_SECURE=false
 # for local http development.
 SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() != "false"
+# Absolute levensduur van de sessiecookie (de ondertekening verloopt hierna) en
+# de maximale stilte-periode voordat opnieuw inloggen nodig is. Expliciet gezet
+# in plaats van de framework-default, zodat de keuze zichtbaar en aanpasbaar is.
+SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", 14 * 24 * 3600))
+SESSION_IDLE_MAX = int(os.environ.get("SESSION_IDLE_MAX", 12 * 3600))
+
+# Wachtwoord van het demo-account. Leeg = het demo-account krijgt bij elke
+# start een willekeurig wachtwoord, zodat er geen bekende login op productie
+# openstaat. Zet dit alleen als je de demo-login wilt gebruiken.
+DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "").strip()
 
 # Postgres connection string (use Neon's pooled URL in production).
 DATABASE_URL = os.environ["DATABASE_URL"]
