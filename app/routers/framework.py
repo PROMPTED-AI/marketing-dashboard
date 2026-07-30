@@ -79,6 +79,11 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
     errors: set[str] = set()
     # Bureau-omgeving: gebruik de aan dit bedrijf toegewezen property/Ads-klant.
     assigned = models.get_org_assets(org_id)
+    # Koppelstatus hier bepalen, in de request-thread: de per-request memo geldt
+    # niet in de worker-threads hieronder, en zo doet de fan-out geen queries
+    # meer die we al konden weten.
+    connected = {p: _connected(org_id, p) for p in
+                 ("google_analytics", "google_ads", "meta_ads", "woocommerce", "shopify")}
 
     def once(setup):
         # Met een lock: maanden worden parallel opgehaald, en zonder lock zouden
@@ -94,7 +99,7 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         return get
 
     def ga_ctx():
-        if not _connected(org_id, "google_analytics"):
+        if not connected["google_analytics"]:
             return None
         creds = _org_credentials(org_id)
         prop = assigned.get("ga_property_id") or property_id
@@ -104,7 +109,7 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         return (creds, prop) if prop else None
 
     def ads_ctx():
-        if not _connected(org_id, "google_ads"):
+        if not connected["google_ads"]:
             return None
         creds = _org_credentials(org_id, provider="google_ads")
         cust = assigned.get("ads_customer_id")
@@ -114,19 +119,19 @@ def _make_fetchers(org_id: str, property_id: str | None) -> dict:
         return (creds, accounts[0]["customer_id"]) if accounts else None
 
     def meta_ctx():
-        if not _connected(org_id, "meta_ads"):
+        if not connected["meta_ads"]:
             return None
         token = _meta_token(org_id)
         accounts = meta.list_assets(token).get("ad_accounts") or []
         return (token, accounts[0]["id"]) if accounts else None
 
     def woo_ctx():
-        if not _connected(org_id, "woocommerce"):
+        if not connected["woocommerce"]:
             return None
         return _wc_creds(org_id)
 
     def shopify_ctx():
-        if not _connected(org_id, "shopify"):
+        if not connected["shopify"]:
             return None
         return _shopify_creds(org_id)
 

@@ -11,7 +11,7 @@
 // whole mirror is cleared (cache is best effort).
 
 import { useEffect, useState } from "react";
-import { api } from "./api.js";
+import { api, setUnauthorizedHandler } from "./api.js";
 
 const MAX_AGE = 7 * 24 * 60 * 60 * 1000; // ouder dan een week negeren
 const PREFIX = "swr:";
@@ -70,6 +70,10 @@ export function invalidateOrg(orgId) {
   const needle = orgId ? "org_id=" + encodeURIComponent(orgId) : null;
   invalidate((url) => url.startsWith("/api/") && (!needle || url.includes(needle)));
 }
+
+// Ook opruimen zodra de server 401 geeft (verlopen of ingetrokken sessie), niet
+// alleen bij een klik op Uitloggen.
+setUnauthorizedHandler(() => invalidateAll());
 
 // Alles wissen (bij uitloggen: geen klantdata achterlaten in de browser).
 export function invalidateAll() {
