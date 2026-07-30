@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from psycopg.types.json import Jsonb
 
-from . import config, crypto, db
+from . import config, crypto, db, reqcache
 
 # ---------------------------------------------------------------- organizations
 
@@ -110,6 +110,16 @@ def create_or_rename_organization(name: str, domain: str, agency_id: str | None 
 
 
 def get_organization(org_id: str) -> dict | None:
+    """De organisatie, per verzoek gememoïseerd.
+
+    Wordt binnen één verzoek van meerdere kanten opgevraagd (demo-check,
+    trial-check, bureau-toewijzing, profiel), dus zonder memo kost dat een
+    handvol identieke queries op een netwerk-database.
+    """
+    return reqcache.memo(("org", org_id), lambda: _fetch_organization(org_id))
+
+
+def _fetch_organization(org_id: str) -> dict | None:
     with db.get_conn() as conn:
         row = conn.execute(
             "SELECT id, name, domain, is_demo, business_type, plan, trial_ends_at, managed, "
@@ -230,6 +240,10 @@ def default_features() -> dict:
 
 def get_org_features(org_id: str) -> dict:
     """Alle functies met hun stand voor deze omgeving (ontbrekend = aan)."""
+    return reqcache.memo(("features", org_id), lambda: _fetch_org_features(org_id))
+
+
+def _fetch_org_features(org_id: str) -> dict:
     out = default_features()
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -278,15 +292,14 @@ def set_org_features(org_id: str, values: dict) -> dict:
 
 
 def feature_enabled(org_id: str, feature: str) -> bool:
-    """Staat deze functie aan voor deze omgeving? Onbekende functies: ja."""
+    """Staat deze functie aan voor deze omgeving? Onbekende functies: ja.
+
+    Leest de volledige (gememoïseerde) stand in plaats van een eigen query: één
+    endpoint controleert vaak meerdere functies en kanalen achter elkaar.
+    """
     if feature not in FEATURES:
         return True
-    with db.get_conn() as conn:
-        row = conn.execute(
-            "SELECT enabled FROM org_features WHERE organization_id = %s AND feature = %s",
-            (org_id, feature),
-        ).fetchone()
-    return True if row is None else bool(row[0])
+    return bool(get_org_features(org_id).get(feature, True))
 
 
 # ------------------------------------------------------ kanalen per omgeving
@@ -334,6 +347,10 @@ def default_channels() -> dict:
 
 def get_org_channels(org_id: str) -> dict:
     """Alle kanalen met hun stand voor deze omgeving (ontbrekend = aan)."""
+    return reqcache.memo(("channels", org_id), lambda: _fetch_org_channels(org_id))
+
+
+def _fetch_org_channels(org_id: str) -> dict:
     out = default_channels()
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -385,15 +402,14 @@ def set_org_channels(org_id: str, values: dict) -> dict:
 
 
 def channel_allowed(org_id: str, channel: str) -> bool:
-    """Mag deze omgeving dit kanaal zien/koppelen? Onbekende kanalen: ja."""
+    """Mag deze omgeving dit kanaal zien/koppelen? Onbekende kanalen: ja.
+
+    Ook hier de volledige (gememoïseerde) stand: het raamwerk vraagt dit voor
+    elk kanaal, en de koppelingenlijst voor alle kanalen achter elkaar.
+    """
     if channel not in CHANNELS:
         return True
-    with db.get_conn() as conn:
-        row = conn.execute(
-            "SELECT enabled FROM org_features WHERE organization_id = %s AND feature = %s",
-            (org_id, _CHANNEL_PREFIX + channel),
-        ).fetchone()
-    return True if row is None else bool(row[0])
+    return bool(get_org_channels(org_id).get(channel, True))
 
 
 # ------------------------------------------------------------------ abonnement
@@ -907,6 +923,30 @@ def get_connection(
     }
 
 
+def connection_meta(organization_id: str, provider: str) -> dict | None:
+    """Status en account van een koppeling, zónder de credentials te ontsleutelen.
+
+    Los van `get_connection`: voor de vraag "is dit kanaal gekoppeld, en met welk
+    account?" is ontsleutelen verspild werk, en die vraag valt per verzoek voor
+    elk kanaal (sidebar, Integraties, raamwerk). Per verzoek gememoïseerd.
+    """
+    def fetch():
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT status, google_email FROM connections "
+                "WHERE organization_id = %s AND provider = %s",
+                (organization_id, provider),
+            ).fetchone()
+        return {"status": row[0], "google_email": row[1]} if row else None
+
+    return reqcache.memo(("connmeta", organization_id, provider), fetch)
+
+
+def connection_status(organization_id: str, provider: str) -> str | None:
+    meta = connection_meta(organization_id, provider)
+    return meta["status"] if meta else None
+
+
 def set_connection_status(
     organization_id: str, status: str, provider: str = "google_analytics"
 ) -> None:
@@ -956,33 +996,6 @@ def count_google_connections(organization_id: str) -> int:
             (organization_id, list(config.GOOGLE_PROVIDERS)),
         ).fetchone()
     return row[0] if row else 0
-
-
-def list_organizations_with_status() -> list[dict]:
-    """Agency admin overview: every org and its GA connection status."""
-    with db.get_conn() as conn:
-        rows = conn.execute(
-            """
-            SELECT o.id, o.name, o.domain,
-                   c.google_email, c.status, c.updated_at
-            FROM organizations o
-            LEFT JOIN connections c
-              ON c.organization_id = o.id AND c.provider = 'google_analytics'
-            WHERE o.is_personal = false
-            ORDER BY o.name
-            """
-        ).fetchall()
-    return [
-        {
-            "id": r[0],
-            "name": r[1],
-            "domain": r[2],
-            "google_email": r[3],
-            "status": r[4] or "not_connected",
-            "updated_at": r[5].isoformat() if r[5] else None,
-        }
-        for r in rows
-    ]
 
 
 def list_organizations_with_connections(agency_id: str | None = None) -> list[dict]:

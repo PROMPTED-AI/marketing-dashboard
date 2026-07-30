@@ -10,15 +10,8 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
 
-from .. import (
-    analytics, assistant, auth, cache, config, demo, email as mailer, google_ads,
-    insights, meta, meta_oauth, models, oauth, ratelimit, search_console, woocommerce,
-)
-from ..org_access import (
-    _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG, _is_grant_revoked,
-    _meta_token, _org_credentials, _previous_period, _require_channel,
-    _require_feature, _require_period, _resolve_org_id, _safe_return, _wc_creds,
-)
+from .. import auth, cache, config, email as mailer, models, oauth, ratelimit
+from ..org_access import _require_channel, _require_feature, _safe_return
 
 log = logging.getLogger("dashboard")
 router = APIRouter()
@@ -43,8 +36,8 @@ def me(request: Request):
     }
     if org and org.get("is_demo"):
         return {**base, "connection_status": "connected"}
-    conn = models.get_connection(user["organization_id"])
-    return {**base, "connection_status": conn["status"] if conn else "not_connected"}
+    status = models.connection_status(user["organization_id"], "google_analytics")
+    return {**base, "connection_status": status or "not_connected"}
 
 
 def _client_ip(request: Request) -> str:

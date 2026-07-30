@@ -193,6 +193,22 @@ bekend wachtwoord op in te loggen. Zet de variabele als je de demo-login gebruik
   cache-misses en dus echte API-calls uitlokken.
 - **Container** draait als niet-root gebruiker en de Python-dependencies staan op
   vaste versies, zodat een build reproduceerbaar is.
+- **Verlopen sessie** ruimt ook de browser-cache op: een 401 wist de SWR-spiegel in
+  `localStorage`, niet alleen een klik op Uitloggen.
+
+## Per-request memo
+
+Eén dashboardverzoek vraagt dezelfde dingen meerdere keren: de organisatie (demo-check,
+trial-check, bureau-toewijzing), de functiestand, de kanaalstand en de koppelstatus.
+`app/reqcache.py` houdt die in een ContextVar die per verzoek wordt gezet, dus er lekt
+niets tussen verzoeken. Verouderde data is uitgesloten doordat `db.get_conn()` de memo
+leegt bij elke query die geen SELECT is — één centrale plek in plaats van een
+`clear()` in elke schrijffunctie. Achtergrondthreads (de parallelle raamwerk-fetch)
+hebben geen memo en lezen gewoon uit de database.
+
+`models.connection_meta()` leest status en account zonder de credentials te
+ontsleutelen; `get_connection()` blijft voor de echte API-calls. Dat scheelt per
+verzoek een Fernet-ontsleuteling per kanaal.
 
 ## Sessies
 

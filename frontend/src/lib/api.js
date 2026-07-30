@@ -1,7 +1,19 @@
 // Small fetch wrapper. All calls share the session cookie.
+// Opruimhaak voor een verlopen sessie. swr.js registreert hier zijn
+// invalidateAll; via een haak in plaats van een import, omdat swr.js zelf al
+// van api.js afhangt (en een cirkel tussen de twee fragiel is).
+let onUnauthorized = null;
+export function setUnauthorizedHandler(fn) {
+  onUnauthorized = fn;
+}
+
 export async function api(path, opts = {}) {
   const res = await fetch(path, { credentials: "include", ...opts });
   if (res.status === 401) {
+    // Sessie weg of verlopen: de gespiegelde klantdata in localStorage hoort
+    // dan ook weg. Anders bleef die staan tot iemand actief op Uitloggen klikt
+    // — op een gedeelde computer geen prettige gedachte.
+    onUnauthorized?.();
     const err = new Error("unauthorized");
     err.status = 401;
     throw err;

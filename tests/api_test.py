@@ -873,6 +873,65 @@ def test_asset_validation(demo):
         models.delete_organization(org["id"])
 
 
+def test_request_cache():
+    """De per-request memo hergebruikt reads maar geeft nooit verouderde data."""
+    from app import models, reqcache
+
+    org = models.create_or_rename_organization("Memo BV", "memo-test.nl")
+    try:
+        # Buiten een verzoek is er geen memo: elke read gaat naar de database.
+        assert reqcache.memo(("x",), lambda: 1) == 1
+        assert reqcache.memo(("x",), lambda: 2) == 2
+
+        # Binnen een verzoek wordt dezelfde sleutel hergebruikt...
+        token = reqcache._current.set({})
+        try:
+            assert reqcache.memo(("x",), lambda: 1) == 1
+            assert reqcache.memo(("x",), lambda: 2) == 1, "memo hoort te blijven staan"
+
+            naam = models.get_organization(org["id"])["name"]
+            assert naam == "Memo BV"
+            # ...maar een schrijfactie leegt de memo, dus de volgende read is vers.
+            models.set_org_profile(org["id"], name="Memo BV nieuw")
+            assert models.get_organization(org["id"])["name"] == "Memo BV nieuw"
+            assert reqcache.memo(("x",), lambda: 3) == 3, "write hoort de memo te legen"
+
+            # Functie- en kanaalstand lopen via dezelfde memo en blijven correct.
+            models.set_org_features(org["id"], {"signalen": False})
+            assert models.feature_enabled(org["id"], "signalen") is False
+            models.set_org_features(org["id"], {"signalen": True})
+            assert models.feature_enabled(org["id"], "signalen") is True
+            models.set_org_channels(org["id"], {"shopify": False})
+            assert models.channel_allowed(org["id"], "shopify") is False
+        finally:
+            reqcache._current.reset(token)
+        print("per-request memo: hergebruikt binnen een verzoek, leeg na elke schrijfactie")
+    finally:
+        models.delete_organization(org["id"])
+
+
+def test_connection_status_no_decrypt(demo_org_id):
+    """De statuscheck leest alleen de status, zonder credentials te ontsleutelen."""
+    from unittest import mock
+
+    from app import crypto, models
+
+    org = models.create_or_rename_organization("Status BV", "status-test.nl")
+    try:
+        models.save_connection(org["id"], "koppel@status-test.nl",
+                               {"token": "geheim"}, provider="woocommerce")
+        with mock.patch.object(crypto, "decrypt", side_effect=AssertionError("mag niet ontsleutelen")):
+            assert models.connection_status(org["id"], "woocommerce") == "connected"
+            assert models.connection_status(org["id"], "shopify") is None
+            meta = models.connection_meta(org["id"], "woocommerce")
+            assert meta["google_email"] == "koppel@status-test.nl", meta
+        # De volledige lezer ontsleutelt uiteraard wél.
+        assert models.get_connection(org["id"], provider="woocommerce")["creds"]["token"] == "geheim"
+        print("koppelstatus: status en account zonder ontsleutelen, volledige lezer ongewijzigd")
+    finally:
+        models.delete_organization(org["id"])
+
+
 def test_authorization(tk_org_id):
     user = login("test@testklant.nl", "test123")
     for ep in ("/api/admin/users", "/api/admin/activity", "/api/admin/feedback",
@@ -916,6 +975,8 @@ if __name__ == "__main__":
     test_security_headers()
     test_cache_purge()
     test_asset_validation(demo)
+    test_request_cache()
+    test_connection_status_no_decrypt(demo_org_id)
     test_org_profile_and_delete(admin, tk_org_id, demo_org_id)
     test_authorization(tk_org_id)
     print("API-TESTS OK")

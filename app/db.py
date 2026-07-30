@@ -10,9 +10,11 @@ connections    : one GA OAuth connection per organization (encrypted, with statu
 dashboards     : user-composed widget layouts, shared within an organization
 org_features   : which product features a bureau activated per client account
 """
+from contextlib import contextmanager
+
 from psycopg_pool import ConnectionPool
 
-from . import config
+from . import config, reqcache
 
 # open=False so importing this module never blocks on a DB connection;
 # the pool opens lazily on first use.
@@ -26,10 +28,14 @@ from . import config
 #   check    : validate (and recycle) a connection before handing it out,
 #              so a dead one never reaches a request.
 #   max_idle : proactively close idle connections before Neon does.
+#   max_size : ruimer dan de vier van eerder. Het raamwerk haalt maanden
+#              parallel op (tot 8 threads) en die threads doen ook kleine
+#              queries; met een pool van 4 stonden ze op elkaar te wachten en
+#              lag een PoolTimeout onder last op de loer.
 _pool = ConnectionPool(
     config.DATABASE_URL,
     min_size=0,
-    max_size=4,
+    max_size=12,
     open=False,
     check=ConnectionPool.check_connection,
     max_idle=60,
@@ -37,11 +43,35 @@ _pool = ConnectionPool(
 )
 
 
+class _WriteAwareConn:
+    """Pooled connectie die de per-request memo leegt bij een schrijfactie.
+
+    Eén centrale plek in plaats van een `reqcache.clear()` in elke schrijffunctie
+    (het zijn er tientallen, en een nieuwe zou het zo vergeten). Alles wat geen
+    SELECT is telt als schrijven; te vaak legen is onschuldig, te weinig niet.
+    """
+
+    __slots__ = ("_conn",)
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, query, params=None, *args, **kwargs):
+        if not str(query).lstrip().upper().startswith(("SELECT", "WITH")):
+            reqcache.clear()
+        return self._conn.execute(query, params, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+@contextmanager
 def get_conn():
     """Context manager yielding a pooled connection (auto-commit on exit)."""
     if _pool.closed:
         _pool.open()
-    return _pool.connection()
+    with _pool.connection() as conn:
+        yield _WriteAwareConn(conn)
 
 
 def init_schema() -> None:

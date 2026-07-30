@@ -12,15 +12,13 @@ from google.auth.exceptions import RefreshError
 from pydantic import BaseModel
 
 from .. import (
-    analytics, assistant, auth, cache, config, demo, google_ads, insights, meta,
-    meta_oauth, models, oauth, ratelimit, search_console, shopify, shopify_oauth,
-    woocommerce,
+    analytics, auth, cache, config, demo, google_ads, meta, meta_oauth, models, oauth,
+    ratelimit, search_console, shopify, shopify_oauth, woocommerce,
 )
 from ..org_access import (
-    _checked_asset, _compact, _connected, _google_data, _GOOGLE_TRANSIENT_MSG,
-    _is_grant_revoked, _limit_assets, _meta_token, _org_credentials,
-    _previous_period, _require_channel, _require_feature, _require_period,
-    _resolve_org_id, _safe_return, _shopify_creds, _wc_creds,
+    _checked_asset, _google_data, _limit_assets, _meta_token, _org_credentials,
+    _require_channel, _require_feature, _require_period, _resolve_org_id, _safe_return,
+    _shopify_creds, _wc_creds,
 )
 
 log = logging.getLogger("dashboard")
@@ -112,17 +110,18 @@ def _connections_payload(target_org: str, user: dict | None = None) -> dict:
     demo_org = models.is_demo_org(target_org)
     items = []
     for provider in config.GOOGLE_PROVIDERS + config.META_PROVIDERS + config.SHOP_PROVIDERS:
-        conn = models.get_connection(target_org, provider=provider)
         # The demo org has no real grants, but GA, Search Console, Google Ads and
         # Meta all serve generated sample data, so present them as connected.
         if demo_org and provider in ("google_analytics", "search_console", "google_ads", "meta_ads"):
             items.append({"provider": provider, "status": "connected", "google_email": demo.DEMO_EMAIL})
             continue
+        # Alleen status en account: de credentials hoeven hier niet ontsleuteld.
+        meta_conn = models.connection_meta(target_org, provider)
         items.append(
             {
                 "provider": provider,
-                "status": conn["status"] if conn else "not_connected",
-                "google_email": conn["google_email"] if conn else None,
+                "status": meta_conn["status"] if meta_conn else "not_connected",
+                "google_email": meta_conn["google_email"] if meta_conn else None,
             }
         )
     for provider in config.PLACEHOLDER_PROVIDERS:

@@ -268,8 +268,7 @@ def _connected(target_org: str, provider: str) -> bool:
     """
     if not models.channel_allowed(target_org, provider):
         return False
-    conn = models.get_connection(target_org, provider=provider)
-    return bool(conn and conn["status"] == "connected")
+    return models.connection_status(target_org, provider) == "connected"
 
 
 def _managed(target_org: str) -> bool:

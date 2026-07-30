@@ -32,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import cache, config, db, demo, shopify_oauth
+from .reqcache import RequestCacheMiddleware
 from .security_headers import SecurityHeadersMiddleware
 
 # Zonder basisconfiguratie hebben de app-loggers geen handler onder uvicorn en
@@ -78,6 +79,9 @@ app.add_middleware(
 # HSTS alleen waar de app ook echt op https draait; dezelfde vlag bepaalt of de
 # sessiecookie Secure is, dus die staat voor "productie".
 app.add_middleware(SecurityHeadersMiddleware, hsts=config.SESSION_COOKIE_SECURE)
+# Per-request memo voor kleine, herhaalde reads (organisatie, functies, kanalen,
+# koppelstatus). Buitenste laag, zodat elke request er een verse memo heeft.
+app.add_middleware(RequestCacheMiddleware)
 
 # Serve the built SPA's static assets (present in production / after a build).
 if (SPA_DIR / "assets").is_dir():
