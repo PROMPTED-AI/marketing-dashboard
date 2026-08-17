@@ -4,12 +4,12 @@ const ThemeCtx = createContext({ theme: "light", toggle: () => {} });
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("kompas-theme") || "light"
+    () => localStorage.getItem("mm-theme") || "light"
   );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("kompas-theme", theme);
+    localStorage.setItem("mm-theme", theme);
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));

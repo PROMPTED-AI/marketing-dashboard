@@ -106,7 +106,7 @@ function StepBedrijf({ draft, onNext, onCancel }) {
 
   return (
     <form onSubmit={submit}>
-      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>nieuwe klant</div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Nieuwe klant</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>De klant komt onder jouw bureau te staan. Hierna kies je de functies, nodig je de klant uit en richt je de kanalen in.</div>
       <label style={lbl}>Naam organisatie</label>
       <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
@@ -114,7 +114,7 @@ function StepBedrijf({ draft, onNext, onCancel }) {
       <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="voorbeeld.nl" style={inp} />
       <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Iedereen die met dit domein inlogt, hoort bij deze klant.</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-        <button type="button" className="pill-btn" onClick={onCancel} style={btnGhost}>annuleren</button>
+        <button type="button" className="pill-btn" onClick={onCancel} style={btnGhost}>Annuleren</button>
         <button type="submit" disabled={!name.trim() || !domain.trim()} className="btn-primary" style={{ height: 42, padding: "0 20px" }}>
           verder →
         </button>
@@ -142,7 +142,7 @@ function StepFuncties({ draft, features, onChange, onBack, onCreated }) {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>functies kiezen</div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Functies kiezen</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
         Bepaal welke onderdelen <strong style={{ color: "var(--c-ink)" }}>{draft.name || "deze klant"}</strong> in de eigen omgeving ziet. Je kunt dit later per klant aanpassen.
       </div>
@@ -176,13 +176,13 @@ function StepToegang({ org, onInvited, onSkip }) {
 
   return (
     <form onSubmit={submit}>
-      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>klant uitnodigen</div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Klant uitnodigen</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
         <strong style={{ color: "var(--c-ink)" }}>{org?.name}</strong> is aangemaakt. Nodig de klant uit met een e-mailadres; die stelt via de link zelf een wachtwoord in en logt in op de eigen omgeving.
       </div>
       <label style={lbl}>E-mailadres klant</label>
       <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={`klant@${org?.domain || "bedrijf.nl"}`} style={inp} />
-      <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Geen e-mail bij de hand? Sla dit over — je kunt later uitnodigen via “Gebruikers &amp; rollen”.</div>
+      <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 6 }}>Geen e-mail bij de hand? Sla dit over, je kunt later uitnodigen via “Gebruikers en rollen”.</div>
       {err && <div style={errBox}>{String(err.message || err)}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 22 }}>
         <button type="button" className="pill-btn" onClick={onSkip} style={btnGhost}>overslaan →</button>
@@ -241,7 +241,7 @@ function StepKanalen({ org, onNext }) {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>kanalen inrichten</div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Kanalen inrichten</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
         Hergebruik je bureau-Google-koppeling en wijs de juiste bron toe. Meta, WooCommerce en Shopify koppelt de klant zelf in de eigen omgeving.
       </div>
@@ -263,7 +263,7 @@ function StepKanalen({ org, onNext }) {
         <div>
           {available.google_email && (
             <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>
-              Bureau-account: <strong style={{ color: "var(--c-ink-soft)" }}>{available.google_email}</strong> — de lijsten tonen wat dít Google-account mag zien.
+              Bureau-account: <strong style={{ color: "var(--c-ink-soft)" }}>{available.google_email}</strong>. De lijsten tonen wat dít Google-account mag zien.
             </div>
           )}
           {field("Google Analytics-property", "ga_property_id", available.properties, "property_id", (p) => p.display_name ? `${p.display_name} (${p.property_id})` : p.property_id)}
@@ -307,7 +307,7 @@ function StepKlaar({ org, invite, features, assetSummary, onDone }) {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>klant staat klaar</div>
+      <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>Klant staat klaar</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
         <strong style={{ color: "var(--c-ink)" }}>{org?.name}</strong> ({org?.domain}) is ingericht.
       </div>
@@ -321,7 +321,7 @@ function StepKlaar({ org, invite, features, assetSummary, onDone }) {
         />
         <SummaryRow
           label="Uitnodiging"
-          value={invite ? (invite.emailed ? `verstuurd naar ${invite.email}` : `link voor ${invite.email}`) : "overgeslagen — later uit te nodigen"}
+          value={invite ? (invite.emailed ? `verstuurd naar ${invite.email}` : `link voor ${invite.email}`) : "Overgeslagen, later uit te nodigen"}
           ok={!!invite}
         />
         <SummaryRow

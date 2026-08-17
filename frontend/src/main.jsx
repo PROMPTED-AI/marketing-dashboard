@@ -8,7 +8,10 @@ import { ActiveOrgProvider } from "./lib/ActiveOrgProvider.jsx";
 import { ConnectionsProvider } from "./lib/useConnections.jsx";
 import { DateRangeProvider } from "./lib/PeriodProvider.jsx";
 import { ChatProvider } from "./lib/ChatProvider.jsx";
+import { migrateLegacyKeys } from "./lib/storage.js";
 import "./theme.css";
+
+migrateLegacyKeys();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

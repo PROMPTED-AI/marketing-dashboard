@@ -29,9 +29,9 @@ function NotificationBell() {
     setInsights(null);
     const q = new URLSearchParams({ start, end });
     if (orgId) q.set("org_id", orgId);
-    const prop = localStorage.getItem("kompas-property");
+    const prop = localStorage.getItem("mm-property");
     if (prop) q.set("property_id", prop);
-    const site = localStorage.getItem("kompas-gsc-site");
+    const site = localStorage.getItem("mm-gsc-site");
     if (site) q.set("site", site);
     api("/api/insights?" + q.toString())
       .then((d) => { if (alive) setInsights(d.insights || []); })
@@ -49,7 +49,7 @@ function NotificationBell() {
 
   const ask = (question) => {
     setOpen(false);
-    sessionStorage.setItem("kompas-ask", question);
+    sessionStorage.setItem("mm-ask", question);
     nav("/app/assistant");
   };
 
@@ -106,7 +106,7 @@ function NotificationBell() {
 
 // Generic dashboard topbar. Pass `left` to replace the default search pill.
 // `onMenu` opens the mobile navigation drawer (button only shows on mobile).
-export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true, onMenu }) {
+export default function Topbar({ left, searchPlaceholder = "Zoek campagne, pagina of metric…", showDateRange = true, onMenu }) {
   const { theme, toggle } = useTheme();
   const { me } = useMe();
   const nav = useNavigate();
@@ -138,7 +138,7 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
         </span>
       )}
       {showDateRange && <DateRangePicker />}
-      <button className="icon-btn" style={iconBtn} onClick={toggle} title="thema wisselen">
+      <button className="icon-btn" style={iconBtn} onClick={toggle} title="Thema wisselen">
         {theme === "dark" ? <IcSun s={17} /> : <IcMoon s={17} />}
       </button>
       <NotificationBell />

@@ -48,9 +48,9 @@ export default function Assistant() {
     setInsights(null);
     const q = new URLSearchParams({ start, end });
     if (orgId) q.set("org_id", orgId);
-    const prop = localStorage.getItem("kompas-property");
+    const prop = localStorage.getItem("mm-property");
     if (prop) q.set("property_id", prop);
-    const site = localStorage.getItem("kompas-gsc-site");
+    const site = localStorage.getItem("mm-gsc-site");
     if (site) q.set("site", site);
     api("/api/insights?" + q.toString())
       .then((d) => { if (alive) setInsights(d.insights || []); })
@@ -78,7 +78,7 @@ export default function Assistant() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--c-accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-accent)" }}><IcChat s={19} /></div>
         <div>
-          <div className="display" style={{ fontSize: 24, lineHeight: 1 }}>assistent</div>
+          <div className="display" style={{ fontSize: 24, lineHeight: 1 }}>Assistent</div>
           <div style={{ fontSize: 12.5, color: "var(--c-muted)" }}>{label} · Vraag alles over je cijfers</div>
         </div>
         <div style={{ flex: 1 }} />

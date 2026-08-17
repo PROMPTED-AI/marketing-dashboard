@@ -13,8 +13,8 @@ export default function TrialExpired({ me, orgName: orgNameProp, isAdmin = false
   const orgName = orgNameProp || me?.organization?.name || "je organisatie";
   const mailto =
     `mailto:${CONTACT_EMAIL}` +
-    `?subject=${encodeURIComponent("Verlenging Kompas voor " + orgName)}` +
-    `&body=${encodeURIComponent("Hallo,\n\nOnze proefperiode van Kompas is verlopen. Wij willen graag een betaalde verlenging bespreken.\n\nOrganisatie: " + orgName + "\nContactpersoon: " + (me?.email || ""))}`;
+    `?subject=${encodeURIComponent("Verlenging MetricMelon voor " + orgName)}` +
+    `&body=${encodeURIComponent("Hallo,\n\nOnze proefperiode van MetricMelon is verlopen. Wij willen graag een betaalde verlenging bespreken.\n\nOrganisatie: " + orgName + "\nContactpersoon: " + (me?.email || ""))}`;
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--c-page)", color: "var(--c-ink)", padding: 24 }}>
@@ -22,7 +22,7 @@ export default function TrialExpired({ me, orgName: orgNameProp, isAdmin = false
         <div style={{ width: 52, height: 52, borderRadius: 14, background: "var(--c-accent)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
           <IcStar />
         </div>
-        <div className="display" style={{ fontSize: 26, marginBottom: 10 }}>je proefperiode is verlopen</div>
+        <div className="display" style={{ fontSize: 26, marginBottom: 10 }}>Je proefperiode is verlopen</div>
         <div style={{ fontSize: 14.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 26 }}>
           De proefperiode van 14 dagen voor <strong style={{ color: "var(--c-ink)" }}>{orgName}</strong> is
           afgelopen. Je gegevens en koppelingen blijven veilig bewaard. Neem contact met ons op voor een

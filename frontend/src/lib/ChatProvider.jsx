@@ -119,8 +119,8 @@ export function ChatProvider({ children }) {
     setConvId(conv?.id ?? null);
     setTool(null);
     // Via de notificatiebel gekozen signaal gaat vóór hervatten.
-    const q = sessionStorage.getItem("kompas-ask");
-    if (q) { sessionStorage.removeItem("kompas-ask"); resume = { q, reuse: false }; }
+    const q = sessionStorage.getItem("mm-ask");
+    if (q) { sessionStorage.removeItem("mm-ask"); resume = { q, reuse: false }; }
     if (resume) setPending(resume);
   }, [orgId]);
 
@@ -172,8 +172,8 @@ export function ChatProvider({ children }) {
           org_id: orgRef.current || undefined,
           start: pStart,
           end: pEnd,
-          property_id: localStorage.getItem("kompas-property") || undefined,
-          site: localStorage.getItem("kompas-gsc-site") || undefined,
+          property_id: localStorage.getItem("mm-property") || undefined,
+          site: localStorage.getItem("mm-gsc-site") || undefined,
         }),
       });
       if (!res.ok || !res.body) throw new Error(res.status === 503 ? "De assistent is nog niet geconfigureerd." : "Serverfout");

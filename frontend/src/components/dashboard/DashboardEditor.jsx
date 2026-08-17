@@ -39,7 +39,7 @@ export default function DashboardEditor({
   const [genError, setGenError] = useState(null);
   const [lastGenPrompt, setLastGenPrompt] = useState("");
 
-  const storeKey = orgId ? `kompas-dash-${page}-${orgId}` : null;
+  const storeKey = orgId ? `mm-dash-${page}-${orgId}` : null;
   const initRef = useRef(null);
   const isOwner = activeId == null || activeMeta.is_owner;
 

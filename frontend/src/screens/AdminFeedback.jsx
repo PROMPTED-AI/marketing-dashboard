@@ -26,7 +26,7 @@ const fmtDate = (iso) => new Date(iso).toLocaleDateString("nl-NL", { day: "numer
 export default function AdminFeedback() {
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
-  const [view, setView] = useState(() => localStorage.getItem("kompas-feedback-view") || "kanban");
+  const [view, setView] = useState(() => localStorage.getItem("mm-feedback-view") || "kanban");
   const [openItem, setOpenItem] = useState(null);
   const [dragId, setDragId] = useState(null);
 
@@ -37,7 +37,7 @@ export default function AdminFeedback() {
 
   useEffect(() => { reload(); }, []);
 
-  const pickView = (v) => { setView(v); localStorage.setItem("kompas-feedback-view", v); };
+  const pickView = (v) => { setView(v); localStorage.setItem("mm-feedback-view", v); };
 
   const setStatus = (id, status) => {
     // optimistisch bijwerken, daarna bevestigen bij de server
@@ -62,7 +62,7 @@ export default function AdminFeedback() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>feedback</div>
+          <div className="display" style={{ fontSize: 30 }}>Feedback</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
             Alles wat gebruikers via de feedbackknop doorgeven. Nieuwe items starten in Requests.
           </div>

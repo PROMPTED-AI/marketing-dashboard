@@ -68,9 +68,9 @@ export default function Signalen() {
     abortRef.current?.abort();
     const q = new URLSearchParams({ start, end });
     if (orgId) q.set("org_id", orgId);
-    const prop = localStorage.getItem("kompas-property");
+    const prop = localStorage.getItem("mm-property");
     if (prop) q.set("property_id", prop);
-    const site = localStorage.getItem("kompas-gsc-site");
+    const site = localStorage.getItem("mm-gsc-site");
     if (site) q.set("site", site);
     api("/api/insights?" + q.toString())
       .then((d) => { if (alive) setSignals(d.insights || []); })
@@ -99,8 +99,8 @@ export default function Signalen() {
           messages: [{ role: "user", content: question }],
           org_id: orgId || undefined,
           start, end,
-          property_id: localStorage.getItem("kompas-property") || undefined,
-          site: localStorage.getItem("kompas-gsc-site") || undefined,
+          property_id: localStorage.getItem("mm-property") || undefined,
+          site: localStorage.getItem("mm-gsc-site") || undefined,
         }),
       });
       if (!res.ok || !res.body) throw new Error(res.status === 503 ? "De assistent is nog niet geconfigureerd." : "Serverfout");
@@ -133,7 +133,7 @@ export default function Signalen() {
   // Doorvragen in de volwaardige chat (met historie): geef de vraag mee via de
   // bestaande sessionStorage-brug die het Assistent-scherm oppikt.
   const openInChat = (question) => {
-    sessionStorage.setItem("kompas-ask", question);
+    sessionStorage.setItem("mm-ask", question);
     nav("/app/assistant");
   };
 
@@ -144,7 +144,7 @@ export default function Signalen() {
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>signalen</div>
+          <div className="display" style={{ fontSize: 30 }}>Signalen</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4, maxWidth: 620 }}>
             Opvallende veranderingen en verbanden in je cijfers voor {label || "de gekozen periode"}. Vraag per signaal om advies, of laat de assistent alles samenvatten en prioriteren.
           </div>

@@ -19,8 +19,8 @@ const VIEWS = [
 export default function MetaOrganic() {
   const { orgId } = useActiveOrg();
   const { start, end, label } = useDateRange();
-  const [view, setView] = useState(() => localStorage.getItem("kompas-meta-organic-view") || "overview");
-  const pickView = (id) => { setView(id); localStorage.setItem("kompas-meta-organic-view", id); };
+  const [view, setView] = useState(() => localStorage.getItem("mm-meta-organic-view") || "overview");
+  const pickView = (id) => { setView(id); localStorage.setItem("mm-meta-organic-view", id); };
 
   const { data: assets, loading, error: assetsErr } = useCachedApi(metaAccountsUrl(orgId));
   const pages = assets?.pages || null;
@@ -168,7 +168,7 @@ function Header({ right, label }) {
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>meta organisch</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>META Organisch</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Meta-koppeling</div>
     </div>
   );

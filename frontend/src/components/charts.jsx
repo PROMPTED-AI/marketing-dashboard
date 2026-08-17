@@ -9,7 +9,9 @@ function pickAxis(all) {
   return [0, 1, 2, 3, 4].map((i) => all[Math.round(i * step)]);
 }
 
-const PALETTE = ["var(--c-accent)", "var(--c-sky)", "var(--c-mint)", "var(--c-orange)", "var(--c-purple)", "var(--c-yellow)"];
+// Categorische reeksen volgen de chart-tokens uit het design system:
+// groen, koraal, navy, sky, amber, violet.
+const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 export const palette = PALETTE;
 
 // Vloeiende lijn door de punten: Catmull-Rom omgezet naar cubic beziers. De
@@ -90,12 +92,12 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
             {compareValues && compareValues.length > 0 && (
               <path d={path(compareValues)} fill="none" vectorEffect="non-scaling-stroke" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="1.5" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
             )}
-            <path d={line} fill="none" vectorEffect="non-scaling-stroke" style={{ stroke: "var(--c-accent)" }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={line} fill="none" vectorEffect="non-scaling-stroke" className="mm-draw" pathLength="1" style={{ stroke: "var(--chart-1)" }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           {hover != null && (
             <>
               <div style={{ position: "absolute", left: `${hx}%`, top: 0, bottom: 0, width: 1, background: "var(--c-border-strong)", transform: "translateX(-0.5px)", pointerEvents: "none" }} />
-              <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, width: 11, height: 11, borderRadius: "50%", background: "var(--c-accent)", border: "2px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none", boxShadow: "0 0 0 1px var(--c-accent)" }} />
+              <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, width: 11, height: 11, borderRadius: "50%", background: "var(--chart-1)", border: "2px solid var(--c-surface)", transform: "translate(-50%, -50%)", pointerEvents: "none", boxShadow: "0 0 0 1px var(--chart-1)" }} />
               <div style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, transform: `translate(${nearRight ? "calc(-100% - 12px)" : "12px"}, -50%)`, pointerEvents: "none", background: "var(--c-ink)", color: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,.18)", zIndex: 5 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{labels[hover] ?? `punt ${hover + 1}`}</div>
                 <div>{num(values[hover])}{unit ? ` ${unitLabel(values[hover], unit)}` : ""}</div>
@@ -195,7 +197,7 @@ export function Legend({ segments = [] }) {
   );
 }
 
-export function Sparkline({ values = [], labels = [], unit = "", color = "var(--c-accent)", height = 34 }) {
+export function Sparkline({ values = [], labels = [], unit = "", color = "var(--chart-1)", height = 34 }) {
   const [hover, setHover] = useState(null);
   const ref = useRef(null);
   const W = 240, H = 40;
@@ -241,7 +243,7 @@ export function RealtimeBars({ values = [], height = 56 }) {
   const bw = 7, gap = (W - n * bw) / (n - 1 || 1);
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <g fill="var(--c-accent)">
+      <g fill="var(--chart-1)">
         {values.map((v, i) => {
           const h = Math.max(4, (v / max) * (H - 6));
           return <rect key={i} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx="2" />;
@@ -254,7 +256,7 @@ export function RealtimeBars({ values = [], height = 56 }) {
 function Empty({ height }) {
   return (
     <div style={{ height, display: "grid", placeItems: "center", color: "var(--c-muted)", fontSize: 13 }}>
-      geen data in deze periode
+      Geen data in deze periode
     </div>
   );
 }
