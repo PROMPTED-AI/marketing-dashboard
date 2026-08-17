@@ -20,8 +20,8 @@ export default function WooCommerce() {
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const { data, loading, error } = useCachedApi(wcReportUrl(start, end, compare, orgId));
-  const [view, setView] = useState(() => localStorage.getItem("kompas-woo-view") || VIEWS[0].id);
-  const pickView = (id) => { setView(id); localStorage.setItem("kompas-woo-view", id); };
+  const [view, setView] = useState(() => localStorage.getItem("mm-woo-view") || VIEWS[0].id);
+  const pickView = (id) => { setView(id); localStorage.setItem("mm-woo-view", id); };
 
   const activeView = VIEWS.find((v) => v.id === view) || VIEWS[0];
   const widgets = useMemo(() => instantiateTemplate(woocommerceCatalog, activeView.tpl).widgets, [activeView.id]);
@@ -56,7 +56,7 @@ export default function WooCommerce() {
         {data && <ExportButton filename="woocommerce" sections={sections} />}
       </div>
 
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>woocommerce</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>WooCommerce</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je WooCommerce-koppeling</div>
 
       {/* view-switcher */}

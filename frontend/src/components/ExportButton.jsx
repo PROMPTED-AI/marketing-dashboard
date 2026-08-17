@@ -17,7 +17,7 @@ export default function ExportButton({ filename = "rapport", sections }) {
   return (
     <div ref={ref} style={{ position: "relative" }} className="no-print">
       <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setOpen((o) => !o)}>
-        <IcDownload s={16} /> rapport exporteren
+        <IcDownload s={16} /> Rapport exporteren
       </button>
       {open && (
         <div style={menu}>

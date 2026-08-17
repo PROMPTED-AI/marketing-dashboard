@@ -51,7 +51,7 @@ export default function AdminUsers({ meEmail }) {
     <div>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>gebruikers &amp; rollen</div>
+          <div className="display" style={{ fontSize: 30 }}>Gebruikers en rollen</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
             Alle accounts op het platform. Bureau-admins beheren alle klanten; klanten zien alleen hun eigen organisatie.
           </div>
@@ -132,7 +132,7 @@ function InviteModal({ orgs, onClose, onLink }) {
     <div style={overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="card" style={{ width: 460, maxWidth: "calc(100vw - 32px)", padding: 26 }}>
         <form onSubmit={submit}>
-          <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>gebruiker uitnodigen</div>
+          <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Gebruiker uitnodigen</div>
           <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>De gebruiker stelt via de link zelf een wachtwoord in en krijgt toegang tot de gekozen organisatie.</div>
           <label style={lbl}>E-mailadres</label>
           <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="klant@bedrijf.nl" style={inp} />
@@ -147,7 +147,7 @@ function InviteModal({ orgs, onClose, onLink }) {
           </select>
           {err && <div style={{ color: "var(--c-neg)", fontSize: 13, marginTop: 12 }}>{String(err.message || err)}</div>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-            <button type="button" className="pill-btn" onClick={onClose} style={btnGhost}>annuleren</button>
+            <button type="button" className="pill-btn" onClick={onClose} style={btnGhost}>Annuleren</button>
             <button type="submit" disabled={busy || !email.trim() || !orgId} className="btn-primary" style={{ height: 42, padding: "0 20px", opacity: busy ? 0.7 : 1 }}>
               {busy ? "bezig…" : "uitnodiging maken"}
             </button>
@@ -179,7 +179,7 @@ function LinkModal({ title, url, emailed, onClose }) {
           <button className="btn-primary" onClick={copy} style={{ height: 44, padding: "0 16px", whiteSpace: "nowrap" }}>{copied ? "gekopieerd" : "kopieer"}</button>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-          <button className="pill-btn" onClick={onClose} style={btnGhost}>sluiten</button>
+          <button className="pill-btn" onClick={onClose} style={btnGhost}>Sluiten</button>
         </div>
       </div>
     </div>

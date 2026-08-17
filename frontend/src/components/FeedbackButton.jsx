@@ -72,7 +72,7 @@ export default function FeedbackButton() {
         <div className="no-print" onClick={close} style={scrim}>
           <div className="bubble-in" onClick={(e) => e.stopPropagation()} style={panel}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div className="display" style={{ fontSize: 22 }}>feedback</div>
+              <div className="display" style={{ fontSize: 22 }}>Feedback</div>
               <button className="btn-ghost" onClick={close} style={{ height: 32, width: 32, padding: 0, fontSize: 16 }}>×</button>
             </div>
 

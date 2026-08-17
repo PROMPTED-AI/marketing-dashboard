@@ -25,12 +25,12 @@ export default function Prefetcher() {
     const t = setTimeout(() => {
       if (active.has("google_analytics")) {
         prefetch(propertiesUrl(orgId));
-        const prop = localStorage.getItem("kompas-property");
+        const prop = localStorage.getItem("mm-property");
         if (prop) prefetch(overviewUrl(prop, start, end, compare, orgId));
       }
       if (active.has("search_console")) {
         prefetch(sitesUrl(orgId));
-        const site = localStorage.getItem("kompas-gsc-site");
+        const site = localStorage.getItem("mm-gsc-site");
         if (site) prefetch(gscReportUrl(site, start, end, compare, orgId));
       }
       if (active.has("google_ads")) prefetch(adsAccountsUrl(orgId));

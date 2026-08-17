@@ -12,11 +12,11 @@ await p.waitForTimeout(2500);
 const body = await p.locator("body").innerText();
 if (!/analytics/i.test(body)) fail("Analytics-view rendert niet");
 
-// KPI-kaarten (kaart met een .display-waarde, kleiner dan grafiekkaarten)
+// KPI-kaarten (kaart met een .mm-metric-waarde, kleiner dan grafiekkaarten)
 // moeten allemaal exact even hoog zijn.
 const heights = await p.$$eval(".card", (cards) =>
   cards
-    .filter((c) => c.querySelector(".display"))
+    .filter((c) => c.querySelector(".mm-metric"))
     .map((c) => Math.round(c.getBoundingClientRect().height))
     .filter((h) => h > 0 && h < 200));
 const unique = [...new Set(heights)];

@@ -53,7 +53,7 @@ function DashIndex() {
   const { data, loading } = useConnections();
   const { features, channels } = useActiveOrg();
   if (loading) return <FullLoader />;
-  const skipped = localStorage.getItem("kompas-onboarded");
+  const skipped = localStorage.getItem("mm-onboarded");
   // Staat Integraties uit, dan zijn kanalen onzichtbaar en richt het bureau de
   // omgeving in; onboarding (zelf koppelen) heeft dan geen zin.
   const channelsVisible = features.integrations !== false;

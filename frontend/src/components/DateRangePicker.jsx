@@ -46,7 +46,7 @@ export default function DateRangePicker() {
           ))}
           <div style={dateRow}>
             <input type="date" value={draft.start} max={draft.end} onChange={(e) => setCustom("start", e.target.value)} style={dateInput} />
-            <span style={{ color: "var(--c-muted)" }}>–</span>
+            <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
             <input type="date" value={draft.end} min={draft.start} max={dr.isoToday} onChange={(e) => setCustom("end", e.target.value)} style={dateInput} />
           </div>
 
@@ -57,7 +57,7 @@ export default function DateRangePicker() {
           {draft.compareMode === "custom" && (
             <div style={dateRow}>
               <input type="date" value={draft.compareStart} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareStart: e.target.value }))} style={dateInput} />
-              <span style={{ color: "var(--c-muted)" }}>–</span>
+              <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
               <input type="date" value={draft.compareEnd} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareEnd: e.target.value }))} style={dateInput} />
             </div>
           )}

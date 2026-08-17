@@ -4,6 +4,7 @@ import { useMe } from "../lib/useMe.jsx";
 import {
   invitationInfo, acceptInvitation, resetInfo, resetPassword,
 } from "../lib/api.js";
+import { Logo } from "../components/Brand.jsx";
 
 const MIN = 8;
 
@@ -49,17 +50,14 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--c-page)", color: "var(--c-ink)", padding: 20 }}>
       <div className="card" style={{ width: "100%", maxWidth: 440, padding: "34px 32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 22 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" /></svg>
-          </div>
-          <div className="display" style={{ fontSize: 22 }}>kompas</div>
+          <Logo size={30} />
         </div>
 
         {info === undefined ? (
           <div style={{ display: "grid", placeItems: "center", padding: 40 }}><div className="spin" /></div>
         ) : info === null ? (
           <div>
-            <div className="display" style={{ fontSize: 24, marginBottom: 8 }}>link is verlopen</div>
+            <div className="display" style={{ fontSize: 24, marginBottom: 8 }}>Link is verlopen</div>
             <div style={{ fontSize: 14, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 22 }}>
               Deze link is verlopen of al gebruikt. Vraag een nieuwe aan of neem contact op met je beheerder.
             </div>
