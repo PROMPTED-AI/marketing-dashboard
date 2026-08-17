@@ -1,9 +1,6 @@
 // Shared inline SVG icons (stroke = currentColor unless noted), from the design.
 const S = (p) => ({ width: p.s || 18, height: p.s || 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" });
 
-export const IcStar = ({ s, stroke = "#fff" }) => (
-  <svg width={s || 18} height={s || 18} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" /></svg>
-);
 export const IcGrid = (p) => (<svg {...S(p)}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>);
 export const IcBars = (p) => (<svg {...S(p)} strokeWidth="2.2"><line x1="5" y1="21" x2="5" y2="12" /><line x1="12" y1="21" x2="12" y2="4" /><line x1="19" y1="21" x2="19" y2="9" /></svg>);
 export const IcSearch = (p) => (<svg {...S(p)}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>);

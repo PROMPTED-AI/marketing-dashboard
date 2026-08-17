@@ -32,7 +32,7 @@ function RequireAuth({ children }) {
 function DashIndex() {
   const { data, loading } = useConnections();
   if (loading) return <FullLoader />;
-  const skipped = localStorage.getItem("kompas-onboarded");
+  const skipped = localStorage.getItem("mm-onboarded");
   if (data && data.connected === 0 && !skipped) return <Navigate to="/onboarding" replace />;
   return <Navigate to="/app/overview" replace />;
 }
@@ -49,8 +49,8 @@ export default function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="search-console" element={<SearchConsole />} />
-        <Route path="google-ads" element={<Placeholder title="google ads" comingSoon />} />
-        <Route path="meta" element={<Placeholder title="meta / social" comingSoon />} />
+        <Route path="google-ads" element={<Placeholder title="Google Ads" comingSoon />} />
+        <Route path="meta" element={<Placeholder title="META / Social" comingSoon />} />
         <Route path="reports" element={<Reports />} />
         <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Settings />} />

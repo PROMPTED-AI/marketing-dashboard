@@ -7,7 +7,8 @@ import { overviewUrl, gscReportUrl, sitesUrl } from "../../lib/urls.js";
 import { exportCsv, printReport } from "../../lib/exportData.js";
 import { num, pct1, duration, shortDate } from "../../lib/format.js";
 import { SectionCard } from "../../components/ui.jsx";
-import { IcStar, IcDownload } from "../../components/icons.jsx";
+import { IcDownload } from "../../components/icons.jsx";
+import { Mark, Wordmark } from "../../components/Brand.jsx";
 
 const GA_SECTIONS = [
   { id: "ga_kpi", label: "KPI-overzicht" },
@@ -18,7 +19,7 @@ const GA_SECTIONS = [
   { id: "ga_daily", label: "Sessies per dag" },
 ];
 const GSC_SECTIONS = [
-  { id: "gsc_kpi", label: "Search Console — KPI" },
+  { id: "gsc_kpi", label: "Search Console · KPI" },
   { id: "gsc_queries", label: "Top zoekopdrachten" },
   { id: "gsc_pages", label: "Top pagina's (SEO)" },
 ];
@@ -33,7 +34,7 @@ export default function Reports() {
   const ga = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
   const sitesResp = useCachedApi(sitesUrl(orgId));
   const sites = sitesResp.data?.sites || [];
-  const stored = localStorage.getItem("kompas-gsc-site");
+  const stored = localStorage.getItem("mm-gsc-site");
   const site = stored && sites.some((s) => s.site_url === stored) ? stored : sites[0]?.site_url || "";
   const gsc = useCachedApi(gscReportUrl(site, start, end, compare, orgId));
 
@@ -43,11 +44,11 @@ export default function Reports() {
 
   // Build the CSV sections from the enabled + available blocks.
   const buildSections = () => {
-    const out = [{ title: `Rapport — ${orgName} · ${label}` }];
+    const out = [{ title: `Rapport · ${orgName} · ${label}` }];
     if (gaData) {
       const k = gaData.kpis;
       const conv = (gaData.conversions || []).reduce((a, c) => a + c.count, 0);
-      if (on.ga_kpi) out.push({ title: "Google Analytics — KPI", columns: ["Metric", "Waarde"], rows: [
+      if (on.ga_kpi) out.push({ title: "Google Analytics · KPI", columns: ["Metric", "Waarde"], rows: [
         ["Gebruikers", k.users], ["Sessies", k.sessions], ["Conversies", conv],
         ["Bouncepercentage %", (k.bounceRate * 100).toFixed(1)], ["Gem. sessieduur (s)", Math.round(k.avgSessionDuration)],
       ] });
@@ -59,7 +60,7 @@ export default function Reports() {
     }
     if (gscData) {
       const t = gscData.totals;
-      if (on.gsc_kpi) out.push({ title: "Search Console — KPI", columns: ["Metric", "Waarde"], rows: [
+      if (on.gsc_kpi) out.push({ title: "Search Console · KPI", columns: ["Metric", "Waarde"], rows: [
         ["Klikken", t.clicks], ["Vertoningen", t.impressions], ["Gem. CTR %", ((t.ctr || 0) * 100).toFixed(2)], ["Gem. positie", (t.position || 0).toFixed(1)],
       ] });
       if (on.gsc_queries) out.push({ title: "Top zoekopdrachten", columns: ["Zoekopdracht", "Klikken", "Vertoningen", "CTR %", "Positie"], rows: gscData.top_queries.map((r) => [r.query, r.clicks, r.impressions, ((r.ctr || 0) * 100).toFixed(2), (r.position || 0).toFixed(1)]) });
@@ -77,8 +78,8 @@ export default function Reports() {
       <div className="no-print">
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
           <div>
-            <div className="display" style={{ fontSize: 30 }}>rapporten</div>
-            <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>stel een rapport samen voor {orgName} · {label}</div>
+            <div className="display" style={{ fontSize: 30 }}>Rapporten</div>
+            <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>Stel een rapport samen voor {orgName} · {label}</div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn-ghost" style={{ height: 42, padding: "0 16px", fontSize: 13.5 }} disabled={!anyData} onClick={() => exportCsv(`rapport-${orgName}.csv`, buildSections())}>
@@ -90,7 +91,7 @@ export default function Reports() {
           </div>
         </div>
 
-        <SectionCard title="secties" style={{ marginBottom: 22 }}>
+        <SectionCard title="Secties" style={{ marginBottom: 22 }}>
           <Group title="Google Analytics" items={GA_SECTIONS} on={on} toggle={toggle} disabled={!gaData} />
           <div style={{ height: 14 }} />
           <Group title="Search Console" items={GSC_SECTIONS} on={on} toggle={toggle} disabled={!gscData} />
@@ -101,10 +102,10 @@ export default function Reports() {
       <div className="report-body">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, paddingBottom: 16, borderBottom: "2px solid var(--c-ink)", marginBottom: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar s={20} /></div>
+            <Mark size={36} />
             <div>
-              <div className="display" style={{ fontSize: 22, lineHeight: 1 }}>kompas</div>
-              <div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>marketingrapport</div>
+              <Wordmark width={124} />
+              <div style={{ fontSize: 11.5, color: "var(--c-muted)", marginTop: 3 }}>Marketingrapport</div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
@@ -113,7 +114,7 @@ export default function Reports() {
           </div>
         </div>
 
-        {!anyData && <div className="card" style={{ padding: 28, color: "var(--c-muted)" }}>Nog geen data beschikbaar — koppel Google Analytics of Search Console.</div>}
+        {!anyData && <div className="card" style={{ padding: 28, color: "var(--c-muted)" }}>Nog geen data beschikbaar. Koppel Google Analytics of Search Console.</div>}
 
         {gaData && on.ga_kpi && (
           <Block title="Overzicht">
@@ -133,7 +134,7 @@ export default function Reports() {
         {gaData && on.ga_daily && <Block title="Sessies per dag"><Table head={["Datum", "Sessies"]} rows={gaData.sessions_by_date.map((d) => [shortDate(d.date), num(d.sessions)])} /></Block>}
 
         {gscData && on.gsc_kpi && (
-          <Block title="Search Console — overzicht">
+          <Block title="Search Console · overzicht">
             <KvTable rows={[
               ["Klikken", num(gscData.totals.clicks)],
               ["Vertoningen", num(gscData.totals.impressions)],
@@ -152,7 +153,7 @@ export default function Reports() {
 function Group({ title, items, on, toggle, disabled }) {
   return (
     <div style={{ opacity: disabled ? 0.5 : 1 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--c-muted)", marginBottom: 10 }}>{title}{disabled && " — niet gekoppeld"}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--c-muted)", marginBottom: 10 }}>{title}{disabled && " · niet gekoppeld"}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {items.map((s) => (
           <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 600, padding: "8px 13px", border: "1px solid var(--c-border)", borderRadius: 999, cursor: disabled ? "default" : "pointer", background: on[s.id] && !disabled ? "var(--c-accent-soft)" : "var(--c-surface)", color: on[s.id] && !disabled ? "var(--c-accent)" : "var(--c-ink-soft)" }}>

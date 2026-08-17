@@ -1,6 +1,8 @@
 // Lightweight SVG charts that mirror the design (no chart library).
 
-const PALETTE = ["var(--c-accent)", "var(--c-sky)", "var(--c-mint)", "var(--c-orange)", "var(--c-purple)", "var(--c-yellow)"];
+// Categorische reeksen volgen de chart-tokens uit het design system:
+// groen, koraal, navy, sky, amber, violet.
+const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 export const palette = PALETTE;
 
 // Area chart with soft fill + line. `compareValues` adds a dashed "previous" line.
@@ -26,7 +28,8 @@ export function AreaChart({ values = [], labels = [], compareValues = null, heig
         {compareValues && compareValues.length > 0 && (
           <path d={path(compareValues)} fill="none" style={{ stroke: "var(--c-border-strong)" }} strokeWidth="2" strokeDasharray="5 5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
         )}
-        <path d={line} fill="none" style={{ stroke: "var(--c-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Grafieken tekenen van links naar rechts in 600ms. */}
+        <path className="mm-draw" pathLength="1" d={line} fill="none" style={{ stroke: "var(--chart-1)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {labels.length > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginTop: 8 }}>
@@ -109,7 +112,7 @@ export function RealtimeBars({ values = [], height = 56 }) {
 function Empty({ height }) {
   return (
     <div style={{ height, display: "grid", placeItems: "center", color: "var(--c-muted)", fontSize: 13 }}>
-      geen data in deze periode
+      Geen data in deze periode
     </div>
   );
 }

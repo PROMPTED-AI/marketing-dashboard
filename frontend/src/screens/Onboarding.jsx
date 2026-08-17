@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { connectUrl } from "../lib/api.js";
-import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
+import { IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
+import { Logo } from "../components/Brand.jsx";
 
 const TOOLS = [
-  { key: "ga", name: "Google Analytics", desc: "bezoekers, sessies, conversies & gedrag (GA4).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
-  { key: "gsc", name: "Search Console", desc: "organisch verkeer, posities & zoekwoorden (SEO).", note: "OAuth via Google · veilig & alleen-lezen", Glyph: GscGlyph, bg: "#E8F0FE", live: true },
-  { key: "ads", name: "Google Ads", desc: "campagnes, kosten, klikken & ROAS.", note: "binnenkort beschikbaar", Glyph: AdsGlyph, bg: "#E8F0FE", live: false },
-  { key: "meta", name: "META Ads", desc: "Facebook & Instagram campagnes en social bereik.", note: "binnenkort beschikbaar", Glyph: MetaGlyph, bg: "#E7F0FF", live: false },
+  { key: "ga", name: "Google Analytics", desc: "Bezoekers, sessies, conversies en gedrag (GA4).", note: "OAuth via Google · veilig en alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
+  { key: "gsc", name: "Search Console", desc: "Organisch verkeer, posities en zoekwoorden (SEO).", note: "OAuth via Google · veilig en alleen-lezen", Glyph: GscGlyph, bg: "#E8F0FE", live: true },
+  { key: "ads", name: "Google Ads", desc: "Campagnes, kosten, klikken en ROAS.", note: "Binnenkort beschikbaar", Glyph: AdsGlyph, bg: "#E8F0FE", live: false },
+  { key: "meta", name: "META Ads", desc: "Facebook- en Instagram-campagnes en social bereik.", note: "Binnenkort beschikbaar", Glyph: MetaGlyph, bg: "#E7F0FF", live: false },
 ];
 
 export default function Onboarding() {
@@ -25,12 +26,12 @@ export default function Onboarding() {
   // Connect only the selected Google tools (incremental authorization).
   const cont = () => {
     const googleSel = [sel.ga && "google_analytics", sel.gsc && "search_console"].filter(Boolean);
-    localStorage.setItem("kompas-onboarded", "1");
+    localStorage.setItem("mm-onboarded", "1");
     if (googleSel.length) window.location.href = connectUrl(googleSel, "/app/overview");
     else nav("/app/overview");
   };
   const skip = () => {
-    localStorage.setItem("kompas-onboarded", "1");
+    localStorage.setItem("mm-onboarded", "1");
     nav("/app/overview");
   };
 
@@ -38,29 +39,28 @@ export default function Onboarding() {
     <div style={{ minHeight: "100vh", background: "var(--c-page)", display: "flex", justifyContent: "center", padding: 24 }}>
       <div className="card" style={{ width: "min(1100px, 100%)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "var(--sh-md)" }}>
         {/* header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "22px 36px", borderBottom: "1px solid var(--c-border)" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
-          <div className="display" style={{ fontSize: 20 }}>kompas</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "20px 36px", borderBottom: "1px solid var(--c-border)" }}>
+          <Logo size={28} />
           <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--c-muted)", fontWeight: 600 }}>
-            <span style={{ color: "var(--c-pos)" }}>✓ account</span><span style={{ opacity: 0.4 }}>———</span>
-            <span style={{ color: "var(--c-accent)" }}>koppelen</span><span style={{ opacity: 0.4 }}>———</span>
-            <span>klaar</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--c-muted)" }}>
+            <span style={{ color: "var(--c-accent-strong)", fontWeight: 600 }}>✓ Account</span><span style={{ opacity: 0.4 }}>···</span>
+            <span style={{ color: "var(--c-accent-strong)", fontWeight: 600 }}>Koppelen</span><span style={{ opacity: 0.4 }}>···</span>
+            <span>Klaar</span>
           </div>
-          <div onClick={skip} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>overslaan</div>
+          <div onClick={skip} style={{ marginLeft: 14, fontSize: 13, color: "var(--c-muted)", fontWeight: 600, cursor: "pointer" }}>Overslaan</div>
         </div>
 
         {/* body */}
         <div style={{ padding: "36px 48px" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 2 van 3</div>
-          <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>koppel je marketingtools.</div>
+          <div className="mm-eyebrow" style={{ color: "var(--c-accent-strong)", marginBottom: 10 }}>Stap 2 van 3</div>
+          <div className="display" style={{ fontSize: 32, letterSpacing: "var(--ls-display)", marginBottom: 10 }}>Koppel je marketingbronnen</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
             <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>
-              kies welke bronnen je wilt verbinden. je kunt er één kiezen of alles tegelijk — later koppelen kan altijd via Integraties.
+              Kies welke bronnen je wilt koppelen. Eén is genoeg om te starten, later koppelen kan altijd via Integraties.
             </div>
             <div onClick={toggleAll} style={selectAll}>
               <div style={{ ...box, ...(allSel ? boxOn : {}) }}>{allSel && <IcCheck />}</div>
-              selecteer alles
+              Selecteer alles
             </div>
           </div>
 
@@ -86,9 +86,9 @@ export default function Onboarding() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 28 }}>
-            <div style={{ fontSize: 14, color: "var(--c-muted)", fontWeight: 600 }}>{count} van 4 tools geselecteerd</div>
-            <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15, opacity: count ? 1 : 0.5, cursor: count ? "pointer" : "not-allowed" }} disabled={!count} onClick={cont}>
-              {count ? `verbind ${count} tool${count === 1 ? "" : "s"}` : "kies minstens één tool"} <IcArrow />
+            <div style={{ fontSize: 14, color: "var(--c-muted)" }}>{count} van 4 bronnen geselecteerd</div>
+            <button className="btn-primary" style={{ height: 52, padding: "0 32px", fontSize: 15 }} disabled={!count} onClick={cont}>
+              {count ? `Koppel ${count} bron${count === 1 ? "" : "nen"}` : "Kies minstens één bron"} <IcArrow />
             </button>
           </div>
           <div style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 14 }}>
@@ -100,10 +100,10 @@ export default function Onboarding() {
   );
 }
 
-const selectAll = { display: "inline-flex", alignItems: "center", gap: 9, padding: "9px 15px", borderRadius: 999, border: "1px solid var(--c-border)", background: "var(--c-surface)", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" };
-const box = { width: 18, height: 18, borderRadius: 6, border: "2px solid var(--c-muted)", display: "flex", alignItems: "center", justifyContent: "center" };
+const selectAll = { display: "inline-flex", alignItems: "center", gap: 9, padding: "9px 15px", borderRadius: "var(--radius-pill)", border: "1px solid var(--c-border)", background: "var(--c-surface)", fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" };
+const box = { width: 18, height: 18, borderRadius: "var(--radius-xs)", border: "2px solid var(--c-border-strong)", display: "flex", alignItems: "center", justifyContent: "center" };
 const boxOn = { background: "var(--c-accent)", border: "2px solid var(--c-accent)" };
-const toolCard = { position: "relative", padding: 26, borderRadius: 16, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", boxShadow: "var(--sh-sm)" };
+const toolCard = { position: "relative", padding: 24, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", background: "var(--c-surface)", cursor: "pointer", boxShadow: "var(--sh-sm)", transition: "box-shadow var(--dur-base) var(--ease-standard)" };
 const toolCardOn = { boxShadow: "0 0 0 2px var(--c-accent) inset, var(--sh-md)" };
 const check = { width: 24, height: 24, borderRadius: "50%", border: "2px solid var(--c-border)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" };
 const checkOn = { background: "var(--c-accent)", border: "2px solid var(--c-accent)" };

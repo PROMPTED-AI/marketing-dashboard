@@ -25,12 +25,12 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>instellingen</div>
-      <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 22px" }}>beheer je profiel, voorkeuren en organisatie</div>
+      <div className="display" style={{ fontSize: 30 }}>Instellingen</div>
+      <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 22px" }}>Beheer je profiel, voorkeuren en organisatie</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>
         {/* PROFIEL */}
-        <SectionCard title="profiel & account">
+        <SectionCard title="Profiel en account">
           <Row label="E-mailadres" value={me?.email || "—"} />
           <Row label="Rol" value={ROLE_LABEL[me?.role] || me?.role || "—"} />
           <Row label="Organisatie" value={activeOrg?.name || "—"} last />

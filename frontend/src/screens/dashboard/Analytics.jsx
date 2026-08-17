@@ -41,7 +41,7 @@ export default function Analytics() {
   const sections = () => {
     if (!data) return [];
     const out = [
-      { title: "Analytics — " + label },
+      { title: "Analytics · " + label },
       { columns: ["Metric", "Waarde"], rows: [
         ["Gebruikers", data.kpis.users],
         ["Sessies", data.kpis.sessions],
@@ -77,13 +77,13 @@ export default function Analytics() {
         )}
         <div style={{ flex: 1 }} />
         <div className="pill pos" style={{ padding: "7px 13px", fontSize: 12.5 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> live verbonden
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> Live verbonden
         </div>
         <ExportButton filename="analytics" sections={sections} />
       </div>
 
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics — gedrag &amp; verkeer</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>automatisch ingeladen via je GA4-koppeling · {label}</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Analytics</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Gedrag en verkeer · automatisch ingeladen via je GA4-koppeling · {label}</div>
 
       <TabState loading={loading} error={error} onConnect />
       {!loading && !error && data && (
@@ -98,7 +98,7 @@ export default function Analytics() {
 
           {/* SESSIONS CHART + REALTIME */}
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <SectionCard title="sessies over tijd" style={{ flex: 2, minWidth: 320 }}>
+            <SectionCard title="Sessies over tijd" style={{ flex: 2, minWidth: 320 }}>
               <AreaChart
                 values={(data.sessions_by_date ?? []).map((d) => d.sessions)}
                 compareValues={data.compare_series}
@@ -108,16 +108,16 @@ export default function Analytics() {
             </SectionCard>
             <SectionCard style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> realtime
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> Realtime
               </div>
               <div className="display" style={{ fontSize: 40, lineHeight: 1, margin: "6px 0 2px" }}>{rt ? num(rt.active_users) : "—"}</div>
-              <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>actieve gebruikers nu</div>
-              <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>per minuut (laatste 30 min)</div>
+              <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>Actieve gebruikers nu</div>
+              <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 6 }}>Per minuut (laatste 30 min)</div>
               <RealtimeBars values={rt?.by_minute || []} />
               {rt?.pages?.length > 0 && (
                 <>
                   <div style={{ height: 1, background: "var(--c-border)", margin: "14px 0" }} />
-                  <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 8 }}>actieve pagina's</div>
+                  <div style={{ fontSize: 11, color: "var(--c-muted)", fontWeight: 600, marginBottom: 8 }}>Actieve pagina's</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}>
                     {rt.pages.slice(0, 3).map((p, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -133,7 +133,7 @@ export default function Analytics() {
 
           {/* TOP PAGES + DONUT */}
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <SectionCard title="toppagina's" style={{ flex: 1.5, minWidth: 320 }}>
+            <SectionCard title="Toppagina's" style={{ flex: 1.5, minWidth: 320 }}>
               <div style={{ ...tableHead, gridTemplateColumns: "2.4fr 1fr 1fr" }}>
                 <span>Pagina</span><span style={{ textAlign: "right" }}>Weergaven</span><span style={{ textAlign: "right" }}>Bounce</span>
               </div>
@@ -145,7 +145,7 @@ export default function Analytics() {
                 </div>
               ))}
             </SectionCard>
-            <SectionCard title="verkeersbronnen" style={{ flex: 1, minWidth: 240 }}>
+            <SectionCard title="Verkeersbronnen" style={{ flex: 1, minWidth: 240 }}>
               <Donut segments={data.channels ?? []} centerTop={(data.channels ?? []).length} centerSub="kanalen" size={150} />
               <div style={{ marginTop: 14 }}><Legend segments={data.channels ?? []} /></div>
             </SectionCard>
@@ -153,7 +153,7 @@ export default function Analytics() {
 
           {/* CONVERSIES + DEVICES + GEO */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SectionCard title="conversies &amp; doelen" style={{ flex: 1, minWidth: 240 }}>
+            <SectionCard title="Conversies en doelen" style={{ flex: 1, minWidth: 240 }}>
               {data.conversions?.length ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {data.conversions.slice(0, 4).map((c, i) => {
@@ -163,12 +163,12 @@ export default function Analytics() {
                 </div>
               ) : <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen conversie-events in deze periode.</div>}
             </SectionCard>
-            <SectionCard title="apparaten" style={{ flex: 1, minWidth: 240 }}>
+            <SectionCard title="Apparaten" style={{ flex: 1, minWidth: 240 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {(data.devices ?? []).map((d, i) => <ProgressRow key={i} label={cap(d.label)} value={`${d.pct}%`} pct={d.pct} color={palette[i % palette.length]} />)}
               </div>
             </SectionCard>
-            <SectionCard title="geografie" style={{ flex: 1, minWidth: 240 }}>
+            <SectionCard title="Geografie" style={{ flex: 1, minWidth: 240 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
                 {(data.geography ?? []).map((g, i) => <ProgressRow key={i} label={g.label} value={`${g.pct}%`} pct={g.pct} color={palette[i % palette.length]} labelWidth={78} />)}
               </div>

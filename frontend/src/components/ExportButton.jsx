@@ -17,7 +17,7 @@ export default function ExportButton({ filename = "rapport", sections }) {
   return (
     <div ref={ref} style={{ position: "relative" }} className="no-print">
       <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setOpen((o) => !o)}>
-        <IcDownload s={16} /> rapport exporteren
+        <IcDownload s={16} /> Rapport exporteren
       </button>
       {open && (
         <div style={menu}>
@@ -29,5 +29,5 @@ export default function ExportButton({ filename = "rapport", sections }) {
   );
 }
 
-const menu = { position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 40, padding: 6 };
-const row = { padding: "10px 12px", fontSize: 13.5, cursor: "pointer", color: "var(--c-ink-soft)", borderRadius: 8 };
+const menu = { position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "var(--radius-md)", boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 40, padding: 6 };
+const row = { padding: "10px 12px", fontSize: 13.5, cursor: "pointer", color: "var(--c-ink-soft)", borderRadius: "var(--radius-xs)" };
