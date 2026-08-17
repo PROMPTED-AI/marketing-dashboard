@@ -21,7 +21,7 @@ DEMO_PASSWORD = "janssen123"
 DEMO_SITE = "https://www.janssen.nl/"
 
 DEMO_PROPERTIES = [
-    {"property_id": "demo-janssen", "display_name": "janssen.nl — website", "account": "Janssen"},
+    {"property_id": "demo-janssen", "display_name": "janssen.nl · website", "account": "Janssen"},
 ]
 
 DEMO_SITES = [{"site_url": DEMO_SITE, "permission": "siteFullUser"}]

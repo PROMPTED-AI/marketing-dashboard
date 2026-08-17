@@ -46,7 +46,7 @@ export default function DateRangePicker() {
           ))}
           <div style={dateRow}>
             <input type="date" value={draft.start} max={draft.end} onChange={(e) => setCustom("start", e.target.value)} style={dateInput} />
-            <span style={{ color: "var(--c-muted)" }}>–</span>
+            <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
             <input type="date" value={draft.end} min={draft.start} max={dr.isoToday} onChange={(e) => setCustom("end", e.target.value)} style={dateInput} />
           </div>
 
@@ -57,7 +57,7 @@ export default function DateRangePicker() {
           {draft.compareMode === "custom" && (
             <div style={dateRow}>
               <input type="date" value={draft.compareStart} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareStart: e.target.value }))} style={dateInput} />
-              <span style={{ color: "var(--c-muted)" }}>–</span>
+              <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
               <input type="date" value={draft.compareEnd} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareEnd: e.target.value }))} style={dateInput} />
             </div>
           )}
@@ -72,11 +72,11 @@ export default function DateRangePicker() {
   );
 }
 
-const pill = { display: "flex", alignItems: "center", gap: 8, padding: "0 14px", height: 40, border: "1px solid var(--c-border)", borderRadius: 999, background: "var(--c-surface)", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--c-ink-soft)", userSelect: "none", whiteSpace: "nowrap" };
-const menu = { position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 260, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 40, paddingTop: 6 };
-const section = { padding: "6px 14px", fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--c-muted)" };
+const pill = { display: "flex", alignItems: "center", gap: 8, padding: "0 14px", height: 38, border: "1px solid var(--c-border)", borderRadius: "var(--radius-pill)", background: "var(--c-surface)", fontSize: 13, cursor: "pointer", color: "var(--c-ink-soft)", userSelect: "none", whiteSpace: "nowrap" };
+const menu = { position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 260, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "var(--radius-md)", boxShadow: "var(--sh-md)", overflow: "hidden", zIndex: 40, paddingTop: 6 };
+const section = { padding: "6px 14px", fontSize: 11, fontWeight: 500, letterSpacing: "var(--ls-caps)", textTransform: "uppercase", color: "var(--c-muted)" };
 const row = { padding: "9px 14px", fontSize: 13.5, cursor: "pointer", color: "var(--c-ink-soft)" };
-const rowActive = { background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
+const rowActive = { background: "var(--surface-accent)", color: "var(--c-accent-strong)", fontWeight: 600 };
 const dateRow = { display: "flex", gap: 8, alignItems: "center", padding: "8px 14px" };
-const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "Montserrat, sans-serif" };
+const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: "var(--radius-sm)", border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "var(--font-body)" };
 const footer = { display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 14px", borderTop: "1px solid var(--c-border)", marginTop: 6 };

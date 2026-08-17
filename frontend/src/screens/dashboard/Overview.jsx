@@ -31,7 +31,7 @@ export default function Overview() {
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState(null);
 
-  const storeKey = orgId ? `kompas-dash-overview-${orgId}` : null;
+  const storeKey = orgId ? `mm-dash-overview-${orgId}` : null;
   const initRef = useRef(null);
   const isOwner = activeId == null || activeMeta.is_owner; // unsaved template -> owner-to-be
 
@@ -173,7 +173,7 @@ export default function Overview() {
     if (!data) return [];
     const conversiesTotal = (data.conversions || []).reduce((a, c) => a + c.count, 0);
     return [
-      { title: "Overzicht — " + label },
+      { title: "Overzicht · " + label },
       { columns: ["Metric", "Waarde"], rows: [
         ["Bezoekers", data.kpis.users],
         ["Sessies", data.kpis.sessions],
@@ -197,16 +197,16 @@ export default function Overview() {
       {/* header + dashboard switcher */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 18, gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>overzicht</div>
+          <div className="display" style={{ fontSize: 30 }}>Overzicht</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
-            prestaties van de {label} · live uit Google Analytics
+            Prestaties van de {label} · live uit Google Analytics
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <DashboardSwitcher list={dash.list} activeId={activeId} onSwitch={switchTo} onNew={() => setModal("template")} />
-          {activeId && activeMeta.visibility === "shared" && <span className="pill accent">gedeeld</span>}
-          {activeId && !isOwner && <span className="pill muted">van een collega</span>}
-          {dirty && <span className="pill muted">niet opgeslagen</span>}
+          {activeId && activeMeta.visibility === "shared" && <span className="pill accent">Gedeeld</span>}
+          {activeId && !isOwner && <span className="pill muted">Van een collega</span>}
+          {dirty && <span className="pill muted">Niet opgeslagen</span>}
           {!editing ? (
             <button className="btn-ghost" onClick={() => setEditing(true)} style={{ height: 40, padding: "0 16px" }}>Aanpassen</button>
           ) : (
@@ -223,7 +223,7 @@ export default function Overview() {
           <button className="btn-ghost" onClick={saveCurrent} disabled={busy || !dirty || !isOwner} title={!isOwner ? "Alleen de eigenaar kan dit dashboard overschrijven" : undefined} style={{ height: 38, padding: "0 16px", opacity: !dirty || busy || !isOwner ? 0.5 : 1 }}>Opslaan</button>
           <button className="btn-ghost" onClick={() => setModal("saveas")} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Opslaan als…</button>
           <div style={{ flex: 1 }} />
-          {!isOwner && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Dit is andermans dashboard — gebruik “Opslaan als…” voor je eigen kopie.</span>}
+          {!isOwner && <span style={{ fontSize: 12.5, color: "var(--c-muted)" }}>Dit is andermans dashboard. Gebruik “Opslaan als…” voor je eigen kopie.</span>}
           {activeId && isOwner && <button className="btn-ghost" onClick={toggleShare} disabled={busy} style={{ height: 38, padding: "0 14px" }}>{activeMeta.visibility === "shared" ? "Delen stoppen" : "Delen met organisatie"}</button>}
           {activeId && isOwner && <button className="btn-ghost" onClick={() => setModal("rename")} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Hernoemen</button>}
           {activeId && isOwner && <button className="btn-ghost" onClick={makeDefault} disabled={busy} style={{ height: 38, padding: "0 14px" }}>Als standaard</button>}

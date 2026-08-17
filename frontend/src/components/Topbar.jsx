@@ -3,7 +3,7 @@ import DateRangePicker from "./DateRangePicker.jsx";
 import { IcSearch, IcSun, IcMoon, IcBell } from "./icons.jsx";
 
 // Generic dashboard topbar. Pass `left` to replace the default search pill.
-export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagina of metric…", showDateRange = true }) {
+export default function Topbar({ left, searchPlaceholder = "Zoek campagne, pagina of metric…", showDateRange = true }) {
   const { theme, toggle } = useTheme();
   return (
     <div style={bar} className="no-print">
@@ -15,7 +15,7 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
       )}
       <div style={{ flex: 1 }} />
       {showDateRange && <DateRangePicker />}
-      <button style={iconBtn} onClick={toggle} title="thema wisselen">
+      <button style={iconBtn} onClick={toggle} title="Thema wisselen">
         {theme === "dark" ? <IcSun s={17} /> : <IcMoon s={17} />}
       </button>
       <div style={{ ...iconBtn, position: "relative", cursor: "pointer" }}>
@@ -26,7 +26,7 @@ export default function Topbar({ left, searchPlaceholder = "zoek campagne, pagin
   );
 }
 
-const bar = { display: "flex", alignItems: "center", gap: 14, padding: "16px 28px", borderBottom: "1px solid var(--c-border)", background: "var(--c-surface)" };
-const searchPill = { display: "flex", alignItems: "center", gap: 9, padding: "0 14px", height: 40, border: "1px solid var(--c-border)", borderRadius: 999, background: "var(--c-surface-2)", width: 320, color: "var(--c-muted)" };
-const iconBtn = { width: 40, height: 40, border: "1px solid var(--c-border)", borderRadius: "50%", background: "var(--c-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--c-ink-soft)" };
+const bar = { display: "flex", alignItems: "center", gap: 12, height: "var(--topbar-h)", flex: "none", padding: "0 28px", borderBottom: "1px solid var(--border-subtle)", background: "var(--c-surface)" };
+const searchPill = { display: "flex", alignItems: "center", gap: 9, padding: "0 14px", height: 38, border: "1px solid var(--c-border)", borderRadius: "var(--radius-pill)", background: "var(--c-surface-2)", width: 320, color: "var(--c-muted)" };
+const iconBtn = { width: 38, height: 38, border: "1px solid var(--c-border)", borderRadius: "50%", background: "var(--c-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--c-ink-soft)" };
 const dot = { position: "absolute", top: 7, right: 8, width: 7, height: 7, borderRadius: "50%", background: "var(--c-neg)", border: "1.5px solid var(--c-surface)" };

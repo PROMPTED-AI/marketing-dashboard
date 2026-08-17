@@ -6,7 +6,10 @@ import { ThemeProvider } from "./lib/ThemeProvider.jsx";
 import { MeProvider } from "./lib/useMe.jsx";
 import { ActiveOrgProvider } from "./lib/ActiveOrgProvider.jsx";
 import { DateRangeProvider } from "./lib/PeriodProvider.jsx";
+import { migrateLegacyKeys } from "./lib/storage.js";
 import "./theme.css";
+
+migrateLegacyKeys();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

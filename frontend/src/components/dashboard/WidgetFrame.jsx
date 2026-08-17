@@ -5,8 +5,8 @@ import WidgetRenderer from "../WidgetRenderer.jsx";
 import { SOURCES, KINDS, SIZES } from "../../lib/widgetCatalog.js";
 
 const ctrlStyle = {
-  height: 30, padding: "0 8px", borderRadius: 8, border: "1px solid var(--c-border)",
-  background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "inherit", fontWeight: 600,
+  height: 30, padding: "0 8px", borderRadius: "var(--radius-sm)", border: "1px solid var(--c-border)",
+  background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "inherit",
 };
 
 export default function WidgetFrame({
@@ -68,7 +68,7 @@ export default function WidgetFrame({
       )}
       <div
         style={{
-          flex: 1, borderRadius: 14,
+          flex: 1, borderRadius: "var(--radius-md)",
           outline: isDropTarget ? "2px solid var(--c-accent)" : editing ? "1px dashed var(--c-border-strong)" : "none",
           outlineOffset: 4,
         }}

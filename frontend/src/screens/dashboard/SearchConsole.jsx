@@ -10,7 +10,7 @@ import ExportButton from "../../components/ExportButton.jsx";
 import { GscGlyph } from "../../components/icons.jsx";
 
 export default function SearchConsole() {
-  const [site, setSite] = useState(() => localStorage.getItem("kompas-gsc-site") || "");
+  const [site, setSite] = useState(() => localStorage.getItem("mm-gsc-site") || "");
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
@@ -25,7 +25,7 @@ export default function SearchConsole() {
 
   const { data, error } = useCachedApi(gscReportUrl(site, start, end, compare, orgId));
 
-  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); };
+  const chooseSite = (s) => { setSite(s); localStorage.setItem("mm-gsc-site", s); };
 
   if (loading) return <TabState loading />;
   if (sitesErr) return <TabState error={sitesErr} onConnect />;
@@ -44,7 +44,7 @@ export default function SearchConsole() {
   const sections = () => {
     if (!data) return [];
     return [
-      { title: "Search Console — " + label + " · " + site },
+      { title: "Search Console · " + label + " · " + site },
       { columns: ["Metric", "Waarde"], rows: [
         ["Klikken", t.clicks],
         ["Vertoningen", t.impressions],
@@ -83,7 +83,7 @@ export default function SearchConsole() {
             <KpiCard label="Gem. positie" value={(t.position || 0).toFixed(1).replace(".", ",")} {...(data.deltas ? deltaProps(data.deltas.position, false) : {})} />
           </div>
 
-          <SectionCard title="klikken over tijd" style={{ marginBottom: 16 }}>
+          <SectionCard title="Klikken over tijd" style={{ marginBottom: 16 }}>
             <AreaChart
               values={data.by_date.map((d) => d.clicks)}
               labels={pickLabels(data.by_date.map((d) => shortDate(d.date.replaceAll("-", ""))))}
@@ -92,10 +92,10 @@ export default function SearchConsole() {
           </SectionCard>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <SectionCard title="top zoekopdrachten" style={{ flex: 1, minWidth: 320 }}>
+            <SectionCard title="Top zoekopdrachten" style={{ flex: 1, minWidth: 320 }}>
               <Table rows={data.top_queries} keyCol="query" />
             </SectionCard>
-            <SectionCard title="top pagina's" style={{ flex: 1, minWidth: 320 }}>
+            <SectionCard title="Top pagina's" style={{ flex: 1, minWidth: 320 }}>
               <Table rows={data.top_pages} keyCol="page" />
             </SectionCard>
           </div>
@@ -110,18 +110,18 @@ function Header({ right, label }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}><GscGlyph s={20} /></div>
-        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Search Console</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>organisch verkeer & posities</div></div>
+        <div><div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.1 }}>Search Console</div><div style={{ fontSize: 11.5, color: "var(--c-muted)" }}>Organisch verkeer en posities</div></div>
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>search console — seo</div>
-      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>{label} · live via je Search Console-koppeling</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Search Console</div>
+      <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>Organische posities en zoekwoorden · {label}</div>
     </div>
   );
 }
 
 function Table({ rows, keyCol }) {
-  if (!rows?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>geen data.</div>;
+  if (!rows?.length) return <div style={{ color: "var(--c-muted)", fontSize: 13 }}>Geen data in deze periode.</div>;
   return (
     <div>
       <div style={{ ...head, gridTemplateColumns: "2.4fr 1fr 1fr 1fr" }}>

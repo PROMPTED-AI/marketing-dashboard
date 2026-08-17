@@ -33,7 +33,7 @@ export default function WidgetRenderer({ widget, data }) {
         label={widget.title}
         value={fmtScalar(s.value, s.fmt)}
         sparkValues={spark}
-        sparkColor="var(--c-accent)"
+        sparkColor="var(--chart-1)"
         {...delta}
       />
     );
@@ -113,7 +113,7 @@ export default function WidgetRenderer({ widget, data }) {
                       style={{
                         textAlign: i === 0 ? "left" : "right",
                         color: "var(--c-muted)",
-                        fontWeight: 600,
+                        fontWeight: 500,
                         fontSize: 12,
                         padding: "6px 8px",
                         borderBottom: "1px solid var(--c-track)",
@@ -134,7 +134,8 @@ export default function WidgetRenderer({ widget, data }) {
                           textAlign: ci === 0 ? "left" : "right",
                           padding: "7px 8px",
                           borderBottom: "1px solid var(--c-track)",
-                          fontWeight: ci === 0 ? 500 : 700,
+                          fontWeight: ci === 0 ? 400 : 600,
+                          fontVariantNumeric: ci === 0 ? "normal" : "tabular-nums",
                           maxWidth: ci === 0 ? 260 : "none",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -160,7 +161,7 @@ export default function WidgetRenderer({ widget, data }) {
 function Empty() {
   return (
     <div style={{ padding: "24px 0", display: "grid", placeItems: "center", color: "var(--c-muted)", fontSize: 13 }}>
-      geen data in deze periode
+      Geen data in deze periode
     </div>
   );
 }

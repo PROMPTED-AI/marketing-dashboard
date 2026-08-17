@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { api, LOGOUT_URL } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
 import Topbar from "../components/Topbar.jsx";
-import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChevDown, IcPlus } from "../components/icons.jsx";
+import { IcUsers, IcPlug, IcCog, IcDoc, IcChevDown, IcPlus } from "../components/icons.jsx";
+import { Logo } from "../components/Brand.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -54,10 +55,9 @@ export default function Admin() {
     <div style={{ height: "100vh", display: "flex", background: "var(--c-page)", color: "var(--c-ink)" }}>
       {/* admin sidebar */}
       <div style={sidebar}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
-          <div className="display" style={{ fontSize: 20 }}>kompas</div>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--c-surface)", background: "var(--c-ink)", padding: "3px 7px", borderRadius: 6 }}>admin</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "20px 20px 16px" }}>
+          <Logo size={26} />
+          <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "var(--ls-caps)", textTransform: "uppercase", color: "#fff", background: "var(--mm-navy-800)", padding: "3px 8px", borderRadius: "var(--radius-pill)" }}>admin</span>
         </div>
         <div style={menuLabel}>Platform</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 12px", fontSize: 14 }}>
@@ -68,26 +68,26 @@ export default function Admin() {
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ padding: 12 }}>
-          <div onClick={() => nav("/app")} style={{ ...navItem, justifyContent: "center", cursor: "pointer", border: "1px solid var(--c-border)" }}>← naar dashboard</div>
+          <div onClick={() => nav("/app")} style={{ ...navItem, justifyContent: "center", cursor: "pointer", border: "1px solid var(--c-border)" }}>← Naar dashboard</div>
         </div>
         <div style={userFoot}>
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--c-ink)", color: "var(--c-surface)", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{initials(me.email)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div><div style={{ fontSize: 11, color: "var(--c-muted)" }}>platform-admin</div></div>
-          <a href={LOGOUT_URL} style={{ color: "var(--c-muted)" }} title="uitloggen"><IcChevDown s={16} /></a>
+          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div><div style={{ fontSize: 11, color: "var(--c-muted)" }}>Platform-admin</div></div>
+          <a href={LOGOUT_URL} style={{ color: "var(--c-muted)" }} title="Uitloggen"><IcChevDown s={16} /></a>
         </div>
       </div>
 
       {/* main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} />
+        <Topbar searchPlaceholder="Zoek klant of domein…" showDateRange={false} />
         <div style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <div className="display" style={{ fontSize: 30 }}>klanten</div>
-              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>alle organisaties op het platform — koppelingen, status &amp; activiteit</div>
+              <div className="display" style={{ fontSize: 30 }}>Klanten</div>
+              <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>Alle organisaties op het platform · koppelingen, status en activiteit</div>
             </div>
             <button className="btn-primary" style={{ height: 42, padding: "0 18px", fontSize: 13.5 }} onClick={() => setAdding(true)}>
-              <IcPlus s={16} /> klant toevoegen
+              <IcPlus s={16} /> Klant toevoegen
             </button>
           </div>
 
@@ -158,10 +158,10 @@ function AddClientModal({ onClose, onDone }) {
       <div className="card" style={{ width: 460, maxWidth: "calc(100vw - 32px)", padding: 26 }}>
         {org ? (
           <div>
-            <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>klant aangemaakt</div>
+            <div className="display" style={{ fontSize: 22, marginBottom: 8 }}>Klant aangemaakt</div>
             <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
               <strong style={{ color: "var(--c-ink)" }}>{org.name}</strong> ({org.domain}) staat klaar. Nodig de klant uit door iemand met een
-              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard — ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
+              <strong style={{ color: "var(--c-ink)" }}> @{org.domain}</strong>-adres te laten inloggen op het dashboard. Ze worden automatisch aan deze organisatie gekoppeld en doorlopen de onboarding om hun tools te verbinden.
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button className="btn-primary" style={{ height: 42, padding: "0 20px" }} onClick={onDone}>klaar</button>
@@ -169,7 +169,7 @@ function AddClientModal({ onClose, onDone }) {
           </div>
         ) : (
           <form onSubmit={submit}>
-            <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>klant toevoegen</div>
+            <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Klant toevoegen</div>
             <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>maak een organisatie aan en nodig de klant uit via hun e-maildomein.</div>
             <label style={lbl}>Naam organisatie</label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Voorbeeld B.V." style={inp} />
