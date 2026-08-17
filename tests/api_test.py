@@ -855,6 +855,35 @@ def test_session_hardening():
         models.delete_organization(org["id"])
 
 
+def test_static_assets():
+    """Bestanden uit frontend/public/ komen als bestand terug, niet als SPA.
+
+    De SPA-catch-all vangt elk onbekend pad af met index.html. Zonder de
+    bestands-lookup kreeg /brand/*.png en /favicon.png dus text/html terug en
+    bleven de merk-assets in de browser stuk, terwijl alles 200 gaf.
+    """
+    for path, kind in (
+        ("/favicon.png", "image/"),
+        ("/apple-touch-icon.png", "image/"),
+        ("/brand/metricmelon-beeldmerk.png", "image/"),
+        ("/brand/metricmelon-wordmark.png", "image/"),
+        ("/brand/metricmelon-wordmark-white.png", "image/"),
+        ("/fonts/Fredoka-SemiBold.ttf", ""),
+    ):
+        r = requests.get(f"{BASE}{path}")
+        assert r.status_code == 200, (path, r.status_code)
+        ctype = r.headers.get("content-type", "")
+        assert not ctype.startswith("text/html"), (path, ctype)
+        assert ctype.startswith(kind), (path, ctype)
+    # Een onbekend pad hoort nog steeds de SPA te zijn (client-side routing).
+    r = requests.get(f"{BASE}/app/analytics")
+    assert r.headers.get("content-type", "").startswith("text/html"), r.headers
+    # Pad-traversal mag nooit buiten de SPA-map komen.
+    r = requests.get(f"{BASE}/../requirements.txt")
+    assert "fastapi" not in r.text.lower(), "pad-traversal lekt bestanden buiten static_spa"
+    print("statische assets: merk-bestanden komen als afbeelding terug, SPA-fallback intact")
+
+
 def test_security_headers():
     """Elke respons draagt de security-headers, ook de SPA en een API-fout."""
     for url in (f"{BASE}/login", f"{BASE}/api/me"):
@@ -1018,6 +1047,7 @@ if __name__ == "__main__":
     test_agency_promotion(admin)
     test_feedback_scope(admin)
     test_session_hardening()
+    test_static_assets()
     test_security_headers()
     test_cache_purge()
     test_asset_validation(demo)

@@ -90,6 +90,26 @@ if (SPA_DIR / "fonts").is_dir():
     app.mount("/fonts", StaticFiles(directory=SPA_DIR / "fonts"), name="fonts")
 
 
+def spa_file(full_path: str) -> Path | None:
+    """Het echte bestand uit de gebouwde SPA achter dit pad, of None.
+
+    Alles in `frontend/public/` komt naast index.html in de build terecht:
+    merk-assets, favicon, apple-touch-icon. Zonder deze lookup vangt de
+    SPA-catch-all die verzoeken op en krijgt de browser index.html terug
+    met content-type text/html, waardoor een <img> stuk gaat. Losse mounts
+    per map dekken alleen wat er op dat moment stond, dus zoeken we het
+    bestand op in plaats van elke nieuwe map apart te moeten registreren.
+    """
+    if not full_path or not SPA_DIR.is_dir():
+        return None
+    candidate = (SPA_DIR / full_path).resolve()
+    root = SPA_DIR.resolve()
+    # Buiten de SPA-map wijzen (../) levert nooit een bestand op.
+    if candidate == root or root not in candidate.parents:
+        return None
+    return candidate if candidate.is_file() else None
+
+
 
 
 @app.get("/healthz")
@@ -111,6 +131,11 @@ app.include_router(framework.router)
 def spa(full_path: str, request: Request):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
+    # Statische bestanden uit de build (merk-assets, favicon) gaan voor op de
+    # SPA-fallback, anders serveren we index.html onder hun naam.
+    asset = spa_file(full_path)
+    if asset is not None:
+        return FileResponse(asset)
     # Shopify App Store-installatie: Shopify opent de App URL met ?shop=&hmac=.
     # Een publieke (niet-embedded) app moet dan meteen authenticeren, dus starten
     # we direct de OAuth-installatieflow in plaats van de SPA te tonen. We
