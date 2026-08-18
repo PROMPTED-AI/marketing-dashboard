@@ -160,7 +160,7 @@ const tabBtn = {
   transform: "rotate(-90deg) translateY(-100%)", transformOrigin: "100% 0",
   zIndex: 90, padding: "9px 18px 7px", border: "1px solid var(--c-border)", borderBottom: "none",
   borderRadius: "10px 10px 0 0", background: "var(--c-accent)", color: "var(--c-accent-ink)",
-  fontFamily: "Montserrat, sans-serif", fontSize: 12.5, fontWeight: 800, letterSpacing: ".04em",
+  fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 800, letterSpacing: ".04em",
   cursor: "pointer", boxShadow: "var(--sh-md)",
 };
 const scrim = { position: "fixed", inset: 0, background: "rgba(10, 10, 42, .42)", zIndex: 95, display: "flex", justifyContent: "flex-end" };
@@ -177,5 +177,5 @@ const catChipOn = { border: "1px solid var(--c-accent)", background: "var(--c-ac
 const textarea = {
   width: "100%", resize: "vertical", padding: "12px 14px", borderRadius: 12,
   border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)",
-  fontSize: 13.5, fontFamily: "Montserrat, sans-serif", lineHeight: 1.5, minHeight: 110,
+  fontSize: 13.5, fontFamily: "var(--font-body)", lineHeight: 1.5, minHeight: 110,
 };

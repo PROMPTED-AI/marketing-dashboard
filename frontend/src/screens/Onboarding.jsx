@@ -83,7 +83,7 @@ export default function Onboarding() {
       <div className="card" style={{ width: "min(1100px, 100%)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "var(--sh-md)" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "22px 36px", borderBottom: "1px solid var(--c-border)" }}>
-          <Logo size={28} />
+          <Logo height={38} />
           <div style={{ flex: 1 }} />
           <div className="hide-mobile" style={{ display: "flex", alignItems: "center" }}>
             {steps.map((s, i) => (
@@ -106,7 +106,7 @@ export default function Onboarding() {
         {/* body */}
         {step === "profile" ? (
           <div style={{ padding: "36px 48px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 1 van 2</div>
+            <div className="mm-eyebrow" style={{ color: "var(--c-accent-strong)", marginBottom: 10 }}>Stap 1 van 2</div>
             <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>Vertel iets over je bedrijf</div>
             <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 620, marginBottom: 24 }}>
               Zo tonen we overal je bedrijfsnaam en richten we je dashboards meteen goed in. Je kunt dit later altijd wijzigen in Instellingen.
@@ -150,7 +150,7 @@ export default function Onboarding() {
           </div>
         ) : (
           <div style={{ padding: "36px 48px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 2 van 2</div>
+            <div className="mm-eyebrow" style={{ color: "var(--c-accent-strong)", marginBottom: 10 }}>Stap 2 van 2</div>
             <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>Koppel je marketingbronnen</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
               <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>

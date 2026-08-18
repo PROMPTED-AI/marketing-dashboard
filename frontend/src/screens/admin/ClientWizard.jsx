@@ -5,6 +5,7 @@ import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import FeatureToggles, { FEATURE_ORDER, FEATURE_LABELS } from "./FeatureToggles.jsx";
 import AssetPicker from "./AssetPicker.jsx";
 import { IcPlug, IcUsers, IcGrid, IcStar, IcCog } from "../../components/icons.jsx";
+import { Illustration } from "../../components/Brand.jsx";
 
 // Klant-wizard: één vloeiende flow die de losse beheerstappen samenvoegt —
 // (1) een klant-organisatie aanmaken onder je bureau, (2) bepalen welke functies
@@ -307,6 +308,8 @@ function StepKlaar({ org, invite, features, assetSummary, onDone }) {
 
   return (
     <div>
+      {/* Gelukt-moment: hier mag de mascotte de gebruiker feliciteren. */}
+      <Illustration name="mascot-springen-vieren" size={96} style={{ marginBottom: 10 }} />
       <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>Klant staat klaar</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 18 }}>
         <strong style={{ color: "var(--c-ink)" }}>{org?.name}</strong> ({org?.domain}) is ingericht.

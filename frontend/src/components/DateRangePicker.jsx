@@ -78,5 +78,5 @@ const section = { padding: "6px 14px", fontSize: 11, fontWeight: 700, letterSpac
 const row = { padding: "9px 14px", fontSize: 13.5, cursor: "pointer", color: "var(--c-ink-soft)" };
 const rowActive = { background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const dateRow = { display: "flex", gap: 8, alignItems: "center", padding: "8px 14px" };
-const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "Montserrat, sans-serif" };
+const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "var(--font-body)" };
 const footer = { display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 14px", borderTop: "1px solid var(--c-border)", marginTop: 6 };

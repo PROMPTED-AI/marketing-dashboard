@@ -77,7 +77,7 @@ export default function Sidebar({ user, connected = 0, total = 4, open = false, 
   return (
     <div className={`app-sidebar no-print${open ? " open" : ""}`}>
       <div style={{ padding: "20px 20px 16px" }}>
-        <Logo size={28} />
+        <Logo height={40} />
       </div>
 
       <div style={{ position: "relative", margin: "4px 14px 14px" }}>

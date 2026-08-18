@@ -50,7 +50,7 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--c-page)", color: "var(--c-ink)", padding: 20 }}>
       <div className="card" style={{ width: "100%", maxWidth: 440, padding: "34px 32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 22 }}>
-          <Logo size={30} />
+          <Logo height={42} />
         </div>
 
         {info === undefined ? (
@@ -61,7 +61,7 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
             <div style={{ fontSize: 14, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 22 }}>
               Deze link is verlopen of al gebruikt. Vraag een nieuwe aan of neem contact op met je beheerder.
             </div>
-            <button className="btn-primary" style={{ height: 46, width: "100%" }} onClick={() => navigate("/login")}>naar inloggen</button>
+            <button className="btn-primary" style={{ height: 46, width: "100%" }} onClick={() => navigate("/login")}>Naar inloggen</button>
           </div>
         ) : (
           <form onSubmit={onSubmit}>
@@ -78,7 +78,7 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
             {error && <div role="alert" style={{ marginTop: 12, padding: "10px 13px", borderRadius: 11, background: "var(--c-neg-soft, #fdecea)", color: "var(--c-neg, #c0392b)", fontSize: 13, fontWeight: 600 }}>{error}</div>}
 
             <button type="submit" className="btn-primary" disabled={busy || !!problem} style={{ height: 48, width: "100%", marginTop: 22, fontSize: 15, opacity: busy || problem ? 0.6 : 1 }}>
-              {busy ? "bezig…" : cta}
+              {busy ? "Bezig…" : cta}
             </button>
           </form>
         )}
@@ -90,8 +90,8 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
 export function Invite() {
   return (
     <SetPasswordScreen
-      title="welkom"
-      cta="wachtwoord instellen en inloggen"
+      title="Welkom"
+      cta="Wachtwoord instellen en inloggen"
       load={invitationInfo}
       submit={acceptInvitation}
       intro={(info) => (
@@ -104,8 +104,8 @@ export function Invite() {
 export function ResetPassword() {
   return (
     <SetPasswordScreen
-      title="nieuw wachtwoord"
-      cta="wachtwoord opslaan"
+      title="Nieuw wachtwoord"
+      cta="Wachtwoord opslaan"
       load={resetInfo}
       submit={resetPassword}
       intro={(info) => (
@@ -119,5 +119,5 @@ const lbl = { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 7 }
 const input = {
   width: "100%", height: 48, padding: "0 15px", boxSizing: "border-box",
   border: "1px solid var(--c-border)", borderRadius: 12, background: "var(--c-surface-2)",
-  fontFamily: "Montserrat, sans-serif", fontSize: 15, color: "var(--c-ink)", outline: "none",
+  fontFamily: "var(--font-body)", fontSize: 15, color: "var(--c-ink)", outline: "none",
 };
