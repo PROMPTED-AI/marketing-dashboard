@@ -33,7 +33,7 @@ export default function Login() {
       {/* LEFT — form (fills the white half) */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "48px clamp(28px, 7vw, 110px)", background: "var(--c-surface)" }}>
         <div style={{ width: "100%", maxWidth: 420, marginInline: "auto" }}>
-          <Logo size={34} style={{ marginBottom: 48 }} />
+          <Logo height={52} style={{ marginBottom: 48 }} />
           <div className="display" style={{ fontSize: 42, lineHeight: 1.08, letterSpacing: "var(--ls-display)", marginBottom: 12 }}>Welkom terug</div>
           <div style={{ fontSize: 15, color: "var(--c-muted)", marginBottom: 34 }}>
             Log in om je marketingdata, koppelingen en rapporten te beheren.

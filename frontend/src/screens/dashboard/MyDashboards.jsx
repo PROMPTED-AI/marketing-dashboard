@@ -28,7 +28,7 @@ import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
 const TABS = [
   { key: "overview", label: "Overzicht", catalog: null },
   ...CHANNELS,
-  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "custom", subtitle: "je met AI samengestelde dashboards" },
+  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "Custom", subtitle: "Je met AI samengestelde dashboards" },
 ];
 
 // Welke koppeling hoort bij welk tabblad. Net als in de sidebar tonen we
@@ -167,7 +167,7 @@ function OverviewData({ page = "overview-mix", canGenerate = false, tabTitle = "
   return (
     <DashboardEditor
       catalog={catalog} page={page} data={data} loading={false} error={null} ctx={ctx}
-      title={tabTitle} subtitle={tabSubtitle ? tabSubtitle + " · " + label : "alle kanalen in één dashboard · " + label}
+      title={tabTitle} subtitle={tabSubtitle ? tabSubtitle + " · " + label : "Alle kanalen in één dashboard · " + label}
       exportFilename={page === "custom" ? "custom-dashboard" : "overzicht-dashboard"}
       canGenerate={canGenerate}
     />
@@ -197,7 +197,7 @@ function AnalyticsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="analytics" data={data} loading={dl} error={de}
-      title="analytics" subtitle={"eigen indeling · " + label}
+      title="Analytics" subtitle={"Eigen indeling · " + label}
       assetControls={controls} exportFilename="analytics-dashboard" exportSections={sections}
     />
   );
@@ -230,7 +230,7 @@ function SearchConsoleData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="search-console" data={data} loading={dl} error={de}
-      title="search console" subtitle={"eigen indeling · " + label}
+      title="Search Console" subtitle={"Eigen indeling · " + label}
       assetControls={controls} exportFilename="search-console-dashboard" exportSections={sections}
     />
   );
@@ -263,7 +263,7 @@ function GoogleAdsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="google-ads" data={data} loading={dl} error={de}
-      title="google ads" subtitle={"eigen indeling · " + label}
+      title="Google Ads" subtitle={"Eigen indeling · " + label}
       assetControls={controls} exportFilename="google-ads-dashboard" exportSections={sections}
     />
   );
@@ -296,7 +296,7 @@ function MetaAdsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="meta-ads" data={data} loading={dl} error={de} ctx={{ currency }}
-      title="meta ads" subtitle={"eigen indeling · " + label}
+      title="META Ads" subtitle={"Eigen indeling · " + label}
       assetControls={controls} exportFilename="meta-ads-dashboard" exportSections={sections}
     />
   );
@@ -333,7 +333,7 @@ function MetaOrganicData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="meta-organic" data={data} loading={dl} error={de}
-      title="meta organisch" subtitle={"eigen indeling · " + label}
+      title="META Organisch" subtitle={"Eigen indeling · " + label}
       assetControls={controls} exportFilename="meta-organisch-dashboard" exportSections={sections}
     />
   );
@@ -353,7 +353,7 @@ function WooCommerceData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="woocommerce" data={data} loading={loading} error={error}
-      title="woocommerce" subtitle={"eigen indeling · " + label + (data?.is_demo ? " · demowinkel" : "")}
+      title="WooCommerce" subtitle={"Eigen indeling · " + label + (data?.is_demo ? " · demowinkel" : "")}
       exportFilename="woocommerce-dashboard" exportSections={sections}
     />
   );

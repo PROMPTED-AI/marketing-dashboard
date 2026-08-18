@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { api } from "../../lib/api.js";
 import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
+import { EmptyState } from "../../components/ui.jsx";
 import {
   IcBars, IcChat, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph, WooGlyph,
 } from "../../components/icons.jsx";
@@ -192,8 +193,12 @@ export default function Signalen() {
           )}
 
           {signals.length === 0 && (
-            <div className="card" style={{ padding: 28, textAlign: "center", color: "var(--c-muted)" }}>
-              Er zijn deze periode geen opvallende veranderingen gevonden. Probeer een langere periode of kom later terug.
+            <div className="card">
+              <EmptyState
+                illustration="mascot-telescoop"
+                title="Niets opvallends deze periode"
+                description="We hebben geen afwijkingen gevonden. Probeer een langere periode of kom later terug."
+              />
             </div>
           )}
 

@@ -82,7 +82,7 @@ export default function Admin() {
       {/* admin sidebar: op mobiel een inschuifbare drawer (zelfde patroon als het dashboard) */}
       <div className={`app-sidebar no-print${drawer ? " open" : ""}`} style={{ background: "var(--c-sidebar)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "20px 20px 16px" }}>
-          <Logo size={26} />
+          <Logo height={34} />
           <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "var(--ls-caps)", textTransform: "uppercase", color: "#fff", background: "var(--mm-navy-800)", padding: "3px 8px", borderRadius: "var(--radius-pill)" }}>admin</span>
         </div>
         <div style={menuLabel}>{me.is_platform_admin ? "Platform" : "Bureau"}</div>

@@ -6,6 +6,7 @@ import { useActiveOrg } from "../../lib/ActiveOrgProvider.jsx";
 import { useDateRange } from "../../lib/PeriodProvider.jsx";
 import { useChat } from "../../lib/ChatProvider.jsx";
 import { IcChat } from "../../components/icons.jsx";
+import { Illustration } from "../../components/Brand.jsx";
 
 // Renders an assistant answer as Markdown (GFM tables/lists) with compact,
 // theme-aware styling. User messages stay plain text.
@@ -92,7 +93,10 @@ export default function Assistant() {
       {/* messages */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "12px 0" }}>
         {messages.length === 0 && (
-          <div className="card" style={{ padding: 22 }}>
+          <div className="card" style={{ padding: 22, display: "flex", gap: 20, alignItems: "flex-start" }}>
+            {/* De assistent spreekt de gebruiker aan, dus hier de mascotte. */}
+            <Illustration name="mascot-ideelamp" size={88} style={{ flex: "none" }} />
+            <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Waarmee kan ik je helpen?</div>
             <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 14 }}>
               Ik kijk mee in de cijfers van deze klant en geef advies. Bijvoorbeeld:
@@ -101,6 +105,7 @@ export default function Assistant() {
               {EXAMPLES.map((q) => (
                 <button key={q} className="pill-btn" onClick={() => onSend(q)} style={chip}>{q}</button>
               ))}
+            </div>
             </div>
           </div>
         )}
@@ -271,4 +276,4 @@ const histNewBtn = { width: 26, height: 26, borderRadius: 8, border: "1px solid 
 const histDelBtn = { width: 22, height: 22, borderRadius: 6, border: "none", background: "transparent", color: "var(--c-muted)", fontSize: 15, cursor: "pointer", flex: "none", lineHeight: 1 };
 const userBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 4px 14px", background: "var(--c-accent)", color: "#fff", fontSize: 13.5, lineHeight: 1.5 };
 const botBubble = { maxWidth: "80%", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-ink)", fontSize: 13.5, lineHeight: 1.55 };
-const textareaStyle = { flex: 1, resize: "none", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "Montserrat, sans-serif", lineHeight: 1.4, maxHeight: 160 };
+const textareaStyle = { flex: 1, resize: "none", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-ink)", fontSize: 13.5, fontFamily: "var(--font-body)", lineHeight: 1.4, maxHeight: 160 };

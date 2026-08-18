@@ -1,22 +1,22 @@
 // MetricMelon merk-assets. Het beeldmerk is een merkelement, geen icoon:
 // app-icoon, avatar, lege staten. Nooit inline in een menu.
-// Het woordmerk staat nooit los uitgelijnd naast het beeldmerk: gebruik <Logo />.
 
-export function Mark({ size = 30, style }) {
+// Het beeldmerk. `size` is de breedte.
+export function Mark({ size = 30, height, style }) {
+  const box = height ? { height, width: "auto" } : { width: size, height: "auto" };
   return (
     <img
       src="/brand/metricmelon-beeldmerk.png"
       alt=""
-      width={size}
-      style={{ width: size, height: "auto", display: "block", flex: "none", ...style }}
+      style={{ ...box, display: "block", flex: "none", ...style }}
     />
   );
 }
 
-// `inverse` dwingt het witte woordmerk af (navy vlakken). Zonder die prop volgt
-// het woordmerk het thema: navy in light, wit in dark.
-export function Wordmark({ width = 132, inverse = false, style }) {
-  const base = { width, height: "auto", ...style };
+// Het woordmerk zonder accenttekens; die zitten al in het beeldmerk ernaast.
+export function Wordmark({ width, height, inverse = false, style }) {
+  const box = height ? { height, width: "auto" } : { width: width ?? 132, height: "auto" };
+  const base = { ...box, ...style };
   if (inverse) return <img src="/brand/metricmelon-wordmark-white.png" alt="MetricMelon" style={{ display: "block", ...base }} />;
   return (
     <>
@@ -26,12 +26,16 @@ export function Wordmark({ width = 132, inverse = false, style }) {
   );
 }
 
-// Beeldmerk + woordmerk naast elkaar, zoals de horizontale lockup.
-export function Logo({ size = 30, wordmarkWidth, inverse = false, style }) {
+// Horizontale lockup. `height` is de hoogte van het beeldmerk; het woordmerk
+// staat daar volgens het design system op 80% van, zodat de meloen het merk
+// draagt en het woordmerk hem gezelschap houdt (niet andersom).
+const WORDMARK_RATIO = 0.8;
+
+export function Logo({ height = 40, inverse = false, style }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, ...style }}>
-      <Mark size={size} />
-      <Wordmark width={wordmarkWidth ?? Math.round(size * 4.4)} inverse={inverse} />
+    <div style={{ display: "flex", alignItems: "center", gap: Math.round(height * 0.18), minWidth: 0, ...style }}>
+      <Mark height={height} />
+      <Wordmark height={Math.round(height * WORDMARK_RATIO)} inverse={inverse} />
     </div>
   );
 }
