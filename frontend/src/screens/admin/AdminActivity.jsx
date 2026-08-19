@@ -54,7 +54,7 @@ export default function AdminActivity() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Activiteitenlog</div>
+      <div className="display" style={{ fontSize: 30 }}>activiteitenlog</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
         De meest recente gebeurtenissen op het platform, van nieuw naar oud.
       </div>

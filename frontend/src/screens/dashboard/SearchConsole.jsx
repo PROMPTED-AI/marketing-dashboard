@@ -32,8 +32,8 @@ const pctOf = (v, max) => (max > 0 ? Math.round((v / max) * 100) : 0);
 const posStr = (v) => (v || 0).toFixed(1).replace(".", ",");
 
 export default function SearchConsole() {
-  const [site, setSite] = useState(() => localStorage.getItem("mm-gsc-site") || "");
-  const [view, setView] = useState(() => localStorage.getItem("mm-gsc-view") || "overview");
+  const [site, setSite] = useState(() => localStorage.getItem("kompas-gsc-site") || "");
+  const [view, setView] = useState(() => localStorage.getItem("kompas-gsc-view") || "overview");
   const { orgId } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
 
@@ -47,8 +47,8 @@ export default function SearchConsole() {
 
   const { data, error } = useCachedApi(gscReportUrl(site, start, end, compare, orgId));
 
-  const chooseSite = (s) => { setSite(s); localStorage.setItem("mm-gsc-site", s); };
-  const pickView = (id) => { setView(id); localStorage.setItem("mm-gsc-view", id); };
+  const chooseSite = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); };
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-gsc-view", id); };
 
   if (loading) return <TabState loading />;
   if (sitesErr) return <TabState error={sitesErr} onConnect />;
@@ -258,7 +258,7 @@ function Header({ right, label }) {
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Search Console</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>search console · seo</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Search Console-koppeling</div>
     </div>
   );

@@ -19,10 +19,10 @@ const META = {
 };
 
 function StatusPill({ status }) {
-  if (status === "connected") return <span className="pill pos">Verbonden</span>;
-  if (status === "revoked") return <span className="pill neg">Opnieuw koppelen</span>;
-  if (status === "coming_soon") return <span className="pill accent">Binnenkort</span>;
-  return <span className="pill muted">Niet gekoppeld</span>;
+  if (status === "connected") return <span className="pill pos">verbonden</span>;
+  if (status === "revoked") return <span className="pill neg">opnieuw koppelen</span>;
+  if (status === "coming_soon") return <span className="pill accent">binnenkort</span>;
+  return <span className="pill muted">niet gekoppeld</span>;
 }
 
 const inputStyle = {
@@ -169,7 +169,7 @@ export default function Integrations() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30, marginBottom: 6 }}>Integraties</div>
+      <div className="display" style={{ fontSize: 30, marginBottom: 6 }}>integraties</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginBottom: 22 }}>
         Beheer je gekoppelde marketingbronnen · {data?.connected ?? 0} van {data?.total ?? 5} actief
       </div>
@@ -211,7 +211,7 @@ export default function Integrations() {
                 ))}
                 {c.status === "connected" && (
                   <>
-                    <span style={{ fontSize: 12.5, color: "var(--c-accent-strong)", fontWeight: 600 }}>Actief</span>
+                    <span style={{ fontSize: 12.5, color: "var(--c-pos)", fontWeight: 700 }}>actief ✓</span>
                     <button className="btn-ghost" style={{ height: 38, padding: "0 16px", fontSize: 13 }} onClick={() => onDisconnect(c.provider, m.name)}>Ontkoppelen</button>
                   </>
                 )}

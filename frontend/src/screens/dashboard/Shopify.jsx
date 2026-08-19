@@ -53,7 +53,7 @@ export default function Shopify() {
         {data && k && <ExportButton filename="shopify" sections={sections} />}
       </div>
 
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Shopify</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>shopify</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>{label} · live via je Shopify-koppeling</div>
 
       <TabState loading={loading && !data} error={error} onConnect />

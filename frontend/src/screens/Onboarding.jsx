@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { connectUrl, metaLoginUrl, setOwnProfile } from "../lib/api.js";
 import { useMe } from "../lib/useMe.jsx";
-import { IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
-import { Logo } from "../components/Brand.jsx";
+import { IcStar, IcArrow, IcCheck, GaGlyph, GscGlyph, AdsGlyph, MetaGlyph } from "../components/icons.jsx";
 
 const TOOLS = [
   { key: "ga", name: "Google Analytics", desc: "Bezoekers, sessies, conversies en gedrag (GA4).", note: "OAuth via Google · veilig en alleen-lezen", Glyph: GaGlyph, bg: "#FFF3E0", live: true },
@@ -58,7 +57,7 @@ export default function Onboarding() {
   // Connect only the selected Google tools (incremental authorization).
   const cont = () => {
     const googleSel = [sel.ga && "google_analytics", sel.gsc && "search_console", sel.ads && "google_ads"].filter(Boolean);
-    localStorage.setItem("mm-onboarded", "1");
+    localStorage.setItem("kompas-onboarded", "1");
     // Meta has its own (Facebook) consent. If Google tools are also selected,
     // connect those first and return to Integraties to add Meta there.
     if (googleSel.length) window.location.href = connectUrl(googleSel, sel.meta ? "/app/integrations" : "/app/analytics");
@@ -66,7 +65,7 @@ export default function Onboarding() {
     else nav("/app/analytics");
   };
   const skip = () => {
-    localStorage.setItem("mm-onboarded", "1");
+    localStorage.setItem("kompas-onboarded", "1");
     nav("/app/analytics");
   };
 
@@ -83,7 +82,8 @@ export default function Onboarding() {
       <div className="card" style={{ width: "min(1100px, 100%)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "var(--sh-md)" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "22px 36px", borderBottom: "1px solid var(--c-border)" }}>
-          <Logo height={38} />
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
+          <div className="display" style={{ fontSize: 20 }}>kompas</div>
           <div style={{ flex: 1 }} />
           <div className="hide-mobile" style={{ display: "flex", alignItems: "center" }}>
             {steps.map((s, i) => (
@@ -106,8 +106,8 @@ export default function Onboarding() {
         {/* body */}
         {step === "profile" ? (
           <div style={{ padding: "36px 48px" }}>
-            <div className="mm-eyebrow" style={{ color: "var(--c-accent-strong)", marginBottom: 10 }}>Stap 1 van 2</div>
-            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>Vertel iets over je bedrijf</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 1 van 2</div>
+            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>vertel iets over je bedrijf.</div>
             <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 620, marginBottom: 24 }}>
               Zo tonen we overal je bedrijfsnaam en richten we je dashboards meteen goed in. Je kunt dit later altijd wijzigen in Instellingen.
             </div>
@@ -127,7 +127,7 @@ export default function Onboarding() {
               </label>
             </div>
 
-            <div className="display" style={{ fontSize: 20, marginBottom: 12 }}>Wat voor bedrijf ben je?</div>
+            <div className="display" style={{ fontSize: 20, marginBottom: 12 }}>wat voor bedrijf ben je?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               {PROFILES.map((p) => (
                 <div key={p.key} className="pill-btn" onClick={() => setProfile(p.key)} style={{ ...toolCard, ...(profile === p.key ? toolCardOn : {}) }}>
@@ -150,8 +150,8 @@ export default function Onboarding() {
           </div>
         ) : (
           <div style={{ padding: "36px 48px" }}>
-            <div className="mm-eyebrow" style={{ color: "var(--c-accent-strong)", marginBottom: 10 }}>Stap 2 van 2</div>
-            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>Koppel je marketingbronnen</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--c-accent)", marginBottom: 10 }}>stap 2 van 2</div>
+            <div className="display" style={{ fontSize: 32, marginBottom: 10 }}>koppel je marketingtools.</div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16 }}>
               <div style={{ fontSize: 15, color: "var(--c-muted)", maxWidth: 560 }}>
                 Kies welke bronnen je wilt verbinden. Je kunt er één kiezen of alles tegelijk. Later koppelen kan altijd via Integraties.

@@ -90,7 +90,7 @@ export default function AdminBilling() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Pakketten en facturatie</div>
+      <div className="display" style={{ fontSize: 30 }}>pakketten &amp; facturatie</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
         Drie pakketten, elk met eenmalig € 500 onboarding. Kies per klant een pakket en vul de facturatiegegevens in.
       </div>

@@ -11,7 +11,7 @@ export function useProperties() {
   const { orgId } = useActiveOrg();
   const url = propertiesUrl(orgId);
   const [props, setProps] = useState(() => cachedGet(url)?.properties ?? null);
-  const [selected, setSelected] = useState(() => localStorage.getItem("mm-property") || "");
+  const [selected, setSelected] = useState(() => localStorage.getItem("kompas-property") || "");
   const [loading, setLoading] = useState(() => cachedGet(url) === undefined);
   const [error, setError] = useState(null);
 
@@ -36,7 +36,7 @@ export function useProperties() {
 
   const choose = (id) => {
     setSelected(id);
-    localStorage.setItem("mm-property", id);
+    localStorage.setItem("kompas-property", id);
   };
 
   return { props, selected, choose, loading, error };

@@ -46,7 +46,7 @@ export default function DateRangePicker() {
           ))}
           <div style={dateRow}>
             <input type="date" value={draft.start} max={draft.end} onChange={(e) => setCustom("start", e.target.value)} style={dateInput} />
-            <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
+            <span style={{ color: "var(--c-muted)" }}>–</span>
             <input type="date" value={draft.end} min={draft.start} max={dr.isoToday} onChange={(e) => setCustom("end", e.target.value)} style={dateInput} />
           </div>
 
@@ -57,7 +57,7 @@ export default function DateRangePicker() {
           {draft.compareMode === "custom" && (
             <div style={dateRow}>
               <input type="date" value={draft.compareStart} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareStart: e.target.value }))} style={dateInput} />
-              <span style={{ color: "var(--c-muted)", fontSize: 12 }}>t/m</span>
+              <span style={{ color: "var(--c-muted)" }}>–</span>
               <input type="date" value={draft.compareEnd} max={dr.isoToday} onChange={(e) => setDraft((d) => ({ ...d, compareEnd: e.target.value }))} style={dateInput} />
             </div>
           )}
@@ -78,5 +78,5 @@ const section = { padding: "6px 14px", fontSize: 11, fontWeight: 700, letterSpac
 const row = { padding: "9px 14px", fontSize: 13.5, cursor: "pointer", color: "var(--c-ink-soft)" };
 const rowActive = { background: "var(--c-accent-soft)", color: "var(--c-accent)", fontWeight: 700 };
 const dateRow = { display: "flex", gap: 8, alignItems: "center", padding: "8px 14px" };
-const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "var(--font-body)" };
+const dateInput = { flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface-2)", color: "var(--c-ink)", fontSize: 12.5, fontFamily: "Montserrat, sans-serif" };
 const footer = { display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 14px", borderTop: "1px solid var(--c-border)", marginTop: 6 };

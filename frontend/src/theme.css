@@ -1,201 +1,90 @@
-/* MetricMelon design tokens.
-   Overgenomen uit het MetricMelon design system (tokens/colors, typography,
-   spacing, shape, motion). De legacy --c-* namen uit het Kompas-thema blijven
-   bestaan als alias op de MetricMelon-tokens, zodat elk scherm de nieuwe
-   huisstijl overneemt zonder losse kleurwaarden in de componenten. */
-
-@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300..700&display=swap");
-
-@font-face { font-family: "Fredoka"; src: url("/fonts/Fredoka-Light.ttf") format("truetype"); font-weight: 300; font-style: normal; font-display: swap; }
-@font-face { font-family: "Fredoka"; src: url("/fonts/Fredoka-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Fredoka"; src: url("/fonts/Fredoka-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: "Fredoka"; src: url("/fonts/Fredoka-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
-@font-face { font-family: "Fredoka"; src: url("/fonts/Fredoka-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+/* kompas design tokens — light + dark, from the approved design. */
+@font-face {
+  font-family: "Dystopian";
+  src: url("/fonts/Dystopian-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-display: swap;
+}
 
 :root {
-  /* ---- merkpalet ---- */
-  --mm-navy-900: #000d1f; --mm-navy-800: #04122b; --mm-navy-700: #0b1d3a; --mm-navy-600: #16294c; --mm-navy-500: #294067;
-  --mm-green-700: #046b33; --mm-green-600: #068040; --mm-green-500: #089848; --mm-green-400: #22b562;
-  --mm-green-300: #6ed99b; --mm-green-100: #c9f2da; --mm-green-50: #eafaf0;
-  --mm-coral-700: #c93524; --mm-coral-600: #e8412d; --mm-coral-500: #ff5848;
-  --mm-coral-300: #ff9b90; --mm-coral-100: #ffe0dc; --mm-coral-50: #fff1ef;
-  --mm-amber-500: #f5a524; --mm-amber-100: #fdeccb;
-  --mm-sky-500: #2e7dd7; --mm-sky-100: #d9e9fb;
-  --mm-violet-500: #6b5bd2; --mm-violet-100: #e5e1fa;
-  --mm-white: #ffffff; --mm-cream: #fbfaf7;
-  --mm-gray-50: #f5f6f8; --mm-gray-100: #eceef2; --mm-gray-200: #dee1e8; --mm-gray-300: #c4c9d4;
-  --mm-gray-400: #98a0b1; --mm-gray-500: #6b7488; --mm-gray-600: #4c5568; --mm-gray-700: #333c50;
-
-  /* ---- semantische rollen ---- */
-  --surface-page: var(--mm-cream); --surface-card: var(--mm-white); --surface-sunken: var(--mm-gray-50);
-  --surface-inverse: var(--mm-navy-800); --surface-accent: var(--mm-green-50);
-  --surface-accent-border: var(--mm-green-100); --surface-hover: var(--mm-gray-50);
-  --text-strong: var(--mm-navy-800); --text-body: var(--mm-navy-700); --text-muted: var(--mm-gray-500);
-  --text-inverse: var(--mm-white); --text-brand: var(--mm-green-600);
-  --text-link: var(--mm-green-600); --text-link-hover: var(--mm-green-700);
-  --border-subtle: var(--mm-gray-100); --border-default: var(--mm-gray-200);
-  --border-strong: var(--mm-gray-300); --border-focus: var(--mm-green-500);
-  --action-primary: var(--mm-green-500); --action-primary-hover: var(--mm-green-600);
-  --action-primary-press: var(--mm-green-700); --action-secondary: var(--mm-navy-800);
-  --action-danger: var(--mm-coral-500);
-  --data-pos: var(--mm-green-500); --data-neg: var(--mm-coral-500); --data-neutral: var(--mm-gray-400);
-  --chart-1: var(--mm-green-500); --chart-2: var(--mm-coral-500); --chart-3: var(--mm-navy-700);
-  --chart-4: var(--mm-sky-500); --chart-5: var(--mm-amber-500); --chart-6: var(--mm-violet-500);
-  --overlay-modal: rgba(4, 18, 43, 0.4);
-
-  /* ---- typografie ---- */
-  --font-display: "Fredoka", ui-rounded, "Segoe UI", system-ui, sans-serif;
-  --font-body: "Nunito Sans", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
-  --fs-display-lg: 44px; --fs-display-md: 34px; --fs-h1: 28px; --fs-h2: 22px; --fs-h3: 18px;
-  --fs-body-lg: 16px; --fs-body: 14px; --fs-body-sm: 13px; --fs-caption: 12px; --fs-micro: 11px;
-  --fs-metric-xl: 40px; --fs-metric-lg: 30px; --fs-metric-md: 22px;
-  --lh-tight: 1.08; --lh-snug: 1.25; --lh-normal: 1.45;
-  --ls-display: -0.02em; --ls-heading: -0.01em; --ls-caps: 0.08em;
-
-  /* ---- vorm & schaduw ---- */
-  --radius-xs: 6px; --radius-sm: 10px; --radius-md: 14px; --radius-lg: 20px; --radius-xl: 28px; --radius-pill: 999px;
-  --shadow-xs: 0 1px 2px rgba(4, 18, 43, 0.06);
-  --shadow-sm: 0 1px 2px rgba(4, 18, 43, 0.05), 0 2px 6px rgba(4, 18, 43, 0.05);
-  --shadow-md: 0 2px 4px rgba(4, 18, 43, 0.05), 0 8px 20px rgba(4, 18, 43, 0.07);
-  --shadow-lg: 0 12px 40px rgba(4, 18, 43, 0.12);
-  --shadow-pop: 0 10px 30px rgba(8, 152, 72, 0.22);
-
-  /* ---- motion ---- */
-  --dur-instant: 80ms; --dur-fast: 140ms; --dur-base: 220ms; --dur-slow: 360ms;
-  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* ---- layout ---- */
-  --sidebar-w: 248px; --topbar-h: 60px;
-
-  /* ---- legacy alias (Kompas -> MetricMelon) ---- */
-  --c-page: var(--surface-page); --c-surface: var(--surface-card); --c-surface-2: var(--surface-sunken); --c-sidebar: var(--surface-card);
-  --c-ink: var(--text-strong); --c-ink-soft: var(--text-body); --c-muted: var(--text-muted);
-  --c-border: var(--border-default); --c-border-soft: var(--border-subtle); --c-border-strong: var(--border-strong);
-  --c-accent: var(--action-primary); --c-accent-ink: var(--mm-white); --c-accent-soft: var(--surface-accent);
-  --c-accent-strong: var(--mm-green-700);
-  --c-pos: var(--data-pos); --c-pos-soft: var(--mm-green-100); --c-pos-ink: var(--mm-green-700);
-  --c-neg: var(--data-neg); --c-neg-soft: var(--mm-coral-100); --c-neg-ink: var(--mm-coral-700);
-  --c-sky: var(--chart-4); --c-mint: var(--mm-green-300); --c-orange: var(--mm-coral-300);
-  --c-purple: var(--chart-6); --c-yellow: var(--chart-5);
-  --c-track: var(--mm-gray-100);
-  --sh-sm: var(--shadow-sm); --sh-md: var(--shadow-md); --sh-lg: var(--shadow-lg);
+  --c-page: #f3f4fb; --c-surface: #ffffff; --c-surface-2: #fafbfe; --c-sidebar: #ffffff;
+  --c-ink: #0a0a52; --c-ink-soft: #3c3f6b; --c-muted: #757cab;
+  --c-border: #e6e9f5; --c-border-soft: #eff1fa; --c-border-strong: #a9b2d8;
+  --c-accent: #294af5; --c-accent-ink: #ffffff; --c-accent-soft: #eaedfe;
+  --c-pos: #15a874; --c-pos-soft: #e2f7ee; --c-neg: #f0603b; --c-neg-soft: #fdeae4;
+  --c-sky: #64abff; --c-mint: #59d8a1; --c-orange: #ff7c66; --c-purple: #6e80f0; --c-yellow: #ffc02e;
+  --c-track: #eceef7;
+  --sh-sm: 0 1px 2px rgba(10, 10, 82, 0.06);
+  --sh-md: 0 8px 24px rgba(10, 10, 82, 0.07);
+  --sh-lg: 0 18px 50px rgba(10, 10, 82, 0.12);
 }
 
 [data-theme="dark"] {
-  --surface-page: var(--mm-navy-900); --surface-card: var(--mm-navy-800); --surface-sunken: #02091a;
-  --surface-inverse: var(--mm-white); --surface-accent: #062919; --surface-accent-border: #0b4429;
-  --surface-hover: var(--mm-navy-700);
-  --text-strong: var(--mm-white); --text-body: #d5dbe8; --text-muted: #8e99b0;
-  --text-inverse: var(--mm-navy-800); --text-brand: var(--mm-green-400);
-  --text-link: var(--mm-green-400); --text-link-hover: var(--mm-green-300);
-  --border-subtle: #122341; --border-default: #1b2f52; --border-strong: #2b436c;
-  /* groen-400 draagt het merk op navy; groen-500 is daar te donker. */
-  --action-primary: var(--mm-green-400); --action-primary-hover: var(--mm-green-300);
-  --action-primary-press: var(--mm-green-500); --action-secondary: var(--mm-navy-600);
-  --data-pos: var(--mm-green-400); --chart-1: var(--mm-green-400); --chart-3: var(--mm-sky-100);
-  --overlay-modal: rgba(0, 6, 16, 0.6);
-
-  --c-accent-ink: var(--mm-navy-900);
-  --c-accent-soft: rgba(34, 181, 98, 0.16);
-  --c-accent-strong: var(--mm-green-300);
-  --c-pos-soft: rgba(34, 181, 98, 0.18); --c-pos-ink: var(--mm-green-300);
-  --c-neg-soft: rgba(255, 88, 72, 0.18); --c-neg-ink: var(--mm-coral-300);
-  --c-mint: var(--mm-green-300); --c-orange: var(--mm-coral-300);
-  --c-track: rgba(255, 255, 255, 0.09);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.55);
-  --shadow-pop: 0 10px 30px rgba(34, 181, 98, 0.28);
+  --c-page: #08082a; --c-surface: #101038; --c-surface-2: #15154a; --c-sidebar: #0b0b2e;
+  --c-ink: #eef0ff; --c-ink-soft: #c4c8f0; --c-muted: #8a90c8;
+  --c-border: rgba(255, 255, 255, 0.09); --c-border-soft: rgba(255, 255, 255, 0.05); --c-border-strong: rgba(255, 255, 255, 0.22);
+  --c-accent: #7184f2; --c-accent-ink: #ffffff; --c-accent-soft: rgba(113, 132, 242, 0.18);
+  --c-pos: #3fd79b; --c-pos-soft: rgba(63, 215, 155, 0.15); --c-neg: #ff8a6e; --c-neg-soft: rgba(255, 138, 110, 0.15);
+  --c-sky: #64abff; --c-mint: #59d8a1; --c-orange: #ff7c66; --c-purple: #8a98f5; --c-yellow: #ffd05a;
+  --c-track: rgba(255, 255, 255, 0.08);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-md: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --sh-lg: 0 22px 55px rgba(0, 0, 0, 0.55);
 }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  font: var(--fw-regular) var(--fs-body) / var(--lh-normal) var(--font-body);
-  background: var(--surface-page);
-  color: var(--text-body);
-  -webkit-font-smoothing: antialiased;
+  font-family: "Montserrat", sans-serif;
+  background: var(--c-page);
+  color: var(--c-ink);
 }
+.display { font-family: "Dystopian", "Montserrat", sans-serif; text-transform: lowercase; letter-spacing: -0.02em; }
 a { color: inherit; }
-
-/* Fredoka draagt het merk: koppen, KPI-cijfers, knoplabels, woordmerk.
-   Nunito Sans zodra tekst gelezen wordt in plaats van gescand. */
-.display {
-  font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-heading);
-  color: var(--text-strong);
-}
-.mm-eyebrow {
-  font: var(--fw-medium) var(--fs-micro) / 1.2 var(--font-body);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.mm-metric {
-  font: var(--fw-semibold) var(--fs-metric-lg) / 1.1 var(--font-display);
-  letter-spacing: -0.015em;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-}
-.tabular { font-variant-numeric: tabular-nums; }
-
-/* Woordmerk volgt het thema: navy op licht, wit op donker. */
-.brand-on-light { display: block; }
-.brand-on-dark { display: none; }
-[data-theme="dark"] .brand-on-light { display: none; }
-[data-theme="dark"] .brand-on-dark { display: block; }
 
 /* shared primitives */
 .btn-primary {
-  border: none; border-radius: var(--radius-pill);
-  background: var(--action-primary); color: var(--mm-white);
-  font-family: var(--font-display); font-weight: var(--fw-medium); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  transition: background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+  border: none; border-radius: 999px; background: var(--c-accent); color: var(--c-accent-ink);
+  font-family: "Montserrat", sans-serif; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  box-shadow: 0 10px 24px rgba(41, 74, 245, 0.22);
+  transition: filter 0.14s ease-out, transform 0.14s ease-out, box-shadow 0.14s ease-out;
 }
 .btn-ghost {
-  border: 1px solid var(--border-default); border-radius: var(--radius-pill); background: var(--surface-card);
-  color: var(--text-strong); font-family: var(--font-display); font-weight: var(--fw-medium); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+  border: 1px solid var(--c-border); border-radius: 999px; background: var(--c-surface);
+  color: var(--c-ink); font-family: "Montserrat", sans-serif; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 11px;
+  transition: background 0.14s ease-out, border-color 0.14s ease-out, transform 0.14s ease-out;
 }
-.btn-primary:disabled, .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Pill-knoppen (tabs, chips, toggles): de inline styles bepalen maat en
    kleur, deze klasse levert alleen hover, active en focus. Het hover-effect
    gebruikt filter en transform, zodat het werkt bovenop elke inline-kleur
    (gevulde én open pills). */
-.pill-btn { transition: filter var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+.pill-btn { transition: filter 0.14s ease-out, transform 0.14s ease-out, box-shadow 0.14s ease-out; }
 
 /* Icoonknoppen (bel, thema, sluiten, widget-acties): zachte cirkel bij hover. */
-.icon-btn { transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+.icon-btn { transition: background 0.14s ease-out, color 0.14s ease-out, transform 0.14s ease-out; }
 
 /* Hover alleen op apparaten met een echte muisaanwijzer, zodat touch geen
-   plakkende hover-status overhoudt. Uitgeschakelde knoppen doen niet mee.
-   Knoppen gaan één stap donkerder, kaarten en rijen krijgen --surface-hover. */
+   plakkende hover-status overhoudt. Uitgeschakelde knoppen doen niet mee. */
 @media (hover: hover) {
-  .btn-primary:hover:not(:disabled) { background: var(--action-primary-hover); transform: translateY(-1px); }
-  .btn-ghost:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
-  .pill-btn:hover:not(:disabled) { filter: brightness(0.95); transform: translateY(-1px); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(41, 74, 245, 0.32); }
+  .btn-ghost:hover:not(:disabled) { background: var(--c-surface-2); border-color: var(--c-accent); }
+  .pill-btn:hover:not(:disabled) { filter: brightness(0.95); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15, 20, 60, 0.08); }
   /* !important zodat de hover ook wint van inline-achtergronden zoals
      background: transparent op icoonknoppen en navigatie-items. */
-  .icon-btn:hover:not(:disabled) { background: var(--surface-hover) !important; }
+  .icon-btn:hover:not(:disabled) { background: var(--c-surface-2) !important; }
 }
-/* Press: scale(.98), geen extra kleurstap. */
-.btn-primary:active:not(:disabled) { background: var(--action-primary-press); transform: scale(0.98); transition-duration: var(--dur-instant); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); filter: brightness(0.96); }
 .btn-ghost:active:not(:disabled),
 .pill-btn:active:not(:disabled),
-.icon-btn:active:not(:disabled) { transform: scale(0.98); transition-duration: var(--dur-instant); }
+.icon-btn:active:not(:disabled) { transform: scale(0.97); }
 
-/* Focus: geen halo, geen glow. Toetsenbordfocus is een outline met offset. */
-:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Toetsenbordfocus in dezelfde visuele taal als hover. */
 .btn-primary:focus-visible, .btn-ghost:focus-visible, .pill-btn:focus-visible, .icon-btn:focus-visible {
-  outline: 2px solid var(--border-focus); outline-offset: 2px;
+  outline: 2px solid var(--c-accent); outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -203,32 +92,26 @@ a { color: inherit; }
   .btn-primary:hover:not(:disabled), .pill-btn:hover:not(:disabled) { transform: none; }
 }
 .card {
-  background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px;
+  box-shadow: var(--sh-sm);
 }
 .pill {
-  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
-  border-radius: var(--radius-pill); font-family: var(--font-body);
-  font-size: var(--fs-micro); font-weight: var(--fw-medium);
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 700;
 }
-.pill.pos { background: var(--c-pos-soft); color: var(--c-pos-ink); }
-.pill.neg { background: var(--c-neg-soft); color: var(--c-neg-ink); }
-.pill.accent { background: var(--surface-accent); color: var(--mm-green-700); }
-.pill.muted { background: var(--c-track); color: var(--text-muted); }
-[data-theme="dark"] .pill.accent { color: var(--mm-green-300); }
-.spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--c-track); border-top-color: var(--action-primary); animation: spin 0.8s linear infinite; }
+.pill.pos { background: var(--c-pos-soft); color: var(--c-pos); }
+.pill.neg { background: var(--c-neg-soft); color: var(--c-neg); }
+.pill.accent { background: var(--c-accent-soft); color: var(--c-accent); }
+.pill.muted { background: var(--c-track); color: var(--c-muted); }
+.spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--c-track); border-top-color: var(--c-accent); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Grafieklijnen tekenen van links naar rechts. */
-@keyframes mm-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-.mm-draw { stroke-dasharray: 1; animation: mm-draw 600ms var(--ease-standard) both; }
-
-/* Hide the navy marketing panel on narrow screens (login). */
+/* Hide the blue marketing panel on narrow screens (login). */
 @media (max-width: 860px) { .login-aside { display: none !important; } }
 
 /* ---- Responsive dashboard: sidebar becomes a slide-in drawer on mobile ---- */
 .app-sidebar {
-  width: var(--sidebar-w); background: var(--c-sidebar); border-right: 1px solid var(--border-subtle);
+  width: 240px; background: var(--c-sidebar); border-right: 1px solid var(--c-border);
   display: flex; flex-direction: column; flex: none;
 }
 .app-scrim { display: none; }
@@ -240,13 +123,13 @@ a { color: inherit; }
   /* Off-canvas drawer, slides in when .open is added. */
   .app-sidebar {
     position: fixed; top: 0; bottom: 0; left: 0; z-index: 60;
-    transform: translateX(-100%); transition: transform var(--dur-base) var(--ease-standard);
-    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%); transition: transform .22s ease;
+    box-shadow: var(--sh-lg);
   }
   .app-sidebar.open { transform: none; }
   .app-scrim.show {
     display: block; position: fixed; inset: 0;
-    background: var(--overlay-modal); z-index: 55;
+    background: rgba(10, 10, 42, .42); z-index: 55;
   }
   .hamburger { display: inline-flex; }
   .dash-content { padding: 16px 14px !important; }
@@ -275,34 +158,28 @@ a { color: inherit; }
   .assistant-main { min-height: 0; }
 }
 
-/* ---- Assistant: Markdown answer formatting (compact, theme-aware) ----
-   Chatberichten zijn lopende tekst, dus Nunito Sans; alleen de kopjes dragen
-   Fredoka. Gewicht blijft op 600, 700 is voorbehouden aan het woordmerk. */
+/* ---- Assistant: Markdown answer formatting (compact, theme-aware) ---- */
 .assistant-md > :first-child { margin-top: 0; }
 .assistant-md > :last-child { margin-bottom: 0; }
 .assistant-md p { margin: 0 0 8px; }
-.assistant-md h1, .assistant-md h2, .assistant-md h3 {
-  font-family: var(--font-display); font-size: 15px; font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-heading); color: var(--text-strong); margin: 12px 0 6px;
-}
+.assistant-md h1, .assistant-md h2, .assistant-md h3 { font-size: 14px; font-weight: 800; margin: 12px 0 6px; }
 .assistant-md ul, .assistant-md ol { margin: 4px 0 8px; padding-left: 20px; }
 .assistant-md li { margin: 2px 0; }
-.assistant-md strong { font-weight: var(--fw-semibold); color: var(--text-strong); }
-.assistant-md a { color: var(--text-link); }
-.assistant-md a:hover { color: var(--text-link-hover); }
-.assistant-md code { font-family: var(--font-mono); background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); padding: 1px 5px; font-size: 12px; }
-.assistant-md pre { font-family: var(--font-mono); background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px; overflow-x: auto; }
+.assistant-md strong { font-weight: 800; }
+.assistant-md a { color: var(--c-accent); }
+.assistant-md code { background: var(--c-surface-2); border: 1px solid var(--c-border-soft); border-radius: 5px; padding: 1px 5px; font-size: 12px; }
+.assistant-md pre { background: var(--c-surface-2); border: 1px solid var(--c-border-soft); border-radius: 8px; padding: 10px; overflow-x: auto; }
 .assistant-md pre code { background: none; border: none; padding: 0; }
-.assistant-md table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; display: block; overflow-x: auto; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.assistant-md th, .assistant-md td { border: 1px solid var(--border-subtle); padding: 6px 9px; text-align: left; white-space: nowrap; }
-.assistant-md th { background: var(--surface-sunken); font-weight: var(--fw-medium); color: var(--text-muted); }
-.assistant-md blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--border-default); color: var(--text-muted); }
+.assistant-md table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; display: block; overflow-x: auto; font-size: 12.5px; }
+.assistant-md th, .assistant-md td { border: 1px solid var(--c-border); padding: 6px 9px; text-align: left; white-space: nowrap; }
+.assistant-md th { background: var(--c-surface-2); font-weight: 700; }
+.assistant-md blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--c-border); color: var(--c-muted); }
 
 /* ---- Assistant: micro-animaties voor denken/streamen ---- */
 /* Drie zacht opverende puntjes zolang de assistent nadenkt of data ophaalt. */
 .typing-dots { display: inline-flex; align-items: center; gap: 4px; }
 .typing-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--action-primary);
+  width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent);
   display: inline-block; animation: dot-bounce 1.2s infinite ease-in-out;
 }
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
@@ -314,40 +191,36 @@ a { color: inherit; }
 /* Het statuslabel ("analyseert Google Ads") ademt zachtjes mee. */
 .thinking-label { animation: soft-pulse 1.6s infinite ease-in-out; }
 @keyframes soft-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-/* Nieuwe bron-chips en antwoordbubbels poppen subtiel in (--ease-pop is
-   voorbehouden aan dingen die verschijnen). */
-.chip-in { animation: chip-in var(--dur-base) var(--ease-pop); }
+/* Nieuwe bron-chips en antwoordbubbels poppen subtiel in. */
+.chip-in { animation: chip-in 0.25s ease; }
 @keyframes chip-in { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
-.bubble-in { animation: bubble-in var(--dur-base) var(--ease-pop); }
+.bubble-in { animation: bubble-in 0.22s ease; }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
-/* Skeleton-laadkaart terwijl content (bijv. een met AI samengesteld dashboard)
-   nog wordt opgebouwd. Skeletons pulseren met opacity, nooit met shimmer. */
+/* Skeleton-laadkaart: een schimmende placeholder terwijl content (bijv. een
+   met AI samengesteld dashboard) nog wordt opgebouwd. */
 .skeleton-card {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-  animation: skeleton-pulse 1.6s ease-in-out infinite;
+  border-radius: 16px;
+  border: 1px solid var(--c-border);
+  background: linear-gradient(100deg, var(--c-surface-2) 30%, var(--c-track) 50%, var(--c-surface-2) 70%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.3s ease-in-out infinite;
 }
-@keyframes skeleton-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes skeleton-shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .typing-dot, .thinking-label, .chip-in, .bubble-in { animation: none; }
   .skeleton-card { animation: none; }
-  .mm-draw { animation: none; stroke-dasharray: none; }
 }
 
 /* Print / Save-as-PDF: drop app chrome, force light, let content flow. */
 @media print {
   .no-print { display: none !important; }
   :root {
-    --surface-page: #fff; --surface-card: #fff; --surface-sunken: #fff;
-    --text-strong: #04122b; --text-body: #0b1d3a; --text-muted: #6b7488;
-    --border-subtle: #eceef2; --border-default: #dee1e8; --c-track: #eceef2;
+    --c-page: #fff; --c-surface: #fff; --c-surface-2: #fff; --c-sidebar: #fff;
+    --c-ink: #0a0a52; --c-ink-soft: #3c3f6b; --c-muted: #757cab;
+    --c-border: #e6e9f5; --c-border-soft: #eff1fa; --c-track: #eceef7;
   }
   html, body, #root { height: auto !important; background: #fff !important; }
   .dash-content { overflow: visible !important; height: auto !important; padding: 0 !important; }
-  /* De achtergrond is in print altijd wit. */
-  .brand-on-light { display: block !important; }
-  .brand-on-dark { display: none !important; }
 }

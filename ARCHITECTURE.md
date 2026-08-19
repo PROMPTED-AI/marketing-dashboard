@@ -1,4 +1,4 @@
-# Architectuur — MetricMelon
+# Architectuur — kompas
 
 White-label marketingdashboard waarmee externe organisaties hun Google-marketingdata
 (GA4 + Search Console) via OAuth koppelen en in heldere dashboards bekijken.

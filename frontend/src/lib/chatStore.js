@@ -11,8 +11,8 @@
 
 const MAX_CONVERSATIONS = 15;
 
-const histKey = (orgId) => `mm-chat-history-${orgId || "default"}`;
-const activeKey = (orgId) => `mm-chat-active-${orgId || "default"}`;
+const histKey = (orgId) => `kompas-chat-history-${orgId || "default"}`;
+const activeKey = (orgId) => `kompas-chat-active-${orgId || "default"}`;
 
 function readHistory(orgId) {
   try {

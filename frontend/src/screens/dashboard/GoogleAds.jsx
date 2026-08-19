@@ -29,8 +29,8 @@ const orderViews = (businessType) => {
 };
 
 export default function GoogleAds() {
-  const [account, setAccount] = useState(() => localStorage.getItem("mm-ads-account") || "");
-  const [view, setView] = useState(() => localStorage.getItem("mm-ads-view") || "overview");
+  const [account, setAccount] = useState(() => localStorage.getItem("kompas-ads-account") || "");
+  const [view, setView] = useState(() => localStorage.getItem("kompas-ads-view") || "overview");
   const { orgId, businessType } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
   const views = useMemo(() => orderViews(businessType), [businessType]);
@@ -45,8 +45,8 @@ export default function GoogleAds() {
 
   const { data, error } = useCachedApi(adsReportUrl(account, start, end, compare, orgId));
 
-  const choose = (id) => { setAccount(id); localStorage.setItem("mm-ads-account", id); };
-  const pickView = (id) => { setView(id); localStorage.setItem("mm-ads-view", id); };
+  const choose = (id) => { setAccount(id); localStorage.setItem("kompas-ads-account", id); };
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-ads-view", id); };
 
   if (loading) return <TabState loading />;
   if (accErr) return <TabState error={accErr} onConnect />;
@@ -199,7 +199,7 @@ function Header({ right, label }) {
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Google Ads</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>google ads · campagnes</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Google Ads-koppeling</div>
     </div>
   );

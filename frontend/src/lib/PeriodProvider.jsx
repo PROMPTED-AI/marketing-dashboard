@@ -60,7 +60,7 @@ const def = () => {
 
 function load() {
   try {
-    const s = JSON.parse(localStorage.getItem("mm-range"));
+    const s = JSON.parse(localStorage.getItem("kompas-range"));
     if (s && s.start && s.end) return { ...def(), ...s };
   } catch {}
   return def();
@@ -75,7 +75,7 @@ export function DateRangeProvider({ children }) {
     const apply = (draft) => {
       const next = { ...state, ...draft };
       setState(next);
-      localStorage.setItem("mm-range", JSON.stringify(next));
+      localStorage.setItem("kompas-range", JSON.stringify(next));
     };
     const presetLabel = PRESETS.find((p) => p.id === state.preset)?.label;
     const fmt = (d) => parse(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });

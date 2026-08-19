@@ -93,8 +93,6 @@ def _demo_orders(start: str, end: str) -> list[dict]:
     orders, oid = [], 5000
     day = s
     while day <= e:
-        # De seed blijft ongewijzigd bij de hernoeming naar MetricMelon:
-        # een andere string levert andere democijfers op.
         rng = random.Random(f"kompas-shopify-demo|{day.isoformat()}")
         base = 5 + (2 if day.weekday() >= 5 else 0) + (day.toordinal() % 7) // 3
         for _ in range(rng.randint(max(base - 2, 1), base + 3)):

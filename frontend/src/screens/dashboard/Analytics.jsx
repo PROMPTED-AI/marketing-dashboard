@@ -37,10 +37,10 @@ export default function Analytics() {
   const { start, end, compare, label } = useDateRange();
   const { data, loading, error } = useCachedApi(overviewUrl(selected, start, end, compare, orgId));
   const [rt, setRt] = useState(null);
-  const [view, setView] = useState(() => localStorage.getItem("mm-analytics-view") || "executive");
+  const [view, setView] = useState(() => localStorage.getItem("kompas-analytics-view") || "executive");
 
   const VIEWS = useMemo(() => buildViews(businessType), [businessType]);
-  const pickView = (id) => { setView(id); localStorage.setItem("mm-analytics-view", id); };
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-analytics-view", id); };
 
   // realtime: refresh on load and then poll every 30s (never cached)
   useEffect(() => {
@@ -103,12 +103,12 @@ export default function Analytics() {
         )}
         <div style={{ flex: 1 }} />
         <div className="pill pos" style={{ padding: "7px 13px", fontSize: 12.5 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> Live verbonden
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-pos)" }} /> live verbonden
         </div>
         {data && <ExportButton filename="analytics" sections={sections} />}
       </div>
 
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>Analytics</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>analytics</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>Automatisch ingeladen via je GA4-koppeling · {label}</div>
 
       {/* view-switcher */}
