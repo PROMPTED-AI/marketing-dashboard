@@ -14,8 +14,8 @@ export default function AssetPicker({
   options,
   idKey,
   labelFn,
-  emptyLabel = "Niet toegewezen",
-  searchPlaceholder = "Zoek op naam of nummer…",
+  emptyLabel = "— niet toegewezen —",
+  searchPlaceholder = "zoek op naam of nummer…",
   disabled = false,
 }) {
   const [open, setOpen] = useState(false);

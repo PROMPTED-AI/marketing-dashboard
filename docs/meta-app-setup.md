@@ -24,7 +24,7 @@ Nodig voordat andere klanten dan jijzelf mogen koppelen.
 
 1. Ga naar **developers.facebook.com** → *My Apps* → **Create App**.
 2. Kies app-type **Business**.
-3. Geef een naam (bijv. "MetricMelon Dashboard") en koppel de app aan je
+3. Geef een naam (bijv. "Kompas Dashboard") en koppel de app aan je
    **Business-portfolio**.
 
 ## 3. Producten toevoegen

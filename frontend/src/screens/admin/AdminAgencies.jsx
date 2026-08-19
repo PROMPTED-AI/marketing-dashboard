@@ -31,7 +31,7 @@ export default function AdminAgencies() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Bureaus</div>
+      <div className="display" style={{ fontSize: 30 }}>bureaus</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px", maxWidth: 680 }}>
         Elk bureau heeft een eigen omgeving en beheert alleen zijn eigen klantaccounts. Een bureau-admin ziet dus nooit de klanten van een ander bureau; jij als platformbeheerder ziet alles.
       </div>
@@ -85,7 +85,7 @@ export default function AdminAgencies() {
                     onChange={(e) => act(o.id, { agency_id: e.target.value })}
                     style={select}
                   >
-                    <option value="">Geen bureau</option>
+                    <option value="">— geen bureau —</option>
                     {agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 )}

@@ -22,7 +22,7 @@ export const ALL_CHANNELS_ON = {};
 export function ActiveOrgProvider({ children }) {
   const { me } = useMe();
   const [orgs, setOrgs] = useState([]);
-  const [orgId, setOrgId] = useState(() => localStorage.getItem("mm-active-org") || "");
+  const [orgId, setOrgId] = useState(() => localStorage.getItem("kompas-active-org") || "");
 
   const reload = () =>
     api("/api/organizations")
@@ -44,10 +44,10 @@ export function ActiveOrgProvider({ children }) {
 
   const setOrg = (id) => {
     setOrgId(id);
-    localStorage.setItem("mm-active-org", id);
+    localStorage.setItem("kompas-active-org", id);
     // a different client has different properties/sites — let them auto-reselect
-    localStorage.removeItem("mm-property");
-    localStorage.removeItem("mm-gsc-site");
+    localStorage.removeItem("kompas-property");
+    localStorage.removeItem("kompas-gsc-site");
   };
 
   const activeOrg = orgs.find((o) => o.id === orgId);

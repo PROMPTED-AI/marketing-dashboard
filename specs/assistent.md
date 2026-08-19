@@ -1,4 +1,4 @@
-# AI-assistent ("MetricMelon Assistent") · chat in de sidebar
+# AI-assistent ("Kompas Assistent") — chat in de sidebar
 
 ## Objective
 

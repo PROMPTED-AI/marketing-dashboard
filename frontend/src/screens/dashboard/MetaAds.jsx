@@ -33,9 +33,9 @@ const orderViews = (businessType) => {
 export default function MetaAds() {
   const { orgId, businessType } = useActiveOrg();
   const { start, end, compare, label } = useDateRange();
-  const [view, setView] = useState(() => localStorage.getItem("mm-meta-ads-view") || "overview");
+  const [view, setView] = useState(() => localStorage.getItem("kompas-meta-ads-view") || "overview");
   const views = useMemo(() => orderViews(businessType), [businessType]);
-  const pickView = (id) => { setView(id); localStorage.setItem("mm-meta-ads-view", id); };
+  const pickView = (id) => { setView(id); localStorage.setItem("kompas-meta-ads-view", id); };
 
   const { data: assets, loading, error: assetsErr } = useCachedApi(metaAccountsUrl(orgId));
   const adAccounts = assets?.ad_accounts || null;
@@ -208,7 +208,7 @@ function Header({ right, label }) {
         <div style={{ flex: 1 }} />
         {right}
       </div>
-      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>META Ads</div>
+      <div className="display" style={{ fontSize: 28, marginBottom: 4 }}>meta ads</div>
       <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 16 }}>{label} · live via je Meta-koppeling</div>
     </div>
   );

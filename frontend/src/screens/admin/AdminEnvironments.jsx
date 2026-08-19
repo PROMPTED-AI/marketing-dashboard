@@ -33,7 +33,7 @@ export default function AdminEnvironments() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Omgevingen</div>
+      <div className="display" style={{ fontSize: 30 }}>omgevingen</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 8px" }}>
         Richt per bedrijf een omgeving in met je bureau-koppeling. Wijs de juiste property, site en Google Ads-klant toe; de klant ziet daarna alleen zijn eigen bedrijf.
       </div>
@@ -146,7 +146,7 @@ function EnvModal({ org, onClose, onSaved }) {
   return (
     <div style={overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="card" style={{ width: 520, maxWidth: "calc(100vw - 32px)", padding: 26, maxHeight: "90vh", overflow: "auto" }}>
-        <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>Omgeving · {org.name}</div>
+        <div className="display" style={{ fontSize: 22, marginBottom: 4 }}>omgeving · {org.name}</div>
         <div style={{ fontSize: 13, color: "var(--c-muted)", marginBottom: 18 }}>
           Hergebruik je bureau-koppeling, wijs de juiste bronnen toe en bepaal welke functies dit account krijgt.
         </div>
@@ -188,7 +188,7 @@ function EnvModal({ org, onClose, onSaved }) {
           <div>
             {available.google_email && (
               <div style={{ fontSize: 12.5, color: "var(--c-muted)", marginBottom: 14 }}>
-                Bureau-account: <strong style={{ color: "var(--c-ink-soft)" }}>{available.google_email}</strong>. De lijsten tonen wat dít Google-account mag zien.
+                Bureau-account: <strong style={{ color: "var(--c-ink-soft)" }}>{available.google_email}</strong> — de lijsten tonen wat dít Google-account mag zien.
               </div>
             )}
             {field("Google Analytics-property", "ga_property_id", available.properties, "property_id", (p) => p.display_name ? `${p.display_name} (${p.property_id})` : p.property_id)}

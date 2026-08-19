@@ -28,7 +28,7 @@ import { buildOverviewCatalog } from "../../lib/widgets/overview.js";
 const TABS = [
   { key: "overview", label: "Overzicht", catalog: null },
   ...CHANNELS,
-  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "Custom", subtitle: "Je met AI samengestelde dashboards" },
+  { key: "custom", label: "Custom", catalog: null, page: "custom", canGenerate: true, title: "custom", subtitle: "je met AI samengestelde dashboards" },
 ];
 
 // Welke koppeling hoort bij welk tabblad. Net als in de sidebar tonen we
@@ -53,8 +53,8 @@ function Empty({ children }) {
 }
 
 export default function MyDashboards() {
-  const [channel, setChannel] = useState(() => localStorage.getItem("mm-mydash-channel") || "overview");
-  const pick = (k) => { setChannel(k); localStorage.setItem("mm-mydash-channel", k); };
+  const [channel, setChannel] = useState(() => localStorage.getItem("kompas-mydash-channel") || "overview");
+  const pick = (k) => { setChannel(k); localStorage.setItem("kompas-mydash-channel", k); };
 
   // Alleen tabs van gekoppelde kanalen. Zolang de status onbekend is (eerste
   // load, geen cache) tonen we alles; daarna klapt de rij netjes terug.
@@ -72,7 +72,7 @@ export default function MyDashboards() {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div className="display" style={{ fontSize: 30 }}>Mijn dashboards</div>
+        <div className="display" style={{ fontSize: 30 }}>mijn dashboards</div>
         <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
           Stel per kanaal je eigen indeling samen, of laat de AI onder Custom een dashboard voor je bouwen.
         </div>
@@ -126,14 +126,14 @@ function OverviewData({ page = "overview-mix", canGenerate = false, tabTitle = "
   // Search Console (opgeslagen site of de eerste geverifieerde).
   const sitesQ = useCachedApi(has("search_console") ? sitesUrl(orgId) : null);
   const sites = sitesQ.data?.sites || null;
-  const storedSite = localStorage.getItem("mm-gsc-site") || "";
+  const storedSite = localStorage.getItem("kompas-gsc-site") || "";
   const activeSite = storedSite && sites?.some((s) => s.site_url === storedSite) ? storedSite : sites?.[0]?.site_url || "";
   const gsc = useCachedApi(activeSite ? gscReportUrl(activeSite, start, end, compare, orgId) : null);
 
   // Google Ads (opgeslagen account of het eerste).
   const accQ = useCachedApi(has("google_ads") ? adsAccountsUrl(orgId) : null);
   const accounts = accQ.data?.accounts || null;
-  const storedAcc = localStorage.getItem("mm-ads-account") || "";
+  const storedAcc = localStorage.getItem("kompas-ads-account") || "";
   const activeAcc = storedAcc && accounts?.some((a) => a.customer_id === storedAcc) ? storedAcc : accounts?.[0]?.customer_id || "";
   const gads = useCachedApi(activeAcc ? adsReportUrl(activeAcc, start, end, compare, orgId) : null);
 
@@ -167,7 +167,7 @@ function OverviewData({ page = "overview-mix", canGenerate = false, tabTitle = "
   return (
     <DashboardEditor
       catalog={catalog} page={page} data={data} loading={false} error={null} ctx={ctx}
-      title={tabTitle} subtitle={tabSubtitle ? tabSubtitle + " · " + label : "Alle kanalen in één dashboard · " + label}
+      title={tabTitle} subtitle={tabSubtitle ? tabSubtitle + " · " + label : "alle kanalen in één dashboard · " + label}
       exportFilename={page === "custom" ? "custom-dashboard" : "overzicht-dashboard"}
       canGenerate={canGenerate}
     />
@@ -197,7 +197,7 @@ function AnalyticsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="analytics" data={data} loading={dl} error={de}
-      title="Analytics" subtitle={"Eigen indeling · " + label}
+      title="analytics" subtitle={"eigen indeling · " + label}
       assetControls={controls} exportFilename="analytics-dashboard" exportSections={sections}
     />
   );
@@ -208,7 +208,7 @@ function SearchConsoleData({ catalog }) {
   const { start, end, compare, label } = useDateRange();
   const { data: sitesResp, loading, error: sErr } = useCachedApi(sitesUrl(orgId));
   const sites = sitesResp?.sites || null;
-  const [site, setSite] = useState(() => localStorage.getItem("mm-gsc-site") || "");
+  const [site, setSite] = useState(() => localStorage.getItem("kompas-gsc-site") || "");
   const activeSite = site && sites?.some((s) => s.site_url === site) ? site : sites?.[0]?.site_url || "";
   const { data, loading: dl, error: de } = useCachedApi(gscReportUrl(activeSite, start, end, compare, orgId));
 
@@ -216,7 +216,7 @@ function SearchConsoleData({ catalog }) {
   if (sErr) return <TabState error={sErr} onConnect />;
   if (!sites?.length) return <Empty>Geen geverifieerde Search Console-sites gevonden.</Empty>;
 
-  const choose = (s) => { setSite(s); localStorage.setItem("mm-gsc-site", s); };
+  const choose = (s) => { setSite(s); localStorage.setItem("kompas-gsc-site", s); };
   const controls = sites.length > 1 && (
     <select value={activeSite} onChange={(e) => choose(e.target.value)} style={selectStyle} title="Site">
       {sites.map((s) => <option key={s.site_url} value={s.site_url}>{s.site_url}</option>)}
@@ -230,7 +230,7 @@ function SearchConsoleData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="search-console" data={data} loading={dl} error={de}
-      title="Search Console" subtitle={"Eigen indeling · " + label}
+      title="search console" subtitle={"eigen indeling · " + label}
       assetControls={controls} exportFilename="search-console-dashboard" exportSections={sections}
     />
   );
@@ -241,7 +241,7 @@ function GoogleAdsData({ catalog }) {
   const { start, end, compare, label } = useDateRange();
   const { data: accResp, loading, error: aErr } = useCachedApi(adsAccountsUrl(orgId));
   const accounts = accResp?.accounts || null;
-  const [account, setAccount] = useState(() => localStorage.getItem("mm-ads-account") || "");
+  const [account, setAccount] = useState(() => localStorage.getItem("kompas-ads-account") || "");
   const activeAcc = account && accounts?.some((a) => a.customer_id === account) ? account : accounts?.[0]?.customer_id || "";
   const { data, loading: dl, error: de } = useCachedApi(adsReportUrl(activeAcc, start, end, compare, orgId));
 
@@ -249,7 +249,7 @@ function GoogleAdsData({ catalog }) {
   if (aErr) return <TabState error={aErr} onConnect />;
   if (!accounts?.length) return <Empty>Geen Google Ads-accounts gevonden voor deze koppeling.</Empty>;
 
-  const choose = (id) => { setAccount(id); localStorage.setItem("mm-ads-account", id); };
+  const choose = (id) => { setAccount(id); localStorage.setItem("kompas-ads-account", id); };
   const controls = accounts.length > 1 && (
     <select value={activeAcc} onChange={(e) => choose(e.target.value)} style={selectStyle} title="Account">
       {accounts.map((a) => <option key={a.customer_id} value={a.customer_id}>{a.name}</option>)}
@@ -263,7 +263,7 @@ function GoogleAdsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="google-ads" data={data} loading={dl} error={de}
-      title="Google Ads" subtitle={"Eigen indeling · " + label}
+      title="google ads" subtitle={"eigen indeling · " + label}
       assetControls={controls} exportFilename="google-ads-dashboard" exportSections={sections}
     />
   );
@@ -296,7 +296,7 @@ function MetaAdsData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="meta-ads" data={data} loading={dl} error={de} ctx={{ currency }}
-      title="META Ads" subtitle={"Eigen indeling · " + label}
+      title="meta ads" subtitle={"eigen indeling · " + label}
       assetControls={controls} exportFilename="meta-ads-dashboard" exportSections={sections}
     />
   );
@@ -333,7 +333,7 @@ function MetaOrganicData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="meta-organic" data={data} loading={dl} error={de}
-      title="META Organisch" subtitle={"Eigen indeling · " + label}
+      title="meta organisch" subtitle={"eigen indeling · " + label}
       assetControls={controls} exportFilename="meta-organisch-dashboard" exportSections={sections}
     />
   );
@@ -353,7 +353,7 @@ function WooCommerceData({ catalog }) {
   return (
     <DashboardEditor
       catalog={catalog} page="woocommerce" data={data} loading={loading} error={error}
-      title="WooCommerce" subtitle={"Eigen indeling · " + label + (data?.is_demo ? " · demowinkel" : "")}
+      title="woocommerce" subtitle={"eigen indeling · " + label + (data?.is_demo ? " · demowinkel" : "")}
       exportFilename="woocommerce-dashboard" exportSections={sections}
     />
   );

@@ -15,7 +15,6 @@ import NameDialog from "./NameDialog.jsx";
 import GenerateDialog from "./GenerateDialog.jsx";
 import { instantiateTemplate, sanitizeLayout, newWidget, defaultTemplateFor, buildManifest } from "../../lib/widgets/kit.js";
 import { api, generateDashboard } from "../../lib/api.js";
-import { Illustration } from "../Brand.jsx";
 
 const serialize = (l) => JSON.stringify(l?.widgets ?? []);
 
@@ -40,7 +39,7 @@ export default function DashboardEditor({
   const [genError, setGenError] = useState(null);
   const [lastGenPrompt, setLastGenPrompt] = useState("");
 
-  const storeKey = orgId ? `mm-dash-${page}-${orgId}` : null;
+  const storeKey = orgId ? `kompas-dash-${page}-${orgId}` : null;
   const initRef = useRef(null);
   const isOwner = activeId == null || activeMeta.is_owner;
 
@@ -297,9 +296,7 @@ export default function DashboardEditor({
 
       {!generating && !error && (data || !loading) && (
         widgets.length === 0 ? (
-          <div className="card" style={{ padding: "40px 24px", textAlign: "center", color: "var(--c-muted)" }}>
-            {/* Het product vraagt hier iets van de gebruiker, dus de mascotte. */}
-            <Illustration name="mascot-laptop" size={120} style={{ margin: "0 auto 14px" }} />
+          <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--c-muted)" }}>
             <div style={{ marginBottom: 14 }}>Dit dashboard heeft nog geen widgets.</div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               {canGenerate && <button className="btn-primary" onClick={() => setModal("generate")} style={{ height: 40, padding: "0 18px" }}>✨ Genereer met AI</button>}

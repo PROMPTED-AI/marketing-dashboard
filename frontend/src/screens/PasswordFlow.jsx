@@ -4,7 +4,6 @@ import { useMe } from "../lib/useMe.jsx";
 import {
   invitationInfo, acceptInvitation, resetInfo, resetPassword,
 } from "../lib/api.js";
-import { Logo } from "../components/Brand.jsx";
 
 const MIN = 8;
 
@@ -50,18 +49,21 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--c-page)", color: "var(--c-ink)", padding: 20 }}>
       <div className="card" style={{ width: "100%", maxWidth: 440, padding: "34px 32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 22 }}>
-          <Logo height={42} />
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: "var(--c-accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" /></svg>
+          </div>
+          <div className="display" style={{ fontSize: 22 }}>kompas</div>
         </div>
 
         {info === undefined ? (
           <div style={{ display: "grid", placeItems: "center", padding: 40 }}><div className="spin" /></div>
         ) : info === null ? (
           <div>
-            <div className="display" style={{ fontSize: 24, marginBottom: 8 }}>Link is verlopen</div>
+            <div className="display" style={{ fontSize: 24, marginBottom: 8 }}>link is verlopen</div>
             <div style={{ fontSize: 14, color: "var(--c-muted)", lineHeight: 1.6, marginBottom: 22 }}>
               Deze link is verlopen of al gebruikt. Vraag een nieuwe aan of neem contact op met je beheerder.
             </div>
-            <button className="btn-primary" style={{ height: 46, width: "100%" }} onClick={() => navigate("/login")}>Naar inloggen</button>
+            <button className="btn-primary" style={{ height: 46, width: "100%" }} onClick={() => navigate("/login")}>naar inloggen</button>
           </div>
         ) : (
           <form onSubmit={onSubmit}>
@@ -78,7 +80,7 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
             {error && <div role="alert" style={{ marginTop: 12, padding: "10px 13px", borderRadius: 11, background: "var(--c-neg-soft, #fdecea)", color: "var(--c-neg, #c0392b)", fontSize: 13, fontWeight: 600 }}>{error}</div>}
 
             <button type="submit" className="btn-primary" disabled={busy || !!problem} style={{ height: 48, width: "100%", marginTop: 22, fontSize: 15, opacity: busy || problem ? 0.6 : 1 }}>
-              {busy ? "Bezig…" : cta}
+              {busy ? "bezig…" : cta}
             </button>
           </form>
         )}
@@ -90,8 +92,8 @@ function SetPasswordScreen({ title, intro, load, submit, cta }) {
 export function Invite() {
   return (
     <SetPasswordScreen
-      title="Welkom"
-      cta="Wachtwoord instellen en inloggen"
+      title="welkom"
+      cta="wachtwoord instellen en inloggen"
       load={invitationInfo}
       submit={acceptInvitation}
       intro={(info) => (
@@ -104,8 +106,8 @@ export function Invite() {
 export function ResetPassword() {
   return (
     <SetPasswordScreen
-      title="Nieuw wachtwoord"
-      cta="Wachtwoord opslaan"
+      title="nieuw wachtwoord"
+      cta="wachtwoord opslaan"
       load={resetInfo}
       submit={resetPassword}
       intro={(info) => (
@@ -119,5 +121,5 @@ const lbl = { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 7 }
 const input = {
   width: "100%", height: 48, padding: "0 15px", boxSizing: "border-box",
   border: "1px solid var(--c-border)", borderRadius: 12, background: "var(--c-surface-2)",
-  fontFamily: "var(--font-body)", fontSize: 15, color: "var(--c-ink)", outline: "none",
+  fontFamily: "Montserrat, sans-serif", fontSize: 15, color: "var(--c-ink)", outline: "none",
 };

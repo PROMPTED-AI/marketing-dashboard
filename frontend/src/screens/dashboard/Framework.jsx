@@ -66,7 +66,7 @@ function fmtValue(v, fmt) {
   return nf0.format(v);
 }
 
-const MONTHS_KEY = "mm-framework-months";
+const MONTHS_KEY = "kompas-framework-months";
 // Elk account ziet standaard de laatste 12 maanden; bijladen kan tot 24.
 const DEFAULT_MONTHS = 12;
 const MAX_MONTHS = 24;
@@ -78,7 +78,7 @@ export default function Framework() {
     return n >= DEFAULT_MONTHS && n <= MAX_MONTHS ? n : DEFAULT_MONTHS;
   });
 
-  const property = localStorage.getItem("mm-property");
+  const property = localStorage.getItem("kompas-property");
   const url = orgId
     ? `/api/framework?months=${monthCount}&org_id=${encodeURIComponent(orgId)}${property ? `&property_id=${encodeURIComponent(property)}` : ""}`
     : null;
@@ -131,7 +131,7 @@ export default function Framework() {
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
-          <div className="display" style={{ fontSize: 30 }}>Raamwerk</div>
+          <div className="display" style={{ fontSize: 30 }}>raamwerk</div>
           <div style={{ fontSize: 13.5, color: "var(--c-muted)", marginTop: 4 }}>
             Je marketingcijfers per maand in één overzicht. Grijze velden worden automatisch gevuld, witte velden vul je zelf in. De variant volgt het bedrijfstype uit de instellingen.
           </div>

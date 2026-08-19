@@ -13,8 +13,7 @@ import AdminActivity from "./admin/AdminActivity.jsx";
 import AdminBilling from "./admin/AdminBilling.jsx";
 import AdminAgencies from "./admin/AdminAgencies.jsx";
 import ClientWizard from "./admin/ClientWizard.jsx";
-import { IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid, IcMegaphone } from "../components/icons.jsx";
-import { Logo } from "../components/Brand.jsx";
+import { IcStar, IcUsers, IcPlug, IcCog, IcDoc, IcChat, IcChevDown, IcPlus, IcGrid, IcMegaphone } from "../components/icons.jsx";
 
 const PROVIDERS = [
   { key: "google_analytics", letter: "G", bg: "#FFF3E0", on: "#E37400" },
@@ -81,9 +80,10 @@ export default function Admin() {
       <div className={`app-scrim no-print${drawer ? " show" : ""}`} onClick={() => setDrawer(false)} />
       {/* admin sidebar: op mobiel een inschuifbare drawer (zelfde patroon als het dashboard) */}
       <div className={`app-sidebar no-print${drawer ? " open" : ""}`} style={{ background: "var(--c-sidebar)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "20px 20px 16px" }}>
-          <Logo height={34} />
-          <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "var(--ls-caps)", textTransform: "uppercase", color: "#fff", background: "var(--mm-navy-800)", padding: "3px 8px", borderRadius: "var(--radius-pill)" }}>admin</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--c-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}><IcStar /></div>
+          <div className="display" style={{ fontSize: 20 }}>kompas</div>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--c-surface)", background: "var(--c-ink)", padding: "3px 7px", borderRadius: 6 }}>admin</span>
         </div>
         <div style={menuLabel}>{me.is_platform_admin ? "Platform" : "Bureau"}</div>
         {/* Twee blokken met een scheidslijn: bovenin wie er in het systeem zit
@@ -122,7 +122,7 @@ export default function Admin() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.email}</div>
             <div style={{ fontSize: 11, color: "var(--c-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {me.is_platform_admin ? "Platform-admin" : `Bureau-admin · ${me.organization?.name || ""}`}
+              {me.is_platform_admin ? "platform-admin" : `bureau-admin · ${me.organization?.name || ""}`}
             </div>
           </div>
           <a href={LOGOUT_URL} onClick={() => invalidateAll()} style={{ color: "var(--c-muted)" }} title="uitloggen"><IcChevDown s={16} /></a>
@@ -131,7 +131,7 @@ export default function Admin() {
 
       {/* main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar searchPlaceholder="Zoek klant of domein…" showDateRange={false} onMenu={() => setDrawer(true)} />
+        <Topbar searchPlaceholder="zoek klant of domein…" showDateRange={false} onMenu={() => setDrawer(true)} />
         <div className="dash-content" style={{ flex: 1, overflow: "auto", padding: "26px 28px" }}>
           {tab === "feedback" ? <AdminFeedback />
             : tab === "gebruikers" ? <AdminUsers meEmail={me.email} />
@@ -143,7 +143,7 @@ export default function Admin() {
             : (<>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <div className="display" style={{ fontSize: 30 }}>Klanten</div>
+              <div className="display" style={{ fontSize: 30 }}>klanten</div>
               <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
                 {me.is_platform_admin
                   ? "Alle organisaties op het platform: koppelingen, status en activiteit"

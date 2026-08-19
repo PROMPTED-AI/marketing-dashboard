@@ -25,7 +25,7 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Instellingen</div>
+      <div className="display" style={{ fontSize: 30 }}>instellingen</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 22px" }}>Beheer je profiel, voorkeuren en organisatie</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}>

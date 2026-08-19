@@ -64,7 +64,7 @@ export default function AdminConnections() {
 
   return (
     <div>
-      <div className="display" style={{ fontSize: 30 }}>Koppelingen</div>
+      <div className="display" style={{ fontSize: 30 }}>koppelingen</div>
       <div style={{ fontSize: 13.5, color: "var(--c-muted)", margin: "4px 0 20px" }}>
         Alle kanaalkoppelingen van alle klanten. {needAction > 0 ? `${needAction} koppeling${needAction === 1 ? " vraagt" : "en vragen"} om actie.` : "Alles werkt."}
       </div>
